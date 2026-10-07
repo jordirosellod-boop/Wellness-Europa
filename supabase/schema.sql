@@ -96,6 +96,31 @@ alter table public.sessions add column if not exists cancelled boolean not null 
 -- Una programació no pot generar dues sessions el mateix dia.
 create unique index if not exists sessions_rule_date_uq on public.sessions (rule_id, session_date) where rule_id is not null;
 
+-- MULTES: normes de l'equip amb el seu import, i les multes posades a cada persona
+-- (jugadores o staff). Els imports es guarden en cèntims per evitar errors d'arrodoniment.
+create table if not exists public.fine_rules (
+  id           uuid primary key default gen_random_uuid(),
+  name         text not null check (char_length(trim(name)) between 1 and 80),
+  amount_cents integer not null check (amount_cents between 1 and 100000),
+  active       boolean not null default true,
+  created_at   timestamptz not null default now()
+);
+
+create table if not exists public.fines (
+  id           uuid primary key default gen_random_uuid(),
+  person_id    uuid not null references public.profiles(id) on delete cascade,
+  rule_id      uuid references public.fine_rules(id) on delete set null,
+  reason       text not null check (char_length(trim(reason)) between 1 and 120),  -- es conserva encara que s'esborri la norma
+  amount_cents integer not null check (amount_cents between 1 and 100000),
+  fine_date    date not null default ((now() at time zone 'Europe/Madrid')::date),
+  notes        text check (notes is null or char_length(notes) <= 300),
+  paid         boolean not null default false,
+  paid_at      timestamptz,
+  created_by   uuid default auth.uid() references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+create index if not exists fines_person_idx on public.fines (person_id);
+
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);
 alter table public.rpe add column if not exists load integer generated always as (rpe * duration_min) stored;
@@ -125,6 +150,25 @@ create trigger wellness_stamp before insert or update on public.wellness
 drop trigger if exists rpe_stamp on public.rpe;
 create trigger rpe_stamp before insert or update on public.rpe
   for each row execute function public.stamp_submission();
+
+-- Multes: l'hora de pagament la posa el servidor quan es marca com a pagada.
+create or replace function public.stamp_fine()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    new.created_at := now();
+    new.paid_at := case when new.paid then now() end;
+  elsif new.paid is distinct from old.paid then
+    new.paid_at := case when new.paid then now() end;
+  else
+    new.paid_at := old.paid_at;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists fines_stamp on public.fines;
+create trigger fines_stamp before insert or update on public.fines
+  for each row execute function public.stamp_fine();
 
 -- ---------------------------------------------------------------------
 -- 3. FUNCIONS D'AJUDA PER A LA SEGURETAT
@@ -174,6 +218,19 @@ begin
   return n;
 end $$;
 
+-- Pot de multes de l'equip: només totals, sense dir de qui són.
+-- Així una jugadora pot veure el total sense veure les multes de les altres.
+create or replace function public.fines_summary()
+returns table (total_cents bigint, paid_cents bigint, pending_cents bigint, fines_count bigint)
+language sql stable security definer set search_path = '' as $$
+  select coalesce(sum(amount_cents), 0),
+         coalesce(sum(amount_cents) filter (where paid), 0),
+         coalesce(sum(amount_cents) filter (where not paid), 0),
+         count(*)
+  from public.fines
+  where (select public.is_coach()) or (select public.is_player());
+$$;
+
 -- Quan es canvia, pausa o esborra una programació: treu les sessions futures que
 -- encara no tenen cap resposta (les que en tenen es queden) i torna a generar.
 create or replace function public.refresh_rule(rid uuid, remove_rule boolean default false)
@@ -216,18 +273,21 @@ alter table public.sessions     enable row level security;
 alter table public.wellness     enable row level security;
 alter table public.rpe          enable row level security;
 alter table public.session_rules enable row level security;
+alter table public.fine_rules   enable row level security;
+alter table public.fines        enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
 -- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
-revoke all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules from anon, authenticated;
+revoke all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
 grant select, insert, update, delete on public.session_rules                 to authenticated;
-grant all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules to service_role;
+grant select, insert, update, delete on public.fine_rules, public.fines      to authenticated;
+grant all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines to service_role;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid) to authenticated;
-revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean) from public, anon;
-grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean) to authenticated;
+revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
+grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
 
 -- PROFILES: cadascú es veu a si mateix; el staff ho veu tot. Ningú en crea des del navegador.
 drop policy if exists profiles_select on public.profiles;
@@ -257,6 +317,22 @@ create policy sessions_delete on public.sessions for delete to authenticated
 -- PROGRAMACIONS: només el staff.
 drop policy if exists session_rules_all on public.session_rules;
 create policy session_rules_all on public.session_rules for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+
+-- NORMES DE MULTES: tot l'equip les pot llegir; només el staff les gestiona.
+drop policy if exists fine_rules_select on public.fine_rules;
+create policy fine_rules_select on public.fine_rules for select to authenticated
+  using ((select public.is_coach()) or (select public.is_player()));
+drop policy if exists fine_rules_write on public.fine_rules;
+create policy fine_rules_write on public.fine_rules for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+
+-- MULTES: cadascú veu només les seves; el staff les veu i gestiona totes.
+drop policy if exists fines_select on public.fines;
+create policy fines_select on public.fines for select to authenticated
+  using (person_id = (select auth.uid()) or (select public.is_coach()));
+drop policy if exists fines_write on public.fines;
+create policy fines_write on public.fines for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 
 -- WELLNESS: la jugadora només llegeix/escriu les seves files, i només el dia de la sessió.

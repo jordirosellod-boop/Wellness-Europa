@@ -215,3 +215,16 @@ input[type="date"], input[type="time"] { min-width: 0; max-width: 100%; -webkit-
   .nav { flex-wrap: nowrap; gap: 0; }
   .nav a, .nav button { font-size: 14px; padding: 10px 8px; }
 }
+
+/* ---------- Multes ---------- */
+.stats.three { grid-template-columns: repeat(3, 1fr); }
+.stats.three .stat b { font-size: 1.15rem; }
+.fine-person {
+  width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 4px 0; min-height: 44px; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+details.card > summary { min-height: 44px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+select { appearance: auto; }
+@media (max-width: 520px) {
+  .nav a, .nav button { font-size: 13.5px; padding: 10px 6px; }
+}

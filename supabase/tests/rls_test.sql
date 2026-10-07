@@ -150,3 +150,53 @@ select pg_temp.check((select count(*) from public.sessions s join public.rpe r o
 update public.session_rules set active = false where id = '22222222-0000-0000-0000-000000000002';
 select public.refresh_rule('22222222-0000-0000-0000-000000000002');
 select pg_temp.check((select count(*) from public.sessions where rule_id = '22222222-0000-0000-0000-000000000002' and not cancelled) = 0, 'Programació pausada: no queden sessions futures pendents');
+
+-- =============== MULTES ===============
+-- Jugadores disponibles: B (...b2) i Dana (...d4). Staff: ...0a
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.fine_rules (id, name, amount_cents) values
+  ('33333333-0000-0000-0000-000000000001', 'Arribar tard', 200),
+  ('33333333-0000-0000-0000-000000000002', 'Oblidar l''equipació', 500);
+insert into public.fines (id, person_id, rule_id, reason, amount_cents) values
+  ('44444444-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b2', '33333333-0000-0000-0000-000000000001', 'Arribar tard', 200),
+  ('44444444-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000b2', '33333333-0000-0000-0000-000000000002', 'Oblidar l''equipació', 500),
+  ('44444444-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000d4', '33333333-0000-0000-0000-000000000001', 'Arribar tard', 200),
+  ('44444444-0000-0000-0000-000000000004', '00000000-0000-0000-0000-00000000000a', '33333333-0000-0000-0000-000000000002', 'Oblidar l''equipació', 500);
+select pg_temp.check(true, 'El staff posa multes a jugadores i a staff');
+with u as (update public.fines set paid = true where id = '44444444-0000-0000-0000-000000000001' returning paid_at)
+select pg_temp.check(bool_and(paid_at is not null), 'Marcar pagada guarda l''hora de pagament (servidor)') from u;
+with u as (update public.fines set paid = false where id = '44444444-0000-0000-0000-000000000001' returning paid_at)
+select pg_temp.check(bool_and(paid_at is null), 'Desfer el pagament treu l''hora') from u;
+update public.fines set paid = true where id in ('44444444-0000-0000-0000-000000000001', '44444444-0000-0000-0000-000000000004');
+select pg_temp.check(total_cents = 1400 and paid_cents = 700 and pending_cents = 700 and fines_count = 4, 'Pot per al staff: total 14 €, pagat 7 €, pendent 7 €') from public.fines_summary();
+select pg_temp.expect_error($$insert into public.fines (person_id, reason, amount_cents) values ('00000000-0000-0000-0000-0000000000b2', 'x', 0)$$, 'Multa de 0 € rebutjada');
+select pg_temp.expect_error($$insert into public.fine_rules (name, amount_cents) values ('x', -100)$$, 'Norma amb import negatiu rebutjada');
+
+-- Jugadora B: veu les seves, les normes i el pot; res més
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check(count(*) = 2 and bool_and(person_id = '00000000-0000-0000-0000-0000000000b2'), 'B només veu les seves 2 multes') from public.fines;
+select pg_temp.check(count(*) = 0, 'B no veu la multa de Dana ni la del staff, ni demanant-les per ID')
+  from public.fines where id in ('44444444-0000-0000-0000-000000000003', '44444444-0000-0000-0000-000000000004');
+select pg_temp.check(count(*) = 2, 'B veu la llista de normes') from public.fine_rules;
+select pg_temp.check(total_cents = 1400 and paid_cents = 700, 'B veu el pot de tot l''equip (només totals)') from public.fines_summary();
+with u as (update public.fines set paid = true returning 1)
+select pg_temp.check(count(*) = 0, 'B no es pot marcar les multes com a pagades') from u;
+with d as (delete from public.fines returning 1)
+select pg_temp.check(count(*) = 0, 'B no es pot esborrar multes') from d;
+select pg_temp.expect_error($$insert into public.fines (person_id, reason, amount_cents) values ('00000000-0000-0000-0000-0000000000d4', 'x', 100)$$, 'B no pot posar multes a ningú');
+with u as (update public.fine_rules set amount_cents = 1 returning 1)
+select pg_temp.check(count(*) = 0, 'B no pot canviar l''import de les normes') from u;
+
+-- Anònim: res
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.fines$$, 'Anònim no pot llegir multes');
+select pg_temp.expect_error($$select * from public.fines_summary()$$, 'Anònim no pot veure el pot');
+
+-- Esborrar una norma conserva les multes (amb el motiu); esborrar una persona esborra les seves multes
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+delete from public.fine_rules where id = '33333333-0000-0000-0000-000000000001';
+select pg_temp.check(count(*) = 2 and bool_and(rule_id is null and reason = 'Arribar tard'), 'Esborrar una norma conserva les multes i el motiu')
+  from public.fines where id in ('44444444-0000-0000-0000-000000000001', '44444444-0000-0000-0000-000000000003');
+reset role;
+delete from auth.users where id = '00000000-0000-0000-0000-0000000000d4';
+select pg_temp.check(count(*) = 0, 'Esborrar una jugadora esborra també les seves multes') from public.fines where person_id = '00000000-0000-0000-0000-0000000000d4';

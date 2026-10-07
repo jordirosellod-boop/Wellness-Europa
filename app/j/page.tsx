@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
+import { PlayerFines } from "@/components/player-fines";
 import { Brand, Footer } from "@/components/ui";
 import { viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -158,6 +159,7 @@ function PlayerHome({ me }: { me: Profile }) {
       )}
       {session && <SessionForms key={session.id} me={me} session={session} onSaved={() => setVersion((v) => v + 1)} />}
       {sessions !== null && <PlayerCalendar me={me} today={today} version={version} onOpenToday={openToday} />}
+      {sessions !== null && <PlayerFines playerId={me.id} />}
     </>
   );
 }
