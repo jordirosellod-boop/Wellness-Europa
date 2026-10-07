@@ -82,17 +82,24 @@ export function CoachShell({ children }: { children: (me: Profile) => ReactNode 
           <Link href="/entrenador/carrega" className={path === "/entrenador/carrega" ? "active" : ""}>
             Càrrega
           </Link>
+          <Link href="/entrenador/estadistiques" className={path === "/entrenador/estadistiques" ? "active" : ""}>
+            Stats
+          </Link>
           <Link href="/entrenador/multes" className={path === "/entrenador/multes" ? "active" : ""}>
             Multes
           </Link>
           <Link href="/entrenador/equip" className={path === "/entrenador/equip" ? "active" : ""}>
             Equip
           </Link>
-          <button onClick={logout}>Sortir</button>
         </nav>
       </header>
       <main>
         {error ? <p className="msg error">{error}</p> : me ? children(me) : <p className="muted">Carregant…</p>}
+        {me && (
+          <div className="center" style={{ marginTop: 28 }}>
+            <button className="btn small secondary" onClick={logout}>Tancar sessió</button>
+          </div>
+        )}
       </main>
     </>
   );

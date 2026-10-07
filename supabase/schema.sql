@@ -161,6 +161,54 @@ insert into public.app_secrets (name, value)
 values ('cron_secret', replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''))
 on conflict (name) do nothing;
 
+-- ESTADÍSTIQUES DE LA FEDERACIÓ (FCF): equip, partits, jugadores i aparicions.
+-- Les omple el servidor de l'app (dades públiques de fcf.cat); ningú les escriu des del navegador.
+create table if not exists public.fcf_config (
+  id         boolean primary key default true check (id),
+  temporada  text not null default '22',        -- 2026-2027
+  grup_id    text not null default '58162336',  -- Primera Divisió Femení Juvenil, Grup 1
+  team_id    text not null default '44099634',  -- EUROPA, C.E. C
+  team_match text not null default 'EUROPA',    -- com surt el nom de l'equip a les actes
+  last_sync  timestamptz,
+  last_error text
+);
+insert into public.fcf_config (id) values (true) on conflict do nothing;
+
+create table if not exists public.fcf_matches (
+  acta_id    text primary key,
+  jornada    integer not null,
+  kickoff    timestamp,
+  home       text not null,
+  away       text not null,
+  home_goals integer,
+  away_goals integer,
+  is_home    boolean not null,
+  closed     boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.fcf_players (
+  fcf_id     text primary key,
+  full_name  text not null,
+  dorsal     text,
+  profile_id uuid references public.profiles(id) on delete set null,   -- jugadora de l'app (si s'ha relacionat)
+  matches    integer not null default 0,
+  starts     integer not null default 0,
+  goals      integer not null default 0,
+  sanctions  integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists fcf_players_profile_uq on public.fcf_players (profile_id) where profile_id is not null;
+
+create table if not exists public.fcf_appearances (
+  acta_id text not null references public.fcf_matches(acta_id) on delete cascade,
+  fcf_id  text not null references public.fcf_players(fcf_id) on delete cascade,
+  titular boolean not null,
+  dorsal  text,
+  goals   integer not null default 0,
+  primary key (acta_id, fcf_id)
+);
+
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);
 alter table public.rpe add column if not exists load integer generated always as (rpe * duration_min) stored;
@@ -395,6 +443,21 @@ begin
   );
 end $$;
 
+-- ESTADÍSTIQUES FCF: la base de dades demana al servidor de l'app que les actualitzi.
+create or replace function public.trigger_fcf_sync()
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  secret text;
+begin
+  select value into secret from public.app_secrets where name = 'cron_secret';
+  perform net.http_post(
+    url := 'https://wellness-europa.vercel.app/api/cron/fcf',   -- si canvieu d'adreça, canvieu-la aquí
+    body := '{}'::jsonb,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', secret),
+    timeout_milliseconds := 60000
+  );
+end $$;
+
 -- Quan es canvia, pausa o esborra una programació: treu les sessions futures que
 -- encara no tenen cap resposta (les que en tenen es queden) i torna a generar.
 create or replace function public.refresh_rule(rid uuid, remove_rule boolean default false)
@@ -443,11 +506,16 @@ alter table public.push_subscriptions enable row level security;
 alter table public.auto_fine_settings enable row level security;
 alter table public.auto_fine_log      enable row level security;
 alter table public.app_secrets        enable row level security;
+alter table public.fcf_config         enable row level security;
+alter table public.fcf_matches        enable row level security;
+alter table public.fcf_players        enable row level security;
+alter table public.fcf_appearances    enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
 -- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
 revoke all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
-  public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets from anon, authenticated;
+  public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
+  public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -455,11 +523,14 @@ grant select, insert, update, delete on public.session_rules                 to 
 grant select, insert, update, delete on public.fine_rules, public.fines      to authenticated;
 grant select, insert, update, delete on public.push_subscriptions            to authenticated;
 grant select, update                 on public.auto_fine_settings            to authenticated;
+grant select                         on public.fcf_config, public.fcf_matches, public.fcf_appearances to authenticated;
+grant select, update (profile_id)    on public.fcf_players                   to authenticated;
 grant all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
-  public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets to service_role;
+  public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
+  public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances to service_role;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid) to authenticated;
 revoke all on function public.wellness_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
-  public.apply_auto_fines(), public.send_wellness_reminder() from public, anon, authenticated;
+  public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
 
@@ -521,6 +592,24 @@ create policy auto_fine_settings_coach on public.auto_fine_settings for all to a
   using ((select public.is_coach())) with check ((select public.is_coach()));
 -- (auto_fine_log i app_secrets no tenen cap política: des del navegador no s'hi pot accedir.)
 
+-- ESTADÍSTIQUES FCF: dades públiques; les veu tot l'equip. Només el staff pot canviar
+-- a quina jugadora de l'app correspon cada fitxa de la FCF.
+drop policy if exists fcf_config_read on public.fcf_config;
+create policy fcf_config_read on public.fcf_config for select to authenticated
+  using ((select public.is_coach()) or (select public.is_player()));
+drop policy if exists fcf_matches_read on public.fcf_matches;
+create policy fcf_matches_read on public.fcf_matches for select to authenticated
+  using ((select public.is_coach()) or (select public.is_player()));
+drop policy if exists fcf_appearances_read on public.fcf_appearances;
+create policy fcf_appearances_read on public.fcf_appearances for select to authenticated
+  using ((select public.is_coach()) or (select public.is_player()));
+drop policy if exists fcf_players_read on public.fcf_players;
+create policy fcf_players_read on public.fcf_players for select to authenticated
+  using ((select public.is_coach()) or (select public.is_player()));
+drop policy if exists fcf_players_link on public.fcf_players;
+create policy fcf_players_link on public.fcf_players for update to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+
 -- WELLNESS: la jugadora només llegeix/escriu les seves files, i només el dia de la sessió.
 -- El staff ho llegeix tot però no ho modifica. Ningú no pot esborrar des del navegador.
 drop policy if exists wellness_select on public.wellness;
@@ -550,11 +639,13 @@ create policy rpe_update on public.rpe for update to authenticated
 -- 6. TASQUES PROGRAMADES (dins la mateixa base de dades)
 --    · cada 15 minuts: multes automàtiques
 --    · 5:30 i 6:30 UTC: recordatori de les 7:30 (només actua a les 7 de Barcelona)
+--    · cada 6 hores: estadístiques de la Federació
 -- =====================================================================
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 select cron.schedule('multes-automatiques', '*/15 * * * *', 'select public.apply_auto_fines()');
 select cron.schedule('recordatori-wellness', '30 5,6 * * *', 'select public.send_wellness_reminder()');
+select cron.schedule('estadistiques-fcf', '20 */6 * * *', 'select public.trigger_fcf_sync()');
 
 -- =====================================================================
 -- 5. EL TEU COMPTE D'ENTRENADOR (només la primera vegada)

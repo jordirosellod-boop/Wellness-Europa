@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
+import { FcfStats } from "@/components/fcf-stats";
 import { PlayerFines } from "@/components/player-fines";
 import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
 import { fmtEuros } from "@/lib/fines";
@@ -122,8 +123,8 @@ function PasteLink() {
   );
 }
 
-type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos";
-const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos"];
+type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats";
+const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats"];
 
 function sectionFromUrl(): Section {
   const s = new URLSearchParams(window.location.search).get("s") as Section | null;
@@ -223,6 +224,7 @@ function PlayerHome({ me }: { me: Profile }) {
 
       {sessions !== null && section === "multes" && <PlayerFines playerId={me.id} />}
       {sessions !== null && section === "normes" && <PlayerFines playerId={me.id} rulesOpen />}
+      {sessions !== null && section === "stats" && <FcfStats mode="player" meId={me.id} />}
 
       {sessions !== null && section === "avisos" && (
         <>
@@ -363,6 +365,11 @@ function Dashboard({
           {svg("M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0")}
           <b>Avisos 7:30</b>
           <span>{data ? (data.reminders === "on" ? "Activats" : "Activa'ls aquí") : "…"}</span>
+        </button>
+        <button type="button" className="tile" onClick={() => go("stats")}>
+          {svg("M4 20V10M10 20V4M16 20v-7M22 20H2")}
+          <b>Estadístiques</b>
+          <span>Partits, gols i targetes</span>
         </button>
         <button type="button" className="tile" onClick={() => go("normes")}>
           {svg("M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM8 7h8M8 11h6")}

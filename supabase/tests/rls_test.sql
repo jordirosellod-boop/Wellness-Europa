@@ -263,3 +263,22 @@ reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0
 select pg_temp.check((select count(*) from public.push_subscriptions) = 0, 'Elna no veu els mòbils de B');
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.push_subscriptions$$, 'Anònim no pot llegir subscripcions');
+
+-- =============== ESTADÍSTIQUES FCF ===============
+reset role;
+insert into public.fcf_matches (acta_id, jornada, home, away, home_goals, away_goals, is_home, closed) values ('4132183', 1, 'OAR VIC A', 'EUROPA, C.E. C', 0, 10, false, true);
+insert into public.fcf_players (fcf_id, full_name, goals) values ('54291437', 'PEREZ ORDOÑEZ, VERA', 4), ('44132866', 'AVILA GOMEZ, LAURA', 3);
+insert into public.fcf_appearances (acta_id, fcf_id, titular, goals) values ('4132183', '54291437', true, 3);
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.fcf_players) = 2 and (select count(*) from public.fcf_matches) = 1, 'Una jugadora veu les estadístiques de l''equip');
+select pg_temp.expect_error($$update public.fcf_players set goals = 99$$, 'Una jugadora no pot canviar estadístiques');
+with u as (update public.fcf_players set profile_id = '00000000-0000-0000-0000-0000000000b2' returning 1)
+select pg_temp.check(count(*) = 0, 'Una jugadora no es pot assignar una fitxa de la FCF (0 files canviades)') from u;
+select pg_temp.expect_error($$select public.trigger_fcf_sync()$$, 'Una jugadora no pot llançar l''actualització');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+with u as (update public.fcf_players set profile_id = '00000000-0000-0000-0000-0000000000b2' where fcf_id = '54291437' returning 1)
+select pg_temp.check(count(*) = 1, 'El staff relaciona una fitxa FCF amb una jugadora de l''app') from u;
+select pg_temp.expect_error($$update public.fcf_players set goals = 99$$, 'Ni el staff pot modificar a mà els números de la FCF');
+select pg_temp.expect_error($$update public.fcf_players set profile_id = '00000000-0000-0000-0000-0000000000b2' where fcf_id = '44132866'$$, 'Una jugadora de l''app només pot tenir una fitxa FCF');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.fcf_players$$, 'Anònim no pot llegir les estadístiques');
