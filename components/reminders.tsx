@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/wellness";
 
-type Status = "loading" | "unsupported" | "ios-home" | "denied" | "off" | "on";
+export type Status = "loading" | "unsupported" | "ios-home" | "denied" | "off" | "on";
 
 function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
   const pad = "=".repeat((4 - (b64.length % 4)) % 4);
@@ -22,7 +22,7 @@ function isStandalone() {
   return window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
-async function detect(): Promise<Status> {
+export async function detect(): Promise<Status> {
   const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   if (!supported) return isIos() && !isStandalone() ? "ios-home" : "unsupported";
   if (Notification.permission === "denied") return "denied";

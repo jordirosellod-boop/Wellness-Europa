@@ -356,3 +356,32 @@ footer.foot a { color: var(--or); }
 @media (max-width: 520px) {
   .topbar:not(:has(.nav)) .brand > span:last-child { display: inline; }
 }
+
+/* ---------- Pantalla de la jugadora: dashboard i menú inferior ---------- */
+.bottom-nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--blau); border-top: 1px solid rgba(255, 255, 255, 0.35);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.bottom-nav button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 60px; padding: 6px 2px; background: none; border: 0; color: rgba(255, 255, 255, 0.85); cursor: pointer;
+  font-family: var(--display); text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.9rem;
+  touch-action: manipulation;
+}
+.bottom-nav button[aria-current="page"] { color: var(--or); box-shadow: inset 0 3px 0 var(--or); }
+body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.player-app { padding-bottom: 8px; }
+
+.today-card .today-item + .today-item { border-top: 1px solid var(--vora); margin-top: 14px; padding-top: 14px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  min-height: 112px; padding: 14px; border: 0; border-radius: var(--radi); cursor: pointer;
+  background: var(--blau); color: rgba(255, 255, 255, 0.85); font-family: var(--cos); font-size: 0.9rem;
+}
+.tile svg { color: var(--or); width: 28px; height: 28px; }
+.tile b { font-family: var(--display); font-weight: 400; text-transform: uppercase; letter-spacing: 0.5px; font-size: 1.35rem; color: #fff; line-height: 1.1; }
+.tile.tile-alert { background: var(--navy); box-shadow: inset 0 0 0 2px var(--or); }
+.tile:active { transform: translateY(1px); }

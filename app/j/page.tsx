@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
 import { PlayerFines } from "@/components/player-fines";
-import { Reminders } from "@/components/reminders";
+import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
+import { fmtEuros } from "@/lib/fines";
 import { Brand, Footer } from "@/components/ui";
-import { viewRange, type CalView } from "@/lib/dates";
+import { fmtShort, viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import {
   bandOf,
@@ -121,13 +122,33 @@ function PasteLink() {
   );
 }
 
+type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos";
+const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos"];
+
+function sectionFromUrl(): Section {
+  const s = new URLSearchParams(window.location.search).get("s") as Section | null;
+  return s && SECTIONS.includes(s) ? s : "inici";
+}
+
+/**
+ * Pantalla de la jugadora, separada en apartats amb un menú a baix.
+ * L'apartat va a l'adreça (?s=...) perquè funcioni el botó "enrere", i es conserva
+ * el "#" de l'enllaç personal.
+ */
 function PlayerHome({ me }: { me: Profile }) {
   const today = todayMadrid();
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
-  const top = useRef<HTMLDivElement>(null);
+  const [section, setSection] = useState<Section>("inici");
+
+  useEffect(() => {
+    const sync = () => setSection(sectionFromUrl());
+    sync();
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -147,39 +168,208 @@ function PlayerHome({ me }: { me: Profile }) {
     })();
   }, [today]);
 
-  const session = sessions?.find((s) => s.id === selected) ?? null;
-
-  function openToday(id: string) {
-    setSelected(id);
-    top.current?.scrollIntoView({ behavior: "smooth" });
+  function go(next: Section) {
+    if (next !== section) {
+      const url = `${window.location.pathname}${next === "inici" ? "" : `?s=${next}`}${window.location.hash}`;
+      window.history.pushState(null, "", url);
+      setSection(next);
+    }
+    window.scrollTo({ top: 0 });
   }
+
+  function openSession(id: string) {
+    setSelected(id);
+    go("avui");
+  }
+
+  const session = sessions?.find((s) => s.id === selected) ?? null;
+  const saved = () => setVersion((v) => v + 1);
+
+  return (
+    <div className="player-app">
+      {error && <p className="msg error">{error}</p>}
+      {sessions === null && !error && <p className="muted">Carregant…</p>}
+
+      {sessions !== null && section === "inici" && (
+        <Dashboard me={me} today={today} sessions={sessions} version={version} go={go} onOpenSession={openSession} />
+      )}
+
+      {sessions !== null && section === "avui" && (
+        <>
+          <h1>Avui</h1>
+          <p className="muted" style={{ marginTop: -6 }}>{fmtDate(today)}</p>
+          {sessions.length === 0 && (
+            <div className="card">
+              <p style={{ margin: 0 }}>Avui no hi ha cap sessió programada.</p>
+            </div>
+          )}
+          {sessions.length > 1 && (
+            <div className="tabs" style={{ marginBottom: 12 }}>
+              {sessions.map((s) => (
+                <button key={s.id} aria-pressed={s.id === selected} onClick={() => setSelected(s.id)}>
+                  {fmtSessionTime(s.start_time) && `${fmtSessionTime(s.start_time)} · `}
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {session && <SessionForms key={session.id} me={me} session={session} onSaved={saved} />}
+        </>
+      )}
+
+      {sessions !== null && section === "calendari" && (
+        <PlayerCalendar me={me} today={today} version={version} onOpenToday={openSession} />
+      )}
+
+      {sessions !== null && section === "multes" && <PlayerFines playerId={me.id} />}
+      {sessions !== null && section === "normes" && <PlayerFines playerId={me.id} rulesOpen />}
+
+      {sessions !== null && section === "avisos" && (
+        <>
+          <h1>Avisos</h1>
+          <Reminders />
+        </>
+      )}
+
+      <nav className="bottom-nav" aria-label="Menú">
+        {([
+          ["inici", "Inici", ICONS.inici],
+          ["avui", "Avui", ICONS.avui],
+          ["calendari", "Calendari", ICONS.calendari],
+          ["multes", "Multes", ICONS.multes],
+        ] as [Section, string, ReactNode][]).map(([key, label, icon]) => (
+          <button key={key} type="button" aria-current={section === key || (key === "multes" && section === "normes") ? "page" : undefined} onClick={() => go(key)}>
+            {icon}
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+const svg = (d: string) => (
+  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+const ICONS: Record<"inici" | "avui" | "calendari" | "multes", ReactNode> = {
+  inici: svg("M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"),
+  avui: svg("M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"),
+  calendari: svg("M7 3v4M17 3v4M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"),
+  multes: svg("M18.5 6.5A7 7 0 1 0 18.5 17.5M4 10.5h10M4 13.5h10"),
+};
+
+type DashData = {
+  mine: Map<string, { w: boolean; r: boolean }>;
+  pending: number;
+  next: Session | null;
+  reminders: ReminderStatus;
+};
+
+async function loadDashboard(playerId: string, today: string, sessions: Session[]): Promise<DashData> {
+  const sb = supabase();
+  const ids = sessions.map((s) => s.id);
+  const [w, r, fines, next, reminders] = await Promise.all([
+    ids.length ? sb.from("wellness").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
+    ids.length ? sb.from("rpe").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
+    fetchAll<{ amount_cents: number; paid: boolean }>((f, t) =>
+      sb.from("fines").select("amount_cents, paid").eq("person_id", playerId).order("id").range(f, t),
+    ),
+    sb.from("sessions").select(SESSION_COLS).gt("session_date", today)
+      .order("session_date").order("start_time", { nullsFirst: true }).order("id").range(0, 0),
+    detectReminders().catch((): ReminderStatus => "unsupported"),
+  ]);
+  for (const res of [w, r, next]) if (res.error) throw new Error(res.error.message);
+  const mine = new Map<string, { w: boolean; r: boolean }>();
+  for (const id of ids) mine.set(id, { w: false, r: false });
+  for (const x of (w.data ?? []) as { session_id: string }[]) mine.get(x.session_id)!.w = true;
+  for (const x of (r.data ?? []) as { session_id: string }[]) mine.get(x.session_id)!.r = true;
+  return {
+    mine,
+    pending: fines.filter((f) => !f.paid).reduce((a, f) => a + f.amount_cents, 0),
+    next: ((next.data ?? []) as Session[])[0] ?? null,
+    reminders,
+  };
+}
+
+/** Inici: resum d'avui i accessos a cada apartat. */
+function Dashboard({
+  me, today, sessions, version, go, onOpenSession,
+}: {
+  me: Profile;
+  today: string;
+  sessions: Session[];
+  version: number;
+  go: (s: Section) => void;
+  onOpenSession: (id: string) => void;
+}) {
+  const [data, setData] = useState<DashData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadDashboard(me.id, today, sessions).then(setData, (e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [me.id, today, sessions, version]);
 
   return (
     <>
-      <div ref={top} />
       <h1>Hola, {me.display_name}!</h1>
       <p className="muted" style={{ marginTop: -6 }}>{fmtDate(today)}</p>
       {error && <p className="msg error">{error}</p>}
-      {sessions === null && !error && <p className="muted">Carregant…</p>}
-      {sessions?.length === 0 && (
-        <div className="card">
-          <p style={{ margin: 0 }}>Avui no hi ha cap sessió programada.</p>
-        </div>
-      )}
-      {sessions && sessions.length > 1 && (
-        <div className="tabs" style={{ marginBottom: 12 }}>
-          {sessions.map((s) => (
-            <button key={s.id} aria-pressed={s.id === selected} onClick={() => setSelected(s.id)}>
-              {fmtSessionTime(s.start_time) && `${fmtSessionTime(s.start_time)} · `}
-              {s.name}
-            </button>
-          ))}
-        </div>
-      )}
-      {session && <SessionForms key={session.id} me={me} session={session} onSaved={() => setVersion((v) => v + 1)} />}
-      {sessions !== null && <PlayerCalendar me={me} today={today} version={version} onOpenToday={openToday} />}
-      {sessions !== null && <Reminders />}
-      {sessions !== null && <PlayerFines playerId={me.id} />}
+
+      <section className="card today-card">
+        <h2>Avui</h2>
+        {sessions.length === 0 && <p style={{ margin: 0 }}>Avui no hi ha cap sessió. Bon descans!</p>}
+        {sessions.map((s) => {
+          const m = data?.mine.get(s.id);
+          const wClosed = wellnessClosed(s);
+          const done = m?.w && m?.r;
+          return (
+            <div key={s.id} className="today-item">
+              <div className="row between">
+                <b>{s.name}</b>
+                <span className="chip">{s.kind}{s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""}</span>
+              </div>
+              <div className="row" style={{ marginTop: 8 }}>
+                {m?.w ? (
+                  <span className="chip fet">Wellness fet</span>
+                ) : wClosed ? (
+                  <span className="chip band-baix">Wellness tancat</span>
+                ) : (
+                  <span className="chip pendent">Wellness pendent{s.kind === "Entrenament" ? ` · fins ${WELLNESS_DEADLINE}` : ""}</span>
+                )}
+                {m?.r ? <span className="chip fet">RPE fet</span> : <span className="chip pendent">RPE pendent · fins 00:00</span>}
+              </div>
+              <button className={`btn block${done ? " secondary" : ""}`} style={{ marginTop: 10 }} onClick={() => onOpenSession(s.id)}>
+                {done ? "Veure o editar" : "Omplir ara"}
+              </button>
+            </div>
+          );
+        })}
+      </section>
+
+      <div className="tiles">
+        <button type="button" className="tile" onClick={() => go("calendari")}>
+          {ICONS.calendari}
+          <b>Calendari</b>
+          <span>{data?.next ? `Propera: ${fmtShort(data.next.session_date)}` : "Les meves sessions"}</span>
+        </button>
+        <button type="button" className="tile" onClick={() => go("multes")}>
+          {ICONS.multes}
+          <b>Multes</b>
+          <span>{data ? (data.pending ? `Deus ${fmtEuros(data.pending)}` : "Estàs al dia") : "…"}</span>
+        </button>
+        <button type="button" className={`tile${data && data.reminders !== "on" ? " tile-alert" : ""}`} onClick={() => go("avisos")}>
+          {svg("M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0")}
+          <b>Avisos 7:30</b>
+          <span>{data ? (data.reminders === "on" ? "Activats" : "Activa'ls aquí") : "…"}</span>
+        </button>
+        <button type="button" className="tile" onClick={() => go("normes")}>
+          {svg("M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM8 7h8M8 11h6")}
+          <b>Normes</b>
+          <span>De l&apos;equip</span>
+        </button>
+      </div>
     </>
   );
 }

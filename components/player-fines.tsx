@@ -21,7 +21,7 @@ async function fetchMine(playerId: string): Promise<Data> {
 }
 
 /** Multes de la jugadora: les seves, el pot de l'equip (només totals) i les normes. */
-export function PlayerFines({ playerId }: { playerId: string }) {
+export function PlayerFines({ playerId, rulesOpen = false }: { playerId: string; rulesOpen?: boolean }) {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,7 +80,7 @@ export function PlayerFines({ playerId }: { playerId: string }) {
         </section>
       )}
       {data.rules.length > 0 && (
-        <details className="card">
+        <details className="card" open={rulesOpen}>
           <summary><b>Normes de l&apos;equip</b> ({data.rules.length})</summary>
           <ul className="list" style={{ marginTop: 10 }}>
             {data.rules.map((r) => (
