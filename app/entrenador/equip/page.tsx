@@ -14,8 +14,13 @@ export default function TeamPage() {
   );
 }
 
+// Sempre l'adreça pública de l'app (Vercel la proporciona sola). Les adreces internes
+// de cada publicació demanen iniciar sessió a Vercel i no serveixen per a les jugadores.
+const PUBLIC_HOST = process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL;
+
 function linkFor(key: string) {
-  return `${window.location.origin}/j#${key}`;
+  const origin = PUBLIC_HOST ? `https://${PUBLIC_HOST}` : window.location.origin;
+  return `${origin}/j#${key}`;
 }
 
 async function fetchTeam() {
