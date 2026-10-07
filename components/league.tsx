@@ -3,7 +3,27 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 
-export type LeagueRow = { profile_id: string; display_name: string; points: number; prev_rank: number | null };
+export type LeagueRow = {
+  profile_id: string;
+  display_name: string;
+  points: number;
+  trainings: number;
+  prev_rank: number | null;
+  min_trainings: number;
+};
+
+/** Promig = punts ÷ entrenaments (null si encara no hi ha entrenaments). */
+export function average(r: Pick<LeagueRow, "points" | "trainings">): number | null {
+  return r.trainings > 0 ? Math.round((r.points / r.trainings) * 10000) / 10000 : null;
+}
+
+export function qualified(r: LeagueRow): boolean {
+  return r.trainings >= r.min_trainings;
+}
+
+export function fmtAvg(n: number | null): string {
+  return n == null ? "–" : n.toFixed(2).replace(".", ",");
+}
 
 export async function fetchLeague(): Promise<LeagueRow[]> {
   const { data, error } = await supabase().rpc("league_table");
@@ -11,7 +31,7 @@ export async function fetchLeague(): Promise<LeagueRow[]> {
   return (data ?? []) as LeagueRow[];
 }
 
-export type LeagueWinner = { month: string; display_name: string; points: number };
+export type LeagueWinner = { month: string; display_name: string; points: number; trainings: number; average: number };
 
 export async function fetchWinners(): Promise<LeagueWinner[]> {
   const { data, error } = await supabase().rpc("league_winners");
@@ -49,7 +69,7 @@ export function Winners({ winners }: { winners: LeagueWinner[] }) {
           <span>
             <span className="winner-cup" aria-hidden="true">🏆</span> <b>{monthName(m, true)}</b>
           </span>
-          <span>{ws.map((w) => w.display_name).join(" i ")} · <b>{ws[0].points} pts</b></span>
+          <span>{ws.map((w) => w.display_name).join(" i ")} · promig <b>{fmtAvg(Number(ws[0].average))}</b></span>
         </li>
       ))}
     </ul>
@@ -62,15 +82,28 @@ export async function fetchTeamLevel(): Promise<number | null> {
   return (data?.commitment_level as number | null) ?? null;
 }
 
-/** Ordre de la classificació: més punts primer; empats per nom. */
+/**
+ * Ordre de la classificació (el mateix que la base de dades): primer les classificades
+ * (mínim d'entrenaments) pel promig; en empat, més punts. Després la resta.
+ */
 export function sortLeague(rows: LeagueRow[]): LeagueRow[] {
-  return [...rows].sort((a, b) => b.points - a.points || a.display_name.localeCompare(b.display_name, "ca"));
+  return [...rows].sort(
+    (a, b) =>
+      Number(qualified(b)) - Number(qualified(a)) ||
+      (average(b) ?? -1) - (average(a) ?? -1) ||
+      b.points - a.points ||
+      a.display_name.localeCompare(b.display_name, "ca"),
+  );
 }
 
-/** Posició amb empats (1, 2, 2, 4...). */
+/** Posició de les classificades, amb empats (1, 2, 2, 4...). Les no classificades no en tenen. */
 export function ranks(sorted: LeagueRow[]): Map<string, number> {
   const out = new Map<string, number>();
-  sorted.forEach((r, i) => out.set(r.profile_id, i > 0 && sorted[i - 1].points === r.points ? out.get(sorted[i - 1].profile_id)! : i + 1));
+  const q = sorted.filter(qualified);
+  q.forEach((r, i) => {
+    const p = q[i - 1];
+    out.set(r.profile_id, p && average(p) === average(r) && p.points === r.points ? out.get(p.profile_id)! : i + 1);
+  });
   return out;
 }
 
@@ -116,12 +149,13 @@ export function LeagueTable({
   const order = showPrev
     ? [...rows].sort((a, b) => (a.prev_rank ?? 999) - (b.prev_rank ?? 999) || a.display_name.localeCompare(b.display_name, "ca"))
     : current;
+  const firstUnq = showPrev ? -1 : order.findIndex((r) => !qualified(r));
   const rank = ranks(current);
 
   // Animació FLIP: es mesura on era cada fila i es fa lliscar fins a la seva posició nova.
   const els = useRef(new Map<string, HTMLElement>());
   const last = useRef(new Map<string, number>());
-  const key = order.map((r) => `${r.profile_id}:${r.points}`).join("|");
+  const key = order.map((r) => `${r.profile_id}:${r.points}:${r.trainings}`).join("|");
   useLayoutEffect(() => {
     const next = new Map<string, number>();
     els.current.forEach((el, id) => {
@@ -142,10 +176,12 @@ export function LeagueTable({
 
   return (
     <ol className="league">
-      {order.map((r) => {
-        const pos = rank.get(r.profile_id)!;
+      {order.map((r, i) => {
+        const pos = rank.get(r.profile_id) ?? null;
         const shownPos = showPrev ? r.prev_rank : pos;
-        const move = !showPrev && r.prev_rank != null ? r.prev_rank - pos : null;
+        const move = !showPrev && r.prev_rank != null && pos != null ? r.prev_rank - pos : null;
+        const avg = average(r);
+        const missing = r.min_trainings - r.trainings;
         return (
           <li
             key={r.profile_id}
@@ -153,20 +189,25 @@ export function LeagueTable({
               if (el) els.current.set(r.profile_id, el);
               else els.current.delete(r.profile_id);
             }}
-            className={`league-row${r.profile_id === meId ? " mine" : ""}${shownPos != null && shownPos <= 3 ? ` top${shownPos}` : ""}`}
+            className={`league-row${r.profile_id === meId ? " mine" : ""}${shownPos != null && shownPos <= 3 ? ` top${shownPos}` : ""}${!showPrev && !qualified(r) ? " unq" : ""}${i === firstUnq ? " first-unq" : ""}`}
+            data-label={i === firstUnq ? `Encara no classificades · mínim ${r.min_trainings} entrenaments` : undefined}
           >
             <span className="league-pos">{shownPos ?? "–"}</span>
             <span className="league-name">
               {r.display_name}
               {r.profile_id === meId && <span className="chip fet" style={{ marginLeft: 6 }}>Tu</span>}
+              <span className="league-sub">
+                {r.points} pts · {r.trainings} entr.
+                {!qualified(r) && <span className="league-missing"> · falten {missing}</span>}
+              </span>
             </span>
             {move != null && (
               <span className={`league-move ${move > 0 ? "up" : move < 0 ? "down" : "same"}`} title="Posicions guanyades o perdudes des d'ahir">
                 {move > 0 ? `▲${move}` : move < 0 ? `▼${-move}` : "="}
               </span>
             )}
-            <span className="league-pts">
-              <b>{r.points}</b> <span>pts</span>
+            <span className="league-pts" title="Promig: punts ÷ entrenaments">
+              <b>{fmtAvg(avg)}</b> <span>promig</span>
             </span>
             {actions && <span className="league-actions">{actions(r)}</span>}
           </li>

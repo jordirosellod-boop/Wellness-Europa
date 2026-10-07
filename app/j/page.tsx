@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
 import { FcfStats } from "@/components/fcf-stats";
-import { daysLeftInMonth, fetchLeague, fetchTeamLevel, fetchWinners, LeagueTable, leagueTitle, LevelBadge, ranks, sortLeague, Winners, type LeagueRow, type LeagueWinner } from "@/components/league";
+import { average, daysLeftInMonth, fetchLeague, fmtAvg, qualified, fetchTeamLevel, fetchWinners, LeagueTable, leagueTitle, LevelBadge, ranks, sortLeague, Winners, type LeagueRow, type LeagueWinner } from "@/components/league";
 import { PlayerFines } from "@/components/player-fines";
 import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
 import { fmtEuros } from "@/lib/fines";
@@ -268,7 +268,7 @@ const ICONS: Record<"inici" | "avui" | "calendari" | "multes" | "lliga", ReactNo
 
 type DashData = {
   level: number | null;
-  leaguePos: { pos: number; points: number; total: number } | null;
+  leaguePos: { pos: number | null; avg: number | null; missing: number; total: number } | null;
   mine: Map<string, { w: boolean; r: boolean }>;
   pending: number;
   next: Session | null;
@@ -299,7 +299,9 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
   const myRow = sorted.find((x) => x.profile_id === playerId);
   return {
     level,
-    leaguePos: myRow ? { pos: ranks(sorted).get(playerId)!, points: myRow.points, total: sorted.length } : null,
+    leaguePos: myRow
+      ? { pos: ranks(sorted).get(playerId) ?? null, avg: average(myRow), missing: Math.max(0, myRow.min_trainings - myRow.trainings), total: sorted.filter(qualified).length }
+      : null,
     mine,
     pending: fines.filter((f) => !f.paid).reduce((a, f) => a + f.amount_cents, 0),
     next: ((next.data ?? []) as Session[])[0] ?? null,
@@ -322,7 +324,8 @@ function PlayerLeague({ meId }: { meId: string }) {
     <>
       <h1>{leagueTitle(today)}</h1>
       <p className="muted" style={{ marginTop: -6 }}>
-        {left === 1 ? "Avui és l'últim dia del mes!" : `Queden ${left} dies per acabar el mes.`} Les fletxes indiquen qui ha pujat o baixat des d&apos;ahir.
+        Promig = punts ÷ entrenaments. Cal un mínim de {rows?.[0]?.min_trainings ?? 6} entrenaments per classificar-se; guanya el millor promig.{" "}
+        {left === 1 ? "Avui és l'últim dia del mes!" : `Queden ${left} dies.`} Les fletxes indiquen qui ha pujat o baixat des d&apos;ahir.
       </p>
       {error && <p className="msg error">{error}</p>}
       {!rows && !error && <p className="muted">Carregant…</p>}
@@ -416,7 +419,13 @@ function Dashboard({
         <button type="button" className="tile" onClick={() => go("lliga")}>
           {ICONS.lliga}
           <b>Lliga interna</b>
-          <span>{data?.leaguePos && data.leaguePos.points > 0 ? `${data.leaguePos.pos}a de ${data.leaguePos.total} · ${data.leaguePos.points} pts` : leagueTitle(today)}</span>
+          <span>
+            {!data?.leaguePos
+              ? leagueTitle(today)
+              : data.leaguePos.pos != null
+                ? `${data.leaguePos.pos}a · promig ${fmtAvg(data.leaguePos.avg)}`
+                : `Et falten ${data.leaguePos.missing} entrenaments`}
+          </span>
         </button>
         <button type="button" className="tile" onClick={() => go("stats")}>
           {svg("M4 20V10M10 20V4M16 20v-7M22 20H2")}

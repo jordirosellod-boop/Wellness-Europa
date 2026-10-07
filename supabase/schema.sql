@@ -216,6 +216,9 @@ create table if not exists public.team_settings (
   updated_at       timestamptz not null default now()
 );
 insert into public.team_settings (id) values (true) on conflict do nothing;
+-- Lliga interna: entrenaments mínims al mes perquè compti el promig.
+alter table public.team_settings add column if not exists league_min_trainings smallint not null default 6
+  check (league_min_trainings between 1 and 31);
 
 -- LLIGA INTERNA: cada mes és una lliga nova (els punts compten només aquell mes).
 -- "prev_rank" és la posició al final del dia anterior, per mostrar qui puja i qui baixa.
@@ -227,6 +230,8 @@ create table if not exists public.league_points (
   updated_at timestamptz not null default now(),
   primary key (profile_id, month)
 );
+-- Entrenaments assistits aquell mes (els porta el staff). Promig = punts ÷ entrenaments.
+alter table public.league_points add column if not exists trainings integer not null default 0 check (trainings between 0 and 100);
 
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);
@@ -478,38 +483,59 @@ begin
 end $$;
 
 -- LLIGA INTERNA ---------------------------------------------------------
+-- Cada mes és una lliga nova. Promig = punts ÷ entrenaments assistits. Per classificar-se
+-- calen com a mínim N entrenaments al mes (team_settings.league_min_trainings, per defecte 6).
+-- Ordre: primer les classificades pel promig (empat: més punts); després la resta.
 create or replace function public.league_month()
 returns date language sql stable set search_path = '' as $$
   select date_trunc('month', now() at time zone 'Europe/Madrid')::date;
 $$;
 
--- Classificació d'un mes (per defecte, l'actual) per a tot l'equip: nom i punts; res més.
-create or replace function public.league_table(m date default null)
-returns table (profile_id uuid, display_name text, points integer, prev_rank integer)
-language sql stable security definer set search_path = '' as $$
-  select p.id, p.display_name, coalesce(l.points, 0), l.prev_rank
-  from public.profiles p
-  left join public.league_points l on l.profile_id = p.id and l.month = coalesce(m, public.league_month())
-  where p.role = 'player' and ((select public.is_coach()) or (select public.is_player()))
-  order by coalesce(l.points, 0) desc, p.display_name, p.id;
+create or replace function public.league_min()
+returns integer language sql stable security definer set search_path = '' as $$
+  select coalesce((select league_min_trainings from public.team_settings where id), 6);
 $$;
 
--- Guanyadores dels mesos anteriors (en cas d'empat, totes les empatades).
-create or replace function public.league_winners()
-returns table (month date, display_name text, points integer)
+-- Classificació d'un mes (per defecte, l'actual) per a tot l'equip: nom, punts, entrenaments
+-- i promig; res més. "rank" només per a les classificades (empats = mateixa posició).
+drop function if exists public.league_table(date);
+create or replace function public.league_table(m date default null)
+returns table (profile_id uuid, display_name text, points integer, trainings integer, average numeric,
+               qualified boolean, rank integer, prev_rank integer, min_trainings integer)
 language sql stable security definer set search_path = '' as $$
-  select r.month, r.display_name, r.points
+  with base as (
+    select p.id, p.display_name, coalesce(l.points, 0) as points, coalesce(l.trainings, 0) as trainings, l.prev_rank,
+           case when coalesce(l.trainings, 0) > 0 then round(coalesce(l.points, 0)::numeric / l.trainings, 4) end as average,
+           coalesce(l.trainings, 0) >= public.league_min() as qualified
+    from public.profiles p
+    left join public.league_points l on l.profile_id = p.id and l.month = coalesce(m, public.league_month())
+    where p.role = 'player' and ((select public.is_coach()) or (select public.is_player()))
+  )
+  select id, display_name, points, trainings, average, qualified,
+         case when qualified then (rank() over (partition by qualified order by average desc nulls last, points desc))::integer end,
+         prev_rank, public.league_min()
+  from base
+  order by qualified desc, average desc nulls last, points desc, display_name, id;
+$$;
+
+-- Guanyadores dels mesos anteriors: promig més alt entre les classificades (empat: totes).
+drop function if exists public.league_winners();
+create or replace function public.league_winners()
+returns table (month date, display_name text, points integer, trainings integer, average numeric)
+language sql stable security definer set search_path = '' as $$
+  select r.month, r.display_name, r.points, r.trainings, r.average
   from (
-    select l.month, p.display_name, l.points, rank() over (partition by l.month order by l.points desc) as rk
+    select l.month, p.display_name, l.points, l.trainings, round(l.points::numeric / l.trainings, 4) as average,
+           rank() over (partition by l.month order by round(l.points::numeric / l.trainings, 4) desc, l.points desc) as rk
     from public.league_points l join public.profiles p on p.id = l.profile_id and p.role = 'player'
-    where l.month < public.league_month() and l.points > 0
+    where l.month < public.league_month() and l.trainings >= public.league_min() and l.points > 0
   ) r
   where r.rk = 1 and ((select public.is_coach()) or (select public.is_player()))
   order by r.month desc, r.display_name;
 $$;
 
--- Sumar o restar punts al mes actual. Només el staff. Mai per sota de 0.
-create or replace function public.league_add(pid uuid, delta integer)
+-- Sumar o restar punts o entrenaments al mes actual. Només el staff. Mai per sota de 0.
+create or replace function public.league_change(pid uuid, field text, delta integer)
 returns integer language plpgsql security definer set search_path = '' as $$
 declare
   result integer;
@@ -520,41 +546,56 @@ begin
   if not exists (select 1 from public.profiles where id = pid and role = 'player') then
     raise exception 'Jugadora no trobada';
   end if;
-  insert into public.league_points (profile_id, month, points) values (pid, public.league_month(), greatest(0, delta))
-  on conflict (profile_id, month) do update
-    set points = greatest(0, public.league_points.points + delta), updated_at = now()
-  returning points into result;
+  if field = 'points' then
+    insert into public.league_points (profile_id, month, points) values (pid, public.league_month(), greatest(0, delta))
+    on conflict (profile_id, month) do update
+      set points = greatest(0, public.league_points.points + delta), updated_at = now()
+    returning points into result;
+  elsif field = 'trainings' then
+    insert into public.league_points (profile_id, month, trainings) values (pid, public.league_month(), least(100, greatest(0, delta)))
+    on conflict (profile_id, month) do update
+      set trainings = least(100, greatest(0, public.league_points.trainings + delta)), updated_at = now()
+    returning trainings into result;
+  else
+    raise exception 'Camp no vàlid';
+  end if;
   return result;
 end $$;
 
--- Posar directament els punts del mes actual d'una jugadora (per carregar la classificació).
-create or replace function public.league_set(pid uuid, value integer)
-returns integer language plpgsql security definer set search_path = '' as $$
+-- Posar directament punts i entrenaments del mes actual (per carregar la classificació).
+create or replace function public.league_set(pid uuid, new_points integer, new_trainings integer)
+returns void language plpgsql security definer set search_path = '' as $$
 begin
   if not (select public.is_coach()) then
     raise exception 'Només el staff pot canviar la lliga' using errcode = '42501';
   end if;
-  if value < 0 or value > 100000 then
-    raise exception 'Punts no vàlids';
+  if new_points < 0 or new_points > 100000 or new_trainings < 0 or new_trainings > 100 then
+    raise exception 'Valors no vàlids';
   end if;
   if not exists (select 1 from public.profiles where id = pid and role = 'player') then
     raise exception 'Jugadora no trobada';
   end if;
-  insert into public.league_points (profile_id, month, points) values (pid, public.league_month(), value)
-  on conflict (profile_id, month) do update set points = value, updated_at = now();
-  return value;
+  insert into public.league_points (profile_id, month, points, trainings) values (pid, public.league_month(), new_points, new_trainings)
+  on conflict (profile_id, month) do update set points = new_points, trainings = new_trainings, updated_at = now();
 end $$;
+-- (versions anteriors, ja no es fan servir)
+drop function if exists public.league_add(uuid, integer);
+drop function if exists public.league_set(uuid, integer);
 
--- Cada nit a les 00:05 (Barcelona): desa la posició de cada jugadora al mes actual, per
--- mostrar l'endemà qui ha pujat i qui ha baixat. Qui encara no té punts no té posició.
+-- Cada nit a les 00:05 (Barcelona): desa la posició de cada jugadora classificada, per
+-- mostrar l'endemà qui ha pujat i qui ha baixat.
 create or replace function public.snapshot_league()
 returns void language sql security definer set search_path = '' as $$
   insert into public.league_points (profile_id, month)
   select id, public.league_month() from public.profiles where role = 'player'
   on conflict do nothing;
-  update public.league_points l set prev_rank = case when l.points > 0 then r.rk end
+  update public.league_points l set prev_rank = r.rk
   from (
-    select l2.profile_id, rank() over (order by l2.points desc) as rk
+    select l2.profile_id,
+           case when l2.trainings >= public.league_min() then
+             (rank() over (partition by l2.trainings >= public.league_min()
+                           order by round(l2.points::numeric / nullif(l2.trainings, 0), 4) desc nulls last, l2.points desc))::integer
+           end as rk
     from public.league_points l2 join public.profiles p on p.id = l2.profile_id and p.role = 'player'
     where l2.month = public.league_month()
   ) r
@@ -640,7 +681,7 @@ grant select, insert, update, delete on public.push_subscriptions            to 
 grant select, update                 on public.auto_fine_settings            to authenticated;
 grant select                         on public.fcf_config, public.fcf_matches, public.fcf_appearances to authenticated;
 grant select, update (profile_id)    on public.fcf_players                   to authenticated;
-grant select, update (commitment_level, updated_at) on public.team_settings to authenticated;
+grant select, update (commitment_level, league_min_trainings, updated_at) on public.team_settings to authenticated;
 -- (league_points: sense permisos directes; tot passa per league_table/league_add/league_set)
 grant all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
@@ -651,9 +692,10 @@ revoke all on function public.wellness_open_at(uuid, timestamp), public.generate
   public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
-revoke all on function public.league_table(date), public.league_winners(), public.league_add(uuid, integer), public.league_set(uuid, integer),
-  public.snapshot_league(), public.snapshot_league_if_midnight() from public, anon;
-grant execute on function public.league_table(date), public.league_winners(), public.league_add(uuid, integer), public.league_set(uuid, integer) to authenticated;
+revoke all on function public.league_table(date), public.league_winners(), public.league_change(uuid, text, integer),
+  public.league_set(uuid, integer, integer), public.snapshot_league(), public.snapshot_league_if_midnight() from public, anon;
+grant execute on function public.league_table(date), public.league_winners(), public.league_change(uuid, text, integer),
+  public.league_set(uuid, integer, integer) to authenticated;
 revoke all on function public.snapshot_league(), public.snapshot_league_if_midnight() from authenticated;
 
 -- PROFILES: cadascú es veu a si mateix; el staff ho veu tot. Ningú en crea des del navegador.

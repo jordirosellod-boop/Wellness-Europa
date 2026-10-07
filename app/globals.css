@@ -454,3 +454,25 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .league-row:has(.league-actions) .league-pos { flex-basis: 30px; height: 30px; font-size: 1rem; }
 .league-row:has(.league-actions) .pt-btn { width: 40px; height: 40px; }
 .winner-cup { font-size: 1.1rem; }
+
+/* Lliga amb promig */
+.league-sub { display: block; font-weight: 400; font-size: 0.8rem; color: var(--suau); }
+.league-missing { color: var(--taronja); font-weight: 600; }
+.league-row.unq { background: #f7f8fb; }
+.league-row.unq .league-pos { background: #eceff5; color: var(--suau); }
+.league-row.first-unq { margin-top: 30px; }
+.league-row.first-unq::before {
+  content: attr(data-label); position: absolute; top: -24px; left: 2px;
+  font-family: var(--display); text-transform: uppercase; letter-spacing: 0.4px; font-size: 0.85rem; color: var(--suau);
+}
+/* Staff: comptadors a la línia de sota */
+.league-row:has(.league-actions) { flex-wrap: wrap; }
+.league-row:has(.league-actions) .league-pts span { display: inline; }
+.league-row .league-actions { flex-basis: 100%; justify-content: space-between; padding-top: 6px; border-top: 1px dashed var(--vora); }
+.mini-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.mini-stepper b { min-width: 26px; text-align: center; font-family: var(--display); font-weight: 400; font-size: 1.25rem; color: var(--blau); }
+.mini-label { font-size: 0.75rem; color: var(--suau); text-transform: uppercase; letter-spacing: 0.3px; }
+.league-row .league-actions { gap: 6px; flex-wrap: wrap; }
+.league-row:has(.league-actions) .pt-btn { width: 38px; height: 38px; font-size: 1.25rem; }
+.mini-stepper { gap: 4px; }
+.mini-label { font-size: 0.7rem; min-width: 26px; }

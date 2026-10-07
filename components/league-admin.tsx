@@ -52,13 +52,13 @@ export function LevelEditor() {
   );
 }
 
-/** Lliga interna: sumar/restar punts d'un en un, o posar-los directament. */
+/** Lliga interna: punts i entrenaments de cada jugadora (− / + d'un en un, o escrivint-los). */
 export function LeagueEditor() {
   const [rows, setRows] = useState<LeagueRow[] | null>(null);
   const [winners, setWinners] = useState<LeagueWinner[]>([]);
   const today = todayMadrid();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [draft, setDraft] = useState<Record<string, { p?: string; t?: string }>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -71,29 +71,34 @@ export function LeagueEditor() {
     fetchWinners().then(setWinners, () => {});
   }, [load]);
 
-  async function add(r: LeagueRow, delta: number) {
-    setBusy(r.profile_id);
+  async function change(r: LeagueRow, field: "points" | "trainings", delta: number) {
+    setBusy(`${r.profile_id}:${field}`);
     setMsg(null);
-    const { data, error } = await supabase().rpc("league_add", { pid: r.profile_id, delta });
+    const { data, error } = await supabase().rpc("league_change", { pid: r.profile_id, field, delta });
     setBusy(null);
     if (error || data == null) return setMsg({ ok: false, text: friendlyError(error?.message ?? "No s'ha pogut desar.") });
     // Només es canvia a la pantalla quan el servidor ho ha confirmat.
-    setRows((prev) => prev?.map((x) => (x.profile_id === r.profile_id ? { ...x, points: data as number } : x)) ?? prev);
+    setRows((prev) => prev?.map((x) => (x.profile_id === r.profile_id ? { ...x, [field]: data as number } : x)) ?? prev);
   }
 
   async function saveAll() {
     if (!rows) return;
     const changes = rows
-      .map((r) => ({ r, v: draft[r.profile_id] }))
-      .filter(({ r, v }) => v !== undefined && v !== "" && Number(v) !== r.points);
-    for (const { v } of changes) {
-      const n = Number(v);
-      if (!Number.isInteger(n) || n < 0 || n > 100000) return setMsg({ ok: false, text: "Els punts han de ser nombres enters a partir de 0." });
+      .map((r) => {
+        const d = draft[r.profile_id] ?? {};
+        const p = d.p === undefined || d.p === "" ? r.points : Number(d.p);
+        const t = d.t === undefined || d.t === "" ? r.trainings : Number(d.t);
+        return { r, p, t };
+      })
+      .filter(({ r, p, t }) => p !== r.points || t !== r.trainings);
+    for (const { p, t } of changes) {
+      if (!Number.isInteger(p) || p < 0 || p > 100000 || !Number.isInteger(t) || t < 0 || t > 100)
+        return setMsg({ ok: false, text: "Els punts i els entrenaments han de ser nombres enters a partir de 0." });
     }
     setBusy("all");
     setMsg(null);
-    for (const { r, v } of changes) {
-      const { error } = await supabase().rpc("league_set", { pid: r.profile_id, value: Number(v) });
+    for (const { r, p, t } of changes) {
+      const { error } = await supabase().rpc("league_set", { pid: r.profile_id, new_points: p, new_trainings: t });
       if (error) {
         setBusy(null);
         await load();
@@ -108,48 +113,63 @@ export function LeagueEditor() {
   }
 
   if (!rows) return msg ? <p className={`msg ${msg.ok ? "ok" : "error"}`}>{msg.text}</p> : null;
+  const min = rows[0]?.min_trainings ?? 6;
+
+  const stepper = (r: LeagueRow, field: "points" | "trainings", label: string) => (
+    <span className="mini-stepper">
+      <span className="mini-label">{label}</span>
+      <button className="pt-btn" aria-label={`Treure 1 ${field === "points" ? "punt" : "entrenament"} a ${r.display_name}`} disabled={busy === `${r.profile_id}:${field}` || r[field] === 0} onClick={() => change(r, field, -1)}>−</button>
+      <b>{r[field]}</b>
+      <button className="pt-btn plus" aria-label={`Sumar 1 ${field === "points" ? "punt" : "entrenament"} a ${r.display_name}`} disabled={busy === `${r.profile_id}:${field}`} onClick={() => change(r, field, 1)}>+</button>
+    </span>
+  );
 
   return (
     <section className="card">
       <div className="row between" style={{ marginBottom: 6 }}>
         <h2 style={{ margin: 0 }}>{leagueTitle(today)}</h2>
         {!editing ? (
-          <button className="btn small secondary" onClick={() => setEditing(true)}>Escriure punts</button>
+          <button className="btn small secondary" onClick={() => setEditing(true)}>Escriure</button>
         ) : (
           <button className="btn small secondary" onClick={() => { setEditing(false); setDraft({}); }}>Tancar</button>
         )}
       </div>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Toca + o − per sumar o restar d&apos;un en un. Cada mes és una lliga nova: el dia 1 tothom torna a 0 i la primera del mes queda com a
-        guanyadora. Queden {daysLeftInMonth(today)} dies. Les fletxes indiquen qui ha pujat o baixat des d&apos;ahir.
+        Promig = punts ÷ entrenaments. Per classificar-se calen <b>{min} entrenaments</b> al mes; guanya el millor promig. Cada mes és una lliga
+        nova (el dia 1 tot torna a 0). Queden {daysLeftInMonth(today)} dies.
       </p>
       {editing ? (
         <div className="stack">
+          <div className="row between muted small" style={{ flexWrap: "nowrap" }}>
+            <span style={{ flex: 1 }}>Jugadora</span>
+            <span style={{ width: 74, textAlign: "center" }}>Punts</span>
+            <span style={{ width: 74, textAlign: "center" }}>Entrenos</span>
+          </div>
           {[...rows].sort((a, b) => a.display_name.localeCompare(b.display_name, "ca")).map((r) => (
             <div key={r.profile_id} className="row between" style={{ flexWrap: "nowrap" }}>
-              <label htmlFor={`pts-${r.profile_id}`} style={{ flex: 1 }}>{r.display_name}</label>
+              <span style={{ flex: 1, minWidth: 0 }}>{r.display_name}</span>
               <input
-                id={`pts-${r.profile_id}`}
+                aria-label={`Punts de ${r.display_name}`}
                 type="text"
                 inputMode="numeric"
-                style={{ width: 90, textAlign: "center" }}
-                value={draft[r.profile_id] ?? String(r.points)}
-                onChange={(e) => setDraft((d) => ({ ...d, [r.profile_id]: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                style={{ width: 74, textAlign: "center" }}
+                value={draft[r.profile_id]?.p ?? String(r.points)}
+                onChange={(e) => setDraft((d) => ({ ...d, [r.profile_id]: { ...d[r.profile_id], p: e.target.value.replace(/\D/g, "").slice(0, 6) } }))}
+              />
+              <input
+                aria-label={`Entrenaments de ${r.display_name}`}
+                type="text"
+                inputMode="numeric"
+                style={{ width: 74, textAlign: "center" }}
+                value={draft[r.profile_id]?.t ?? String(r.trainings)}
+                onChange={(e) => setDraft((d) => ({ ...d, [r.profile_id]: { ...d[r.profile_id], t: e.target.value.replace(/\D/g, "").slice(0, 3) } }))}
               />
             </div>
           ))}
           <button className="btn block" disabled={busy === "all"} onClick={saveAll}>{busy === "all" ? "Desant…" : "Desar la classificació"}</button>
         </div>
       ) : (
-        <LeagueTable
-          rows={rows}
-          actions={(r) => (
-            <>
-              <button className="pt-btn" aria-label={`Treure 1 punt a ${r.display_name}`} disabled={busy === r.profile_id || r.points === 0} onClick={() => add(r, -1)}>−</button>
-              <button className="pt-btn plus" aria-label={`Sumar 1 punt a ${r.display_name}`} disabled={busy === r.profile_id} onClick={() => add(r, 1)}>+</button>
-            </>
-          )}
-        />
+        <LeagueTable rows={rows} actions={(r) => (<>{stepper(r, "points", "Pts")}{stepper(r, "trainings", "Entr.")}</>)} />
       )}
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
       <h3 style={{ marginTop: 18 }}>Guanyadores</h3>
