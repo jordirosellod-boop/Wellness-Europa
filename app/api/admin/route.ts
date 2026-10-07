@@ -10,6 +10,8 @@ function adminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secret = process.env.SUPABASE_SECRET_KEY;
   if (!url || !secret) throw new HttpError(500, "Falta configurar SUPABASE_SECRET_KEY al servidor.");
+  if (secret.startsWith("sb_publishable_") || secret === process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+    throw new HttpError(500, "SUPABASE_SECRET_KEY té la clau pública: cal posar-hi la Secret key (sb_secret_...).");
   return createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
@@ -34,7 +36,8 @@ async function requireCoach(req: Request, db: SupabaseClient): Promise<string> {
   if (!token) throw new HttpError(401, "Cal iniciar sessió.");
   const { data, error } = await db.auth.getUser(token);
   if (error || !data.user) throw new HttpError(401, "La sessió ha caducat. Torna a entrar.");
-  const { data: profile } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+  const { data: profile, error: pErr } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+  if (pErr) throw new HttpError(500, `No s'ha pogut comprovar el rol (revisa SUPABASE_SECRET_KEY a Vercel): ${pErr.message}`);
   if (profile?.role !== "coach") throw new HttpError(403, "Només el staff pot fer això.");
   return data.user.id;
 }
