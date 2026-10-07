@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
 import { PlayerFines } from "@/components/player-fines";
+import { Reminders } from "@/components/reminders";
 import { Brand, Footer } from "@/components/ui";
 import { viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -14,6 +15,8 @@ import {
   fmtTime,
   SESSION_COLS,
   todayMadrid,
+  WELLNESS_DEADLINE,
+  wellnessClosed,
   type Profile,
   type Rpe,
   type Session,
@@ -82,12 +85,7 @@ export default function PlayerPage() {
       </header>
       <main>
         {state.kind === "loading" && <p className="muted">Carregant…</p>}
-        {state.kind === "nolink" && (
-          <div className="card">
-            <h1 style={{ marginTop: 0 }}>Obre el teu enllaç</h1>
-            <p>Per entrar, obre l&apos;enllaç personal que t&apos;ha enviat el teu entrenador.</p>
-          </div>
-        )}
+        {state.kind === "nolink" && <PasteLink />}
         {state.kind === "badlink" && (
           <div className="card">
             <h1 style={{ marginTop: 0 }}>Aquest enllaç ja no funciona</h1>
@@ -99,6 +97,27 @@ export default function PlayerPage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+/** Si l'app s'obre sense l'enllaç (per exemple, des de la icona de l'iPhone), es pot enganxar aquí. */
+function PasteLink() {
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  function go() {
+    const key = text.trim().split("#")[1]?.trim();
+    if (!key || !decodeKey(key)) return setError("Això no sembla el teu enllaç. Copia'l sencer del missatge de l'entrenador.");
+    window.location.hash = key;
+    window.location.reload();
+  }
+  return (
+    <div className="card stack">
+      <h1 style={{ marginTop: 0 }}>Obre el teu enllaç</h1>
+      <p style={{ margin: 0 }}>Obre l&apos;enllaç personal que t&apos;ha enviat el teu entrenador, o enganxa&apos;l aquí (només cal la primera vegada):</p>
+      <input type="text" inputMode="url" autoComplete="off" placeholder="https://wellness-europa.vercel.app/j#…" value={text} onChange={(e) => setText(e.target.value)} />
+      <button className="btn block" onClick={go} disabled={!text.trim()}>Entrar</button>
+      {error && <p className="msg error">{error}</p>}
+    </div>
   );
 }
 
@@ -159,6 +178,7 @@ function PlayerHome({ me }: { me: Profile }) {
       )}
       {session && <SessionForms key={session.id} me={me} session={session} onSaved={() => setVersion((v) => v + 1)} />}
       {sessions !== null && <PlayerCalendar me={me} today={today} version={version} onOpenToday={openToday} />}
+      {sessions !== null && <Reminders />}
       {sessions !== null && <PlayerFines playerId={me.id} />}
     </>
   );
@@ -166,6 +186,7 @@ function PlayerHome({ me }: { me: Profile }) {
 
 function SessionForms({ me, session, onSaved }: { me: Profile; session: Session; onSaved: () => void }) {
   const editable = true;
+  const wellnessOpen = !wellnessClosed(session);
   const [w, setW] = useState<Wellness | null | undefined>(undefined);
   const [r, setR] = useState<Rpe | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -202,7 +223,12 @@ function SessionForms({ me, session, onSaved }: { me: Profile; session: Session;
           <h2 style={{ margin: 0 }}>Wellness <span className="muted small">(abans)</span></h2>
           {w ? <span className="chip fet">Enviat {fmtTime(w.submitted_at)}</span> : <span className="chip pendent">Pendent</span>}
         </div>
-        <WellnessForm sessionId={session.id} existing={w} editable={editable} onSaved={(x) => { setW(x); onSaved(); }} />
+        {!wellnessOpen && (
+          <p className="msg error" style={{ marginTop: 0 }}>
+            El termini del wellness d&apos;avui ({WELLNESS_DEADLINE}) ja ha passat.
+          </p>
+        )}
+        <WellnessForm sessionId={session.id} existing={w} editable={editable && wellnessOpen} onSaved={(x) => { setW(x); onSaved(); }} />
       </section>
       <section className="card">
         <div className="row between" style={{ marginBottom: 10 }}>
@@ -211,7 +237,11 @@ function SessionForms({ me, session, onSaved }: { me: Profile; session: Session;
         </div>
         <RpeForm sessionId={session.id} plannedDuration={session.duration_min} existing={r} editable={editable} onSaved={(x) => { setR(x); onSaved(); }} />
       </section>
-      <p className="muted small center">Pots modificar les respostes fins a les 23:59 d&apos;avui.</p>
+      <p className="muted small center">
+        {session.kind === "Entrenament"
+          ? `Límits d'avui: wellness fins a les ${WELLNESS_DEADLINE} · RPE fins a les 00:00. Si no es fan, hi ha multa.`
+          : "Pots omplir i modificar les respostes fins a les 00:00 d'avui."}
+      </p>
     </>
   );
 }

@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   title: "Wellness CE Europa",
   description: "Wellness i RPE de l'equip",
   robots: { index: false, follow: false },
+  // A l'iPhone, l'app afegida a la pantalla d'inici s'obre a pantalla completa (necessari per als avisos).
+  appleWebApp: { capable: true, title: "Wellness", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

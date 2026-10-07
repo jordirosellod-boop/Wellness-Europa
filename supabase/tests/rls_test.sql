@@ -15,7 +15,7 @@ insert into public.profiles (id, role, display_name)
 select id, 'coach', 'Entrenador' from auth.users where email = 'coach@test'
 on conflict (id) do update set role = 'coach';
 insert into public.sessions (id, session_date, kind, name) values
- ('11111111-0000-0000-0000-000000000001', (now() at time zone 'Europe/Madrid')::date, 'Entrenament', 'Avui'),
+ ('11111111-0000-0000-0000-000000000001', (now() at time zone 'Europe/Madrid')::date, 'Partit', 'Avui'),
  ('11111111-0000-0000-0000-000000000002', (now() at time zone 'Europe/Madrid')::date - 1, 'Partit', 'Ahir');
 
 create function pg_temp.expect_error(q text, label text) returns text language plpgsql as $$
@@ -200,3 +200,66 @@ select pg_temp.check(count(*) = 2 and bool_and(rule_id is null and reason = 'Arr
 reset role;
 delete from auth.users where id = '00000000-0000-0000-0000-0000000000d4';
 select pg_temp.check(count(*) = 0, 'Esborrar una jugadora esborra també les seves multes') from public.fines where person_id = '00000000-0000-0000-0000-0000000000d4';
+
+-- =============== LÍMITS, MULTES AUTOMÀTIQUES I RECORDATORIS ===============
+reset role;
+insert into public.sessions (id, session_date, kind, name) values
+  ('55555555-0000-0000-0000-000000000001', '2026-03-10', 'Entrenament', 'Entreno límit'),
+  ('55555555-0000-0000-0000-000000000002', '2026-03-10', 'Partit', 'Partit límit');
+select pg_temp.check(public.wellness_open_at('55555555-0000-0000-0000-000000000001', '2026-03-10 13:59'), 'Entrenament: wellness obert a les 13:59');
+select pg_temp.check(not public.wellness_open_at('55555555-0000-0000-0000-000000000001', '2026-03-10 14:00'), 'Entrenament: wellness tancat a les 14:00');
+select pg_temp.check(public.wellness_open_at('55555555-0000-0000-0000-000000000002', '2026-03-10 20:00'), 'Partit: wellness obert a les 20:00 (sense límit de 14:00)');
+select pg_temp.check(not public.wellness_open_at('55555555-0000-0000-0000-000000000001', '2026-03-11 09:00'), 'L''endemà el wellness està tancat');
+
+-- Escenari de multes automàtiques: sessions d'ahir
+insert into auth.users values ('00000000-0000-0000-0000-0000000000e5','e@jug'), ('00000000-0000-0000-0000-0000000000f6','f@jug');
+insert into public.profiles (id, role, display_name, created_at) values
+  ('00000000-0000-0000-0000-0000000000e5','player','Elna', now() - interval '30 days'),
+  ('00000000-0000-0000-0000-0000000000f6','player','Fiona (nova)', now());
+update public.profiles set created_at = now() - interval '30 days' where id = '00000000-0000-0000-0000-0000000000b2';
+insert into public.sessions (id, session_date, kind, name, created_at, cancelled) values
+  ('66666666-0000-0000-0000-000000000001', (select today from vars) - 1, 'Entrenament', 'Entreno ahir', now() - interval '5 days', false),
+  ('66666666-0000-0000-0000-000000000002', (select today from vars) - 1, 'Partit', 'Partit ahir', now() - interval '5 days', false),
+  ('66666666-0000-0000-0000-000000000003', (select today from vars) - 1, 'Entrenament', 'Entreno cancel·lat', now() - interval '5 days', true),
+  ('66666666-0000-0000-0000-000000000004', (select today from vars) - 1, 'Entrenament', 'Entreno creat tard', now(), false);
+insert into public.wellness (session_id, player_id, sleep, fatigue, mood) values ('66666666-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b2', 7, 7, 7);
+insert into public.fine_rules (id, name, amount_cents) values ('33333333-0000-0000-0000-000000000009', 'Wellness/RPE no fet', 100);
+
+-- El staff tria la norma; la data d'inici la posa el servidor
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+with u as (update public.auto_fine_settings set wellness_rule_id = '33333333-0000-0000-0000-000000000009', rpe_rule_id = '33333333-0000-0000-0000-000000000009', wellness_since = '2000-01-01' returning wellness_since)
+select pg_temp.check(bool_and(wellness_since > now() - interval '1 minute'), 'Activar multes automàtiques: compta des d''ara (no es pot posar una data antiga)') from u;
+reset role;
+select pg_temp.check(public.apply_auto_fines() = 0, 'Recent activades: no es multen els dies anteriors');
+-- (simulem que es van activar fa 10 dies)
+alter table public.auto_fine_settings disable trigger auto_fine_settings_stamp;
+update public.auto_fine_settings set wellness_since = now() - interval '10 days', rpe_since = now() - interval '10 days';
+alter table public.auto_fine_settings enable trigger auto_fine_settings_stamp;
+select pg_temp.check(public.apply_auto_fines() = 3, 'Multes automàtiques: 3 (B sense RPE; Elna sense wellness ni RPE)');
+select pg_temp.check((select count(*) from public.fines where notes like 'Automàtica%' and person_id = '00000000-0000-0000-0000-0000000000b2') = 1
+  and (select count(*) from public.fines where notes like 'Automàtica%' and person_id = '00000000-0000-0000-0000-0000000000e5') = 2
+  and (select bool_and(amount_cents = 100 and fine_date = (select today from vars) - 1) from public.fines where notes like 'Automàtica%'),
+  'Les multes són d''1 €, a la persona i el dia correctes');
+select pg_temp.check((select count(*) from public.fines where notes like 'Automàtica%' and (person_id = '00000000-0000-0000-0000-0000000000f6' or notes like '%Partit%' or notes like '%cancel%' or notes like '%creat tard%')) = 0,
+  'No es multa: jugadora nova, partits, sessions cancel·lades ni creades després del límit');
+select pg_temp.check(public.apply_auto_fines() = 0, 'Tornar-ho a executar no duplica multes');
+delete from public.fines where person_id = '00000000-0000-0000-0000-0000000000e5' and notes like '%wellness%';
+select pg_temp.check(public.apply_auto_fines() = 0, 'Si el staff esborra una multa automàtica, no es torna a posar');
+select pg_temp.check((select count(*) from cron.job where jobname in ('multes-automatiques', 'recordatori-wellness')) = 2, 'Tasques programades creades (multes cada 15 min i recordatori)');
+
+-- Seguretat de les parts noves
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.expect_error($$select public.apply_auto_fines()$$, 'Una jugadora no pot executar les multes automàtiques');
+select pg_temp.expect_error($$select public.send_wellness_reminder()$$, 'Una jugadora no pot llançar recordatoris');
+select pg_temp.expect_error($$select * from public.app_secrets$$, 'Una jugadora no pot llegir els secrets');
+select pg_temp.expect_error($$select * from public.auto_fine_log$$, 'Una jugadora no pot llegir el registre de multes automàtiques');
+select pg_temp.check((select count(*) from public.auto_fine_settings) = 0, 'Una jugadora no veu la configuració de multes automàtiques');
+with u as (update public.auto_fine_settings set wellness_rule_id = null returning 1)
+select pg_temp.check(count(*) = 0, 'Una jugadora no pot desactivar les multes automàtiques') from u;
+insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://push.example/b', 'k', 'a');
+select pg_temp.check((select count(*) from public.push_subscriptions) = 1, 'B activa els recordatoris al seu mòbil');
+select pg_temp.expect_error($$insert into public.push_subscriptions (player_id, endpoint, p256dh, auth) values ('00000000-0000-0000-0000-0000000000e5', 'https://push.example/x', 'k', 'a')$$, 'B no pot registrar un mòbil en nom d''una altra');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5', false); set role authenticated;
+select pg_temp.check((select count(*) from public.push_subscriptions) = 0, 'Elna no veu els mòbils de B');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.push_subscriptions$$, 'Anònim no pot llegir subscripcions');

@@ -147,11 +147,24 @@ export function fmtSessionTime(t: string | null): string {
 export function friendlyError(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("row-level security") || m.includes("permission denied"))
-    return "No s'ha pogut desar: aquesta sessió només es pot omplir o modificar el mateix dia.";
+    return "No s'ha pogut desar: el termini ha acabat (els dies d'entrenament, wellness fins a les 14:00 i RPE fins a les 00:00; si no, fins a les 00:00 del dia de la sessió).";
   if (m.includes("duplicate key")) return "Ja hi havia un registre per a aquesta sessió. Torna a carregar la pàgina.";
   if (m.includes("check constraint")) return "Algun valor no és vàlid. Revisa el formulari.";
   if (m.includes("failed to fetch") || m.includes("network") || m.includes("load failed"))
     return "Sense connexió. Comprova internet i torna-ho a provar.";
   if (m.includes("jwt")) return "La sessió ha caducat. Torna a obrir el teu enllaç.";
   return `Error: ${message}`;
+}
+
+/** Hora límit del wellness els dies d'entrenament (també la comprova la base de dades). */
+export const WELLNESS_DEADLINE = "14:00";
+
+/** Hora actual a Barcelona, "HH:MM". */
+export function nowMadridHHMM(): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+}
+
+/** El wellness d'un entrenament d'avui es tanca a les 14:00. */
+export function wellnessClosed(s: Pick<Session, "kind" | "session_date">): boolean {
+  return s.kind === "Entrenament" && s.session_date === todayMadrid() && nowMadridHHMM() >= WELLNESS_DEADLINE;
 }

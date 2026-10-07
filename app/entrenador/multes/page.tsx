@@ -72,6 +72,8 @@ function Fines() {
 
       <NewFine people={data.people} rules={data.rules.filter((r) => r.active)} onDone={load} />
 
+      <AutoFines rules={data.rules} />
+
       <section className="card">
         <h2>Per persona</h2>
         {withFines.length === 0 && <p className="muted" style={{ margin: 0 }}>Encara no hi ha cap multa.</p>}
@@ -326,6 +328,69 @@ function Rules({ rules, onChange }: { rules: FineRule[]; onChange: () => void })
         <button className="btn secondary block" disabled={busy}>{busy ? "Afegint…" : "Afegir norma"}</button>
         {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
       </form>
+    </section>
+  );
+}
+
+type AutoSettings = { wellness_rule_id: string | null; rpe_rule_id: string | null; wellness_since: string | null; rpe_since: string | null };
+
+/** Multes automàtiques: quina norma s'aplica si no es fa el wellness (14:00) o l'RPE (00:00) els dies d'entrenament. */
+function AutoFines({ rules }: { rules: FineRule[] }) {
+  const [cfg, setCfg] = useState<AutoSettings | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    supabase()
+      .from("auto_fine_settings")
+      .select("wellness_rule_id, rpe_rule_id, wellness_since, rpe_since")
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) setMsg({ ok: false, text: friendlyError(error.message) });
+        else setCfg((data as AutoSettings) ?? { wellness_rule_id: null, rpe_rule_id: null, wellness_since: null, rpe_since: null });
+      });
+  }, []);
+
+  async function save(field: "wellness_rule_id" | "rpe_rule_id", value: string) {
+    setBusy(true);
+    setMsg(null);
+    const { data, error } = await supabase()
+      .from("auto_fine_settings")
+      .update({ [field]: value || null })
+      .eq("id", true)
+      .select("wellness_rule_id, rpe_rule_id, wellness_since, rpe_since")
+      .maybeSingle();
+    setBusy(false);
+    if (error || !data) return setMsg({ ok: false, text: friendlyError(error?.message ?? "No s'ha pogut desar.") });
+    setCfg(data as AutoSettings);
+    setMsg({ ok: true, text: value ? "Desat. S'aplicarà a partir d'ara (no als dies anteriors)." : "Desactivat." });
+  }
+
+  if (!cfg) return null;
+  const options = rules.filter((r) => r.active);
+  const row = (field: "wellness_rule_id" | "rpe_rule_id", label: string, since: string | null) => (
+    <div>
+      <label className="field" htmlFor={field}>{label}</label>
+      <select id={field} value={cfg[field] ?? ""} disabled={busy} onChange={(e) => save(field, e.target.value)}>
+        <option value="">Desactivat (no posar multa)</option>
+        {options.map((r) => <option key={r.id} value={r.id}>{r.name} · {fmtEuros(r.amount_cents)}</option>)}
+        {cfg[field] && !options.some((r) => r.id === cfg[field]) && <option value={cfg[field]!}>(norma desactivada)</option>}
+      </select>
+      {cfg[field] && since && <p className="muted small" style={{ margin: "4px 0 0" }}>Activa des del {fmtDate(since.slice(0, 10)).toLowerCase()}.</p>}
+    </div>
+  );
+
+  return (
+    <section className="card stack">
+      <h2>Multes automàtiques</h2>
+      <p className="muted small" style={{ margin: 0 }}>
+        Només els dies d&apos;<b>entrenament</b>. Es revisa sola cada 15 minuts. Si esborres una multa automàtica (per exemple, a una
+        jugadora lesionada), no es torna a posar.
+      </p>
+      {row("wellness_rule_id", "Wellness no fet abans de les 14:00", cfg.wellness_since)}
+      {row("rpe_rule_id", "RPE no fet abans de les 00:00", cfg.rpe_since)}
+      {options.length === 0 && <p className="muted small" style={{ margin: 0 }}>Primer crea la norma (per exemple «Wellness/RPE no fet · 1 €») a l&apos;apartat Normes.</p>}
+      {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
     </section>
   );
 }
