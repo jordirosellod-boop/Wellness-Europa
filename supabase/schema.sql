@@ -136,8 +136,14 @@ alter table public.sessions     enable row level security;
 alter table public.wellness     enable row level security;
 alter table public.rpe          enable row level security;
 
--- Els visitants sense sessió iniciada no poden tocar res.
-revoke all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe from anon;
+-- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
+-- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
+revoke all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe from anon, authenticated;
+grant select                         on public.profiles, public.player_links to authenticated;
+grant select, insert, update, delete on public.sessions                      to authenticated;
+grant select, insert, update         on public.wellness, public.rpe          to authenticated;
+grant all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe to service_role;
+grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid) to authenticated;
 
 -- PROFILES: cadascú es veu a si mateix; el staff ho veu tot. Ningú en crea des del navegador.
 drop policy if exists profiles_select on public.profiles;

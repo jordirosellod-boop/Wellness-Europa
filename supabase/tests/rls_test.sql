@@ -58,8 +58,7 @@ with u as (update public.wellness set sleep = 1 where player_id = '00000000-0000
 select pg_temp.check(count(*) = 0, 'B no pot modificar el wellness d''A (0 files canviades)') from u;
 with u as (update public.wellness set mood = 6, submitted_at = '2000-01-01', player_id = '00000000-0000-0000-0000-0000000000a1' returning *)
 select pg_temp.check(count(*) = 1 and bool_and(player_id = '00000000-0000-0000-0000-0000000000b2' and submitted_at > '2001-01-01' and score = 6.0), 'B edita el seu registre; no pot canviar l''hora ni passar-lo a A') from u;
-with d as (delete from public.wellness returning 1)
-select pg_temp.check(count(*) = 0, 'B no pot esborrar registres') from d;
+select pg_temp.expect_error($$delete from public.wellness$$, 'B no pot esborrar registres');
 select pg_temp.expect_error($$insert into public.sessions (session_date, kind, name) values (current_date, 'Partit', 'x')$$, 'Una jugadora no pot crear sessions');
 with d as (delete from public.sessions returning 1)
 select pg_temp.check(count(*) = 0, 'Una jugadora no pot esborrar sessions') from d;
