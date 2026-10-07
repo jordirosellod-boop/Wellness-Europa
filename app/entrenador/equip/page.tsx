@@ -14,13 +14,13 @@ export default function TeamPage() {
   );
 }
 
-// Sempre l'adreça pública de l'app (Vercel la proporciona sola). Les adreces internes
-// de cada publicació demanen iniciar sessió a Vercel i no serveixen per a les jugadores.
-const PUBLIC_HOST = process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL;
+// Sempre l'adreça pública de l'app. Les adreces internes de cada publicació de Vercel
+// demanen iniciar sessió a Vercel i no serveixen per a les jugadores.
+// Si algun dia canvieu de domini, canvieu-lo aquí (o amb la variable NEXT_PUBLIC_APP_URL).
+const PUBLIC_URL = process.env.NEXT_PUBLIC_APP_URL || "https://wellness-europa.vercel.app";
 
 function linkFor(key: string) {
-  const origin = PUBLIC_HOST ? `https://${PUBLIC_HOST}` : window.location.origin;
-  return `${origin}/j#${key}`;
+  return `${PUBLIC_URL}/j#${key}`;
 }
 
 async function fetchTeam() {
