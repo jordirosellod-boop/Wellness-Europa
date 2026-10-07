@@ -7,3 +7,7 @@ App web (mòbil primer) perquè les jugadores omplin el **wellness** (abans de l
 - `app/` — pantalles (Next.js). `/j` jugadora, `/entrenador` staff, `/api/admin` accions amb la clau secreta.
 
 Variables d'entorn: vegeu `.env.example`.
+
+## Publicació
+
+Vercel publica automàticament cada canvi a la branca `main`.
