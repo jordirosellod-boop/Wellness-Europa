@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   const { publicKey, privateKey } = await vapidKeys(db);
   webpush.setVapidDetails("https://wellness-europa.vercel.app", publicKey, privateKey);
   const payload = JSON.stringify({
-    title: "Wellness CE Europa",
+    title: "Juvenil C 2026/2027",
     body: "Bon dia! Avui hi ha entrenament: omple el wellness abans de les 14:00.",
     url: "/j",
   });

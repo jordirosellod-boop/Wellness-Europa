@@ -11,7 +11,7 @@ export function Brand() {
     <span className="brand">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="brand-logo" src="/escut.png" alt="Escut del CE Europa" width={40} height={40} />
-      <span>Wellness</span>
+      <span>Juvenil C 2026/2027</span>
     </span>
   );
 }

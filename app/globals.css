@@ -401,3 +401,9 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .stats-table .pname { font-weight: 600; }
 .link-select { display: block; margin-top: 4px; min-height: 40px; padding: 6px 8px; font-size: 0.85rem; max-width: 240px; }
 .tiles > .tile:last-child:nth-child(odd) { grid-column: 1 / -1; min-height: auto; }
+
+/* Nom de l'app més llarg ("Juvenil C 2026/2027"): que càpiga al costat del nom de la jugadora */
+.brand > span:last-child { white-space: nowrap; }
+@media (max-width: 520px) {
+  .topbar:not(:has(.nav)) .brand { font-size: 1.15rem; }
+}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Brand } from "@/components/ui";
 
-export const metadata = { title: "Privacitat · Wellness CE Europa" };
+export const metadata = { title: "Privacitat · Juvenil C 2026/2027" };
 
 export default function PrivacyPage() {
   return (

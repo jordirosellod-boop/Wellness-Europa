@@ -4,8 +4,8 @@ import type { MetadataRoute } from "next";
 // Sense "start_url": el mòbil obre l'adreça des d'on s'ha afegit (amb l'enllaç personal).
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Wellness CE Europa",
-    short_name: "Wellness",
+    name: "Juvenil C 2026/2027 · CE Europa",
+    short_name: "Juvenil C",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#0a2ea0",

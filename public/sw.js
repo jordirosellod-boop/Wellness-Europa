@@ -3,7 +3,7 @@ self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
   event.waitUntil(
-    self.registration.showNotification(data.title || "Wellness CE Europa", {
+    self.registration.showNotification(data.title || "Juvenil C 2026/2027", {
       body: data.body || "Recorda omplir el wellness.",
       icon: "/icon-192.png",
       badge: "/icon-192.png",
