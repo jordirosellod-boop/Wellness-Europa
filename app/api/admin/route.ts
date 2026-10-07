@@ -8,10 +8,19 @@ const PLAYER_EMAIL_DOMAIN = "jugadores.ce-europa.invalid"; // correu intern inve
 
 function adminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secret = process.env.SUPABASE_SECRET_KEY;
+  const secret = process.env.SUPABASE_SECRET_KEY?.trim();
   if (!url || !secret) throw new HttpError(500, "Falta configurar SUPABASE_SECRET_KEY al servidor.");
   if (secret.startsWith("sb_publishable_") || secret === process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
     throw new HttpError(500, "SUPABASE_SECRET_KEY té la clau pública: cal posar-hi la Secret key (sb_secret_...).");
+  if (secret.startsWith("eyJ")) {
+    // Clau antiga en format JWT: ha de ser la "service_role", no la "anon".
+    let role = "";
+    try {
+      role = JSON.parse(Buffer.from(secret.split(".")[1], "base64url").toString("utf8")).role ?? "";
+    } catch {}
+    if (role !== "service_role")
+      throw new HttpError(500, `SUPABASE_SECRET_KEY és una clau "${role || "desconeguda"}": cal posar-hi la Secret key (sb_secret_...).`);
+  }
   return createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
