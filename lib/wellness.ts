@@ -8,6 +8,23 @@ export type Session = {
   start_time: string | null; // HH:MM:SS
   kind: Kind;
   name: string;
+  duration_min: number | null; // durada prevista
+  rule_id: string | null; // programació que l'ha generat
+  cancelled: boolean;
+};
+
+export const SESSION_COLS = "id, session_date, start_time, kind, name, duration_min, rule_id, cancelled";
+
+export type SessionRule = {
+  id: string;
+  name: string;
+  kind: Kind;
+  weekdays: number[];
+  start_time: string | null;
+  duration_min: number | null;
+  start_date: string;
+  end_date: string | null;
+  active: boolean;
 };
 
 export type Profile = { id: string; role: "coach" | "player"; display_name: string };
@@ -32,6 +49,8 @@ export type Rpe = {
   session_id: string;
   player_id: string;
   rpe: number;
+  duration_min: number | null; // durada real
+  load: number | null; // RPE x minuts (la calcula la base de dades)
   notes: string | null;
   submitted_at: string;
   updated_at: string;

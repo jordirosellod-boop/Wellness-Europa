@@ -17,14 +17,14 @@ export function sessionCsv(
   const header = [
     "Jugadora", "Data", "Hora sessió", "Tipus", "Sessió",
     "Son", "Fatiga", "Ànim", "Wellness", "Banda", "Alertes", "Molèstia", "Notes wellness", "Enviat wellness",
-    "RPE", "Notes RPE", "Enviat RPE",
+    "RPE", "Durada (min)", "Càrrega (UA)", "Notes RPE", "Enviat RPE",
   ];
   const lines = rows.map(({ player, w, r }) => [
     player.display_name, session.session_date, fmtSessionTime(session.start_time), session.kind, session.name,
     w?.sleep, w?.fatigue, w?.mood, w ? Number(w.score).toFixed(1).replace(".", ",") : "PENDENT", w ? bandOf(Number(w.score)).label : "",
     w ? alertsOf(w).map((a) => `${a.label} (${a.value})`).join(", ") : "",
     w?.has_pain ? w.pain_description : "", w?.notes, w ? fmtDateTime(w.submitted_at) : "",
-    r ? r.rpe : "PENDENT", r?.notes, r ? fmtDateTime(r.submitted_at) : "",
+    r ? r.rpe : "PENDENT", r?.duration_min, r?.load, r?.notes, r ? fmtDateTime(r.submitted_at) : "",
   ]);
   return "﻿" + [header, ...lines].map((l) => l.map(cell).join(";")).join("\r\n") + "\r\n";
 }

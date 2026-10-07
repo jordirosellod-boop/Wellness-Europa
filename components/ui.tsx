@@ -73,8 +73,11 @@ export function CoachShell({ children }: { children: (me: Profile) => ReactNode 
           <Brand />
         </Link>
         <nav className="nav">
-          <Link href="/entrenador" className={path === "/entrenador" || path.startsWith("/entrenador/sessio") ? "active" : ""}>
-            Sessions
+          <Link
+            href="/entrenador"
+            className={path === "/entrenador" || path.startsWith("/entrenador/sessio") || path.startsWith("/entrenador/programacio") ? "active" : ""}
+          >
+            Calendari
           </Link>
           <Link href="/entrenador/equip" className={path === "/entrenador/equip" ? "active" : ""}>
             Equip

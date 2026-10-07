@@ -95,3 +95,58 @@ select pg_temp.expect_error($$insert into public.sessions (session_date, kind, n
 reset role;
 delete from auth.users where id = '00000000-0000-0000-0000-0000000000a1';
 select pg_temp.check((select count(*) from public.wellness where player_id='00000000-0000-0000-0000-0000000000a1') + (select count(*) from public.rpe where player_id='00000000-0000-0000-0000-0000000000a1') = 0, 'Esborrar una jugadora elimina totes les seves dades');
+
+-- =============== CALENDARI I PROGRAMACIONS ===============
+reset role;
+insert into auth.users values ('00000000-0000-0000-0000-0000000000d4','d@jug');
+insert into public.profiles values ('00000000-0000-0000-0000-0000000000d4','player','Dana');
+create temp table vars as select (now() at time zone 'Europe/Madrid')::date as today;
+grant select on vars to authenticated, anon;
+
+-- Entrenador crea una programació per a tots els dies de la setmana
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.session_rules (id, name, kind, weekdays, start_time, duration_min, start_date)
+  values ('22222222-0000-0000-0000-000000000001', 'Força', 'Entrenament', '{1,2,3,4,5,6,7}', '19:00', 90, (select today from vars) - 10);
+select pg_temp.check(public.generate_rule_sessions() = 43, 'Programació diària genera 43 sessions (avui + 42 dies; res al passat)');
+select pg_temp.check(public.generate_rule_sessions() = 0, 'Tornar a generar no crea duplicats');
+select pg_temp.check((select min(session_date) from public.sessions where rule_id = '22222222-0000-0000-0000-000000000001') = (select today from vars)
+  and (select bool_and(duration_min = 90 and start_time = '19:00') from public.sessions where rule_id = '22222222-0000-0000-0000-000000000001'),
+  'Les sessions generades comencen avui i hereten hora i durada');
+select pg_temp.expect_error($$insert into public.session_rules (name, kind, weekdays, start_date) values ('x','Entrenament','{8}', current_date)$$, 'Dia de la setmana 8 rebutjat');
+select pg_temp.expect_error($$insert into public.session_rules (name, kind, weekdays, start_date, end_date) values ('x','Entrenament','{1}', current_date, current_date - 1)$$, 'Data final anterior a la inicial rebutjada');
+
+-- Programació només dilluns i dimecres durant 3 setmanes
+insert into public.session_rules (id, name, kind, weekdays, start_date, end_date)
+  values ('22222222-0000-0000-0000-000000000002', 'Dl i Dc', 'Entrenament', '{1,3}', (select today from vars), (select today from vars) + 20);
+select public.generate_rule_sessions();
+select pg_temp.check((select bool_and(extract(isodow from session_date) in (1,3)) and count(*) between 5 and 7 from public.sessions where rule_id = '22222222-0000-0000-0000-000000000002'),
+  'Dl i Dc durant 3 setmanes: només dilluns i dimecres, dins del període');
+
+-- La jugadora Dana omple la sessió d'avui (generada) amb durada
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000d4', false); set role authenticated;
+insert into public.rpe (session_id, rpe, duration_min)
+  select id, 7, 85 from public.sessions where rule_id = '22222222-0000-0000-0000-000000000001' and session_date = (select today from vars);
+select pg_temp.check((select load from public.rpe where player_id = '00000000-0000-0000-0000-0000000000d4') = 595, 'Càrrega calculada per la base de dades: 7 x 85 = 595');
+select pg_temp.expect_error($$update public.rpe set duration_min = 0 where player_id = '00000000-0000-0000-0000-0000000000d4'$$, 'Durada 0 rebutjada');
+select pg_temp.expect_error($$update public.rpe set load = 1 where player_id = '00000000-0000-0000-0000-0000000000d4'$$, 'La jugadora no pot posar la càrrega a mà');
+select pg_temp.expect_error($$insert into public.session_rules (name, kind, weekdays, start_date) values ('x','Entrenament','{1}', current_date)$$, 'Una jugadora no pot crear programacions');
+select pg_temp.check((select count(*) from public.session_rules) = 0, 'Una jugadora no veu les programacions');
+select pg_temp.expect_error($$select public.refresh_rule('22222222-0000-0000-0000-000000000001')$$, 'Una jugadora no pot esborrar sessions programades');
+select pg_temp.check(public.generate_rule_sessions() = 0, 'La jugadora pot activar la generació (sense duplicats)');
+
+-- Cancel·lar: la jugadora deixa de veure la sessió i no la pot omplir
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+update public.sessions set cancelled = true where rule_id = '22222222-0000-0000-0000-000000000002' and session_date = (select min(session_date) from public.sessions where rule_id = '22222222-0000-0000-0000-000000000002');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000d4', false); set role authenticated;
+select pg_temp.check((select count(*) from public.sessions where cancelled) = 0, 'La jugadora no veu les sessions cancel·lades');
+
+-- Esborrar programació: treu les futures sense respostes, conserva la que té dades
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.check(public.refresh_rule('22222222-0000-0000-0000-000000000001', true) = 42, 'Esborrar programació treu les 42 sessions futures sense respostes');
+select pg_temp.check((select count(*) from public.sessions s join public.rpe r on r.session_id = s.id where r.player_id = '00000000-0000-0000-0000-0000000000d4') = 1
+  and (select count(*) from public.session_rules where id = '22222222-0000-0000-0000-000000000001') = 0,
+  'La sessió amb respostes es conserva (sense programació)');
+-- Pausar: les futures sense respostes desapareixen i no es tornen a generar
+update public.session_rules set active = false where id = '22222222-0000-0000-0000-000000000002';
+select public.refresh_rule('22222222-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from public.sessions where rule_id = '22222222-0000-0000-0000-000000000002' and not cancelled) = 0, 'Programació pausada: no queden sessions futures pendents');

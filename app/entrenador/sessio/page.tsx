@@ -13,6 +13,7 @@ import {
   fmtSessionTime,
   fmtTime,
   RPE_LABELS,
+  SESSION_COLS,
   shortLabel,
   WELLNESS_VARS,
   type Profile,
@@ -42,7 +43,7 @@ async function fetchDetail(id: string): Promise<{ session: Session | null; rows:
   const sb = supabase();
   const { data: s, error: sErr } = await sb
     .from("sessions")
-    .select("id, session_date, start_time, kind, name")
+    .select(SESSION_COLS)
     .eq("id", id)
     .maybeSingle();
   if (sErr && !/uuid/i.test(sErr.message)) throw new Error(sErr.message);
@@ -97,6 +98,15 @@ function Detail() {
     void load();
   }
 
+  // Les sessions automàtiques no s'esborren (es tornarien a generar): es cancel·len.
+  async function setCancelled(value: boolean) {
+    if (!session) return;
+    if (value && !confirm(`Cancel·lar "${session.name}"? Les jugadores deixaran de veure-la.`)) return;
+    const { data, error } = await supabase().from("sessions").update({ cancelled: value }).eq("id", session.id).select(SESSION_COLS).maybeSingle();
+    if (error || !data) return setError(error?.message ?? "No s'ha pogut canviar la sessió.");
+    setSession(data as Session);
+  }
+
   async function remove() {
     if (!session) return;
     if (!confirm(`Segur que vols esborrar "${session.name}"? S'esborraran també tots els wellness i RPE d'aquesta sessió.`)) return;
@@ -113,6 +123,8 @@ function Detail() {
   const rs = rows.flatMap((x) => (x.r ? [x.r.rpe] : []));
   const wAvg = average(ws);
   const rAvg = average(rs);
+  const loads = rows.flatMap((x) => (x.r?.load != null ? [x.r.load] : []));
+  const loadAvg = average(loads);
   const withAlerts = rows.filter((x) => x.w && (alertsOf(x.w).length > 0 || x.w.has_pain)).length;
   const pendingW = rows.filter((x) => !x.w).map((x) => x.player.display_name);
   const pendingR = rows.filter((x) => !x.r).map((x) => x.player.display_name);
@@ -132,6 +144,12 @@ function Detail() {
         <p className="muted" style={{ margin: "4px 0 12px" }}>
           {fmtDate(session.session_date, { year: true })}
           {session.start_time ? ` · ${fmtSessionTime(session.start_time)}` : ""}
+          {session.duration_min ? ` · ${session.duration_min} min previstos` : ""}
+          {session.rule_id ? " · ⟳ automàtica" : ""}
+        </p>
+        {session.cancelled && <p className="msg error" style={{ marginTop: 0 }}>Sessió cancel·lada: les jugadores no la veuen.</p>}
+        <p className="small" style={{ margin: "0 0 10px" }}>
+          Respostes: wellness <b>{ws.length}/{rows.length}</b> · RPE <b>{rs.length}/{rows.length}</b>
         </p>
         <div className="stats">
           <div className="stat">
@@ -144,9 +162,9 @@ function Detail() {
             <b>{rAvg == null ? "–" : rAvg.toFixed(1)}</b>
           </div>
           <div className="stat">
-            Respostes
-            <b>{ws.length}/{rows.length}</b>
-            <span className="small">wellness · RPE {rs.length}/{rows.length}</span>
+            Càrrega mitjana
+            <b>{loadAvg == null ? "–" : Math.round(loadAvg)}</b>
+            <span className="small">UA (RPE × min)</span>
           </div>
           <div className="stat">
             Amb alerta o molèstia
@@ -213,7 +231,9 @@ function Detail() {
             <div className="line">
               {r ? (
                 <>
-                  <b>RPE {r.rpe}</b> <span className="muted">({RPE_LABELS[r.rpe]}) · {fmtTime(r.submitted_at)}</span>
+                  <b>RPE {r.rpe}</b> <span className="muted">({RPE_LABELS[r.rpe]})</span>
+                  {r.duration_min != null && <span> · {r.duration_min} min · càrrega <b>{r.load}</b></span>}
+                  <span className="muted"> · {fmtTime(r.submitted_at)}</span>
                   {r.notes && <div className="muted">Nota: {r.notes}</div>}
                 </>
               ) : (
@@ -225,7 +245,15 @@ function Detail() {
       })}
 
       <div style={{ marginTop: 24 }}>
-        <button className="btn danger" onClick={remove}>Esborrar sessió</button>
+        {session.rule_id ? (
+          session.cancelled ? (
+            <button className="btn secondary" onClick={() => setCancelled(false)}>Reactivar sessió</button>
+          ) : (
+            <button className="btn danger" onClick={() => setCancelled(true)}>Cancel·lar sessió</button>
+          )
+        ) : (
+          <button className="btn danger" onClick={remove}>Esborrar sessió</button>
+        )}
       </div>
     </>
   );

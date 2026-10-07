@@ -163,16 +163,19 @@ export function WellnessForm({
 
 export function RpeForm({
   sessionId,
+  plannedDuration,
   existing,
   editable,
   onSaved,
 }: {
   sessionId: string;
+  plannedDuration: number | null;
   existing: Rpe | null;
   editable: boolean;
   onSaved: (r: Rpe) => void;
 }) {
   const [value, setValue] = useState<number | null>(existing?.rpe ?? null);
+  const [duration, setDuration] = useState<string>(String(existing?.duration_min ?? plannedDuration ?? ""));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
@@ -182,8 +185,12 @@ export function RpeForm({
       setStatus({ kind: "error", text: "Toca un número de 0 a 10." });
       return;
     }
+    if (minutes == null) {
+      setStatus({ kind: "error", text: "Indica quants minuts ha durat la sessió (d'1 a 300)." });
+      return;
+    }
     setStatus({ kind: "saving" });
-    const payload = { rpe: value, notes: notes.trim() || null };
+    const payload = { rpe: value, duration_min: minutes, notes: notes.trim() || null };
     try {
       const res = existing
         ? await supabase().from("rpe").update(payload).eq("id", existing.id).select().maybeSingle()
@@ -196,6 +203,14 @@ export function RpeForm({
       setStatus({ kind: "error", text: friendlyError(err instanceof Error ? err.message : String(err)) });
     }
   }
+
+  const parsed = Number(duration);
+  const minutes = Number.isInteger(parsed) && parsed >= 1 && parsed <= 300 ? parsed : null;
+  const step = (d: number) => {
+    const base = minutes ?? plannedDuration ?? 60;
+    setDuration(String(Math.min(300, Math.max(5, Math.round((base + d) / 5) * 5))));
+    setStatus({ kind: "idle" });
+  };
 
   return (
     <form className="stack" onSubmit={save}>
@@ -217,6 +232,30 @@ export function RpeForm({
         {value != null && (
           <p className="muted" style={{ marginBottom: 0 }}>
             {value} = <b>{RPE_LABELS[value]}</b>
+          </p>
+        )}
+      </div>
+      <div>
+        <label className="field" htmlFor="rdur">Durada real (minuts)</label>
+        <div className="stepper">
+          <button type="button" aria-label="5 minuts menys" disabled={!editable} onClick={() => step(-5)}>−</button>
+          <input
+            id="rdur"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            disabled={!editable}
+            value={duration}
+            onChange={(e) => {
+              setDuration(e.target.value.replace(/\D/g, "").slice(0, 3));
+              setStatus({ kind: "idle" });
+            }}
+          />
+          <button type="button" aria-label="5 minuts més" disabled={!editable} onClick={() => step(5)}>+</button>
+        </div>
+        {value != null && minutes != null && (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Càrrega: {value} × {minutes} min = <b>{value * minutes}</b> UA
           </p>
         )}
       </div>

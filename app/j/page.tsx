@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
 import { Brand, Footer } from "@/components/ui";
-import { supabase } from "@/lib/supabase";
+import { viewRange, type CalView } from "@/lib/dates";
+import { fetchAll, supabase } from "@/lib/supabase";
 import {
   bandOf,
   fmtDate,
   fmtSessionTime,
   fmtTime,
+  SESSION_COLS,
   todayMadrid,
   type Profile,
   type Rpe,
@@ -103,12 +106,17 @@ function PlayerHome({ me }: { me: Profile }) {
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const top = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase()
+      const sb = supabase();
+      // Crea les sessions que toquin segons les programacions (si encara no existeixen).
+      await sb.rpc("generate_rule_sessions");
+      const { data, error } = await sb
         .from("sessions")
-        .select("id, session_date, start_time, kind, name")
+        .select(SESSION_COLS)
         .eq("session_date", today)
         .order("start_time", { ascending: true, nullsFirst: true })
         .order("id")
@@ -121,8 +129,14 @@ function PlayerHome({ me }: { me: Profile }) {
 
   const session = sessions?.find((s) => s.id === selected) ?? null;
 
+  function openToday(id: string) {
+    setSelected(id);
+    top.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
   return (
     <>
+      <div ref={top} />
       <h1>Hola, {me.display_name}!</h1>
       <p className="muted" style={{ marginTop: -6 }}>{fmtDate(today)}</p>
       {error && <p className="msg error">{error}</p>}
@@ -142,13 +156,14 @@ function PlayerHome({ me }: { me: Profile }) {
           ))}
         </div>
       )}
-      {session && <SessionForms key={session.id} me={me} session={session} editable />}
-      <History me={me} today={today} />
+      {session && <SessionForms key={session.id} me={me} session={session} onSaved={() => setVersion((v) => v + 1)} />}
+      {sessions !== null && <PlayerCalendar me={me} today={today} version={version} onOpenToday={openToday} />}
     </>
   );
 }
 
-function SessionForms({ me, session, editable }: { me: Profile; session: Session; editable: boolean }) {
+function SessionForms({ me, session, onSaved }: { me: Profile; session: Session; onSaved: () => void }) {
+  const editable = true;
   const [w, setW] = useState<Wellness | null | undefined>(undefined);
   const [r, setR] = useState<Rpe | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -185,96 +200,119 @@ function SessionForms({ me, session, editable }: { me: Profile; session: Session
           <h2 style={{ margin: 0 }}>Wellness <span className="muted small">(abans)</span></h2>
           {w ? <span className="chip fet">Enviat {fmtTime(w.submitted_at)}</span> : <span className="chip pendent">Pendent</span>}
         </div>
-        <WellnessForm sessionId={session.id} existing={w} editable={editable} onSaved={setW} />
+        <WellnessForm sessionId={session.id} existing={w} editable={editable} onSaved={(x) => { setW(x); onSaved(); }} />
       </section>
       <section className="card">
         <div className="row between" style={{ marginBottom: 10 }}>
           <h2 style={{ margin: 0 }}>RPE <span className="muted small">(després)</span></h2>
           {r ? <span className="chip fet">Enviat {fmtTime(r.submitted_at)}</span> : <span className="chip pendent">Pendent</span>}
         </div>
-        <RpeForm sessionId={session.id} existing={r} editable={editable} onSaved={setR} />
+        <RpeForm sessionId={session.id} plannedDuration={session.duration_min} existing={r} editable={editable} onSaved={(x) => { setR(x); onSaved(); }} />
       </section>
       <p className="muted small center">Pots modificar les respostes fins a les 23:59 d&apos;avui.</p>
     </>
   );
 }
 
-type HistRow = Session & {
-  wellness: Pick<Wellness, "score" | "submitted_at">[];
-  rpe: Pick<Rpe, "rpe" | "submitted_at">[];
-};
+type Mine = { w?: Pick<Wellness, "score">; r?: Pick<Rpe, "rpe" | "duration_min" | "load"> };
 
-const PAGE = 10;
-
-// Sessions anteriors amb els registres propis (la base de dades només deixa veure els seus).
-function fetchHistory(playerId: string, today: string, from: number) {
-  return supabase()
-    .from("sessions")
-    .select("id, session_date, start_time, kind, name, wellness(score, submitted_at), rpe(rpe, submitted_at)")
-    .lt("session_date", today)
-    .eq("wellness.player_id", playerId)
-    .eq("rpe.player_id", playerId)
-    .order("session_date", { ascending: false })
-    .order("id", { ascending: false })
-    .range(from, from + PAGE - 1);
+function playerStatus(s: Session, today: string, m: Mine): CalStatus {
+  if (m.w && m.r) return "completada";
+  if (m.w || m.r) return "parcial";
+  return s.session_date > today ? "programada" : "pendent";
 }
 
-function History({ me, today }: { me: Profile; today: string }) {
-  const [rows, setRows] = useState<HistRow[]>([]);
-  const [more, setMore] = useState(true);
-  const [busy, setBusy] = useState(true);
+/** Calendari de la jugadora: les sessions i com les ha omplert ella (només veu les seves dades). */
+function PlayerCalendar({ me, today, version, onOpenToday }: { me: Profile; today: string; version: number; onOpenToday: (id: string) => void }) {
+  const [view, setView] = useState<CalView>("mes");
+  const [anchor, setAnchor] = useState(today);
+  const [data, setData] = useState<{ sessions: Session[]; mine: Map<string, Mine> }>({ sessions: [], mine: new Map() });
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const apply = useCallback((from: number, res: Awaited<ReturnType<typeof fetchHistory>>) => {
-    setBusy(false);
-    if (res.error) return setError(res.error.message);
-    const data = (res.data ?? []) as unknown as HistRow[];
-    setRows((prev) => (from === 0 ? data : [...prev, ...data]));
-    setMore(data.length === PAGE);
-  }, []);
+  const { from, to } = viewRange(view, anchor);
 
   useEffect(() => {
-    fetchHistory(me.id, today, 0).then((res) => apply(0, res));
-  }, [apply, me.id, today]);
+    let alive = true;
+    loadPlayerRange(me.id, from, to).then(
+      (d) => {
+        if (!alive) return;
+        setData(d);
+        setLoading(false);
+      },
+      (e) => alive && setError(e instanceof Error ? e.message : String(e)),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [me.id, from, to, version]);
 
-  function loadMore() {
-    const from = rows.length;
-    setBusy(true);
-    fetchHistory(me.id, today, from).then((res) => apply(from, res));
-  }
+  const items: CalItem[] = data.sessions.map((s) => ({ session: s, status: playerStatus(s, today, data.mine.get(s.id) ?? {}) }));
 
   return (
-    <section className="card">
-      <h2>Els meus registres</h2>
+    <>
+      <h2 style={{ marginTop: 20 }}>El meu calendari</h2>
       {error && <p className="msg error">{error}</p>}
-      {rows.length === 0 && !busy && !error && <p className="muted" style={{ margin: 0 }}>Encara no hi ha sessions anteriors.</p>}
-      <ul className="list">
-        {rows.map((s) => {
-          const w = s.wellness[0];
-          const r = s.rpe[0];
+      <Calendar
+        view={view}
+        anchor={anchor}
+        today={today}
+        items={items}
+        loading={loading}
+        onView={setView}
+        onAnchor={setAnchor}
+        renderItem={({ session: s, status }) => {
+          const m = data.mine.get(s.id) ?? {};
           return (
-            <li key={s.id}>
+            <div>
               <div className="row between">
                 <b>{s.name}</b>
-                <span className="muted small">{fmtDate(s.session_date)}</span>
+                <StatusChip status={status} />
               </div>
-              <div className="row" style={{ marginTop: 4 }}>
-                {w ? (
-                  <span className={`chip ${bandOf(Number(w.score)).cls}`}>Wellness {Number(w.score).toFixed(1)}</span>
-                ) : (
-                  <span className="chip pendent">Sense wellness</span>
-                )}
-                {r ? <span className="chip">RPE {r.rpe}</span> : <span className="chip pendent">Sense RPE</span>}
+              <div className="muted small">
+                {s.kind}
+                {s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""}
+                {s.duration_min ? ` · ${s.duration_min} min` : ""}
               </div>
-            </li>
+              {(m.w || m.r) && (
+                <div className="row" style={{ marginTop: 6 }}>
+                  {m.w && <span className={`chip ${bandOf(Number(m.w.score)).cls}`}>Wellness {Number(m.w.score).toFixed(1)}</span>}
+                  {m.r && <span className="chip">RPE {m.r.rpe}</span>}
+                  {m.r?.load != null && <span className="chip">Càrrega {m.r.load}</span>}
+                </div>
+              )}
+              {s.session_date === today && (
+                <button className="btn small" style={{ marginTop: 8 }} onClick={() => onOpenToday(s.id)}>
+                  {status === "completada" ? "Veure o editar" : "Omplir ara"}
+                </button>
+              )}
+            </div>
           );
-        })}
-      </ul>
-      {more && rows.length > 0 && (
-        <button className="btn secondary block" style={{ marginTop: 12 }} disabled={busy} onClick={loadMore}>
-          {busy ? "Carregant…" : "Veure'n més"}
-        </button>
-      )}
-    </section>
+        }}
+      />
+    </>
   );
+}
+
+async function loadPlayerRange(playerId: string, from: string, to: string) {
+  const sb = supabase();
+  // Sempre filtrat per dates i paginat amb ordre fix (límit de 1.000 files de Supabase).
+  const sessions = await fetchAll<Session>((f, t) =>
+    sb.from("sessions").select(SESSION_COLS).gte("session_date", from).lte("session_date", to)
+      .order("session_date").order("start_time", { nullsFirst: true }).order("id").range(f, t),
+  );
+  const ids = sessions.map((s) => s.id);
+  const mine = new Map<string, Mine>();
+  if (ids.length) {
+    const [w, r] = await Promise.all([
+      fetchAll<{ session_id: string; score: number }>((f, t) =>
+        sb.from("wellness").select("session_id, score").eq("player_id", playerId).in("session_id", ids).order("id").range(f, t),
+      ),
+      fetchAll<{ session_id: string; rpe: number; duration_min: number | null; load: number | null }>((f, t) =>
+        sb.from("rpe").select("session_id, rpe, duration_min, load").eq("player_id", playerId).in("session_id", ids).order("id").range(f, t),
+      ),
+    ]);
+    for (const x of w) mine.set(x.session_id, { ...mine.get(x.session_id), w: x });
+    for (const x of r) mine.set(x.session_id, { ...mine.get(x.session_id), r: x });
+  }
+  return { sessions, mine };
 }
