@@ -217,13 +217,15 @@ create table if not exists public.team_settings (
 );
 insert into public.team_settings (id) values (true) on conflict do nothing;
 
--- LLIGA INTERNA: punts de cada jugadora. "prev_rank" és la posició a l'inici del mes
--- (la desa la base de dades cada dia 1) per mostrar quantes posicions s'ha pujat o baixat.
+-- LLIGA INTERNA: cada mes és una lliga nova (els punts compten només aquell mes).
+-- "prev_rank" és la posició al final del dia anterior, per mostrar qui puja i qui baixa.
 create table if not exists public.league_points (
-  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  month      date not null check (extract(day from month) = 1),   -- primer dia del mes
   points     integer not null default 0 check (points between 0 and 100000),
   prev_rank  integer,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (profile_id, month)
 );
 
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
@@ -476,18 +478,37 @@ begin
 end $$;
 
 -- LLIGA INTERNA ---------------------------------------------------------
--- Classificació per a tot l'equip (nom i punts de cada jugadora; res més).
-create or replace function public.league_table()
+create or replace function public.league_month()
+returns date language sql stable set search_path = '' as $$
+  select date_trunc('month', now() at time zone 'Europe/Madrid')::date;
+$$;
+
+-- Classificació d'un mes (per defecte, l'actual) per a tot l'equip: nom i punts; res més.
+create or replace function public.league_table(m date default null)
 returns table (profile_id uuid, display_name text, points integer, prev_rank integer)
 language sql stable security definer set search_path = '' as $$
   select p.id, p.display_name, coalesce(l.points, 0), l.prev_rank
   from public.profiles p
-  left join public.league_points l on l.profile_id = p.id
+  left join public.league_points l on l.profile_id = p.id and l.month = coalesce(m, public.league_month())
   where p.role = 'player' and ((select public.is_coach()) or (select public.is_player()))
   order by coalesce(l.points, 0) desc, p.display_name, p.id;
 $$;
 
--- Sumar o restar punts (d'un en un o els que calgui). Només el staff. Mai per sota de 0.
+-- Guanyadores dels mesos anteriors (en cas d'empat, totes les empatades).
+create or replace function public.league_winners()
+returns table (month date, display_name text, points integer)
+language sql stable security definer set search_path = '' as $$
+  select r.month, r.display_name, r.points
+  from (
+    select l.month, p.display_name, l.points, rank() over (partition by l.month order by l.points desc) as rk
+    from public.league_points l join public.profiles p on p.id = l.profile_id and p.role = 'player'
+    where l.month < public.league_month() and l.points > 0
+  ) r
+  where r.rk = 1 and ((select public.is_coach()) or (select public.is_player()))
+  order by r.month desc, r.display_name;
+$$;
+
+-- Sumar o restar punts al mes actual. Només el staff. Mai per sota de 0.
 create or replace function public.league_add(pid uuid, delta integer)
 returns integer language plpgsql security definer set search_path = '' as $$
 declare
@@ -499,14 +520,14 @@ begin
   if not exists (select 1 from public.profiles where id = pid and role = 'player') then
     raise exception 'Jugadora no trobada';
   end if;
-  insert into public.league_points (profile_id, points) values (pid, greatest(0, delta))
-  on conflict (profile_id) do update
+  insert into public.league_points (profile_id, month, points) values (pid, public.league_month(), greatest(0, delta))
+  on conflict (profile_id, month) do update
     set points = greatest(0, public.league_points.points + delta), updated_at = now()
   returning points into result;
   return result;
 end $$;
 
--- Posar directament els punts d'una jugadora (per carregar la classificació inicial).
+-- Posar directament els punts del mes actual d'una jugadora (per carregar la classificació).
 create or replace function public.league_set(pid uuid, value integer)
 returns integer language plpgsql security definer set search_path = '' as $$
 begin
@@ -519,24 +540,35 @@ begin
   if not exists (select 1 from public.profiles where id = pid and role = 'player') then
     raise exception 'Jugadora no trobada';
   end if;
-  insert into public.league_points (profile_id, points) values (pid, value)
-  on conflict (profile_id) do update set points = value, updated_at = now();
+  insert into public.league_points (profile_id, month, points) values (pid, public.league_month(), value)
+  on conflict (profile_id, month) do update set points = value, updated_at = now();
   return value;
 end $$;
 
--- Cada dia 1 de mes: desa la posició de cada jugadora (empats = mateixa posició).
+-- Cada nit a les 00:05 (Barcelona): desa la posició de cada jugadora al mes actual, per
+-- mostrar l'endemà qui ha pujat i qui ha baixat. Qui encara no té punts no té posició.
 create or replace function public.snapshot_league()
 returns void language sql security definer set search_path = '' as $$
-  insert into public.league_points (profile_id)
-  select id from public.profiles where role = 'player'
+  insert into public.league_points (profile_id, month)
+  select id, public.league_month() from public.profiles where role = 'player'
   on conflict do nothing;
-  update public.league_points l set prev_rank = r.rk
+  update public.league_points l set prev_rank = case when l.points > 0 then r.rk end
   from (
     select l2.profile_id, rank() over (order by l2.points desc) as rk
     from public.league_points l2 join public.profiles p on p.id = l2.profile_id and p.role = 'player'
+    where l2.month = public.league_month()
   ) r
-  where r.profile_id = l.profile_id;
+  where r.profile_id = l.profile_id and l.month = public.league_month();
 $$;
+
+-- La tasca programada es crida a les 22:05 i 23:05 UTC; només actua a les 00 de Barcelona.
+create or replace function public.snapshot_league_if_midnight()
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if extract(hour from (now() at time zone 'Europe/Madrid')) = 0 then
+    perform public.snapshot_league();
+  end if;
+end $$;
 
 -- Quan es canvia, pausa o esborra una programació: treu les sessions futures que
 -- encara no tenen cap resposta (les que en tenen es queden) i torna a generar.
@@ -619,9 +651,10 @@ revoke all on function public.wellness_open_at(uuid, timestamp), public.generate
   public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
-revoke all on function public.league_table(), public.league_add(uuid, integer), public.league_set(uuid, integer), public.snapshot_league() from public, anon;
-grant execute on function public.league_table(), public.league_add(uuid, integer), public.league_set(uuid, integer) to authenticated;
-revoke all on function public.snapshot_league() from authenticated;
+revoke all on function public.league_table(date), public.league_winners(), public.league_add(uuid, integer), public.league_set(uuid, integer),
+  public.snapshot_league(), public.snapshot_league_if_midnight() from public, anon;
+grant execute on function public.league_table(date), public.league_winners(), public.league_add(uuid, integer), public.league_set(uuid, integer) to authenticated;
+revoke all on function public.snapshot_league(), public.snapshot_league_if_midnight() from authenticated;
 
 -- PROFILES: cadascú es veu a si mateix; el staff ho veu tot. Ningú en crea des del navegador.
 drop policy if exists profiles_select on public.profiles;
@@ -737,14 +770,14 @@ create policy rpe_update on public.rpe for update to authenticated
 --    · cada 15 minuts: multes automàtiques
 --    · 5:30 i 6:30 UTC: recordatori de les 7:30 (només actua a les 7 de Barcelona)
 --    · cada 6 hores: estadístiques de la Federació
---    · cada dia 1 de mes: posició de la lliga interna (per a les fletxes de pujada/baixada)
+--    · cada nit a les 00:05: posició de la lliga interna (per a les fletxes de pujada/baixada)
 -- =====================================================================
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 select cron.schedule('multes-automatiques', '*/15 * * * *', 'select public.apply_auto_fines()');
 select cron.schedule('recordatori-wellness', '30 5,6 * * *', 'select public.send_wellness_reminder()');
 select cron.schedule('estadistiques-fcf', '20 */6 * * *', 'select public.trigger_fcf_sync()');
-select cron.schedule('lliga-inici-de-mes', '5 0 1 * *', 'select public.snapshot_league()');
+select cron.schedule('lliga-cada-nit', '5 22,23 * * *', 'select public.snapshot_league_if_midnight()');
 
 -- =====================================================================
 -- 5. EL TEU COMPTE D'ENTRENADOR (només la primera vegada)

@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
 import { FcfStats } from "@/components/fcf-stats";
-import { fetchLeague, fetchTeamLevel, LeagueTable, LevelBadge, ranks, sortLeague, type LeagueRow } from "@/components/league";
+import { daysLeftInMonth, fetchLeague, fetchTeamLevel, fetchWinners, LeagueTable, leagueTitle, LevelBadge, ranks, sortLeague, Winners, type LeagueRow, type LeagueWinner } from "@/components/league";
 import { PlayerFines } from "@/components/player-fines";
 import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
 import { fmtEuros } from "@/lib/fines";
@@ -309,15 +309,21 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
 
 /** Lliga interna: classificació de tot l'equip, amb animació des de l'inici del mes. */
 function PlayerLeague({ meId }: { meId: string }) {
+  const today = todayMadrid();
   const [rows, setRows] = useState<LeagueRow[] | null>(null);
+  const [winners, setWinners] = useState<LeagueWinner[]>([]);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     fetchLeague().then(setRows, (e) => setError(e instanceof Error ? e.message : String(e)));
+    fetchWinners().then(setWinners, () => {});
   }, []);
+  const left = daysLeftInMonth(today);
   return (
     <>
-      <h1>Lliga interna</h1>
-      <p className="muted" style={{ marginTop: -6 }}>Classificació de tot l&apos;equip. Les fletxes indiquen quantes posicions has pujat o baixat aquest mes.</p>
+      <h1>{leagueTitle(today)}</h1>
+      <p className="muted" style={{ marginTop: -6 }}>
+        {left === 1 ? "Avui és l'últim dia del mes!" : `Queden ${left} dies per acabar el mes.`} Les fletxes indiquen qui ha pujat o baixat des d&apos;ahir.
+      </p>
       {error && <p className="msg error">{error}</p>}
       {!rows && !error && <p className="muted">Carregant…</p>}
       {rows && (
@@ -325,6 +331,10 @@ function PlayerLeague({ meId }: { meId: string }) {
           <LeagueTable rows={rows} meId={meId} fromPrevious />
         </section>
       )}
+      <section className="card">
+        <h2>Guanyadores</h2>
+        <Winners winners={winners} />
+      </section>
     </>
   );
 }
@@ -406,7 +416,7 @@ function Dashboard({
         <button type="button" className="tile" onClick={() => go("lliga")}>
           {ICONS.lliga}
           <b>Lliga interna</b>
-          <span>{data?.leaguePos ? `Ets ${data.leaguePos.pos}a de ${data.leaguePos.total} · ${data.leaguePos.points} pts` : "Classificació"}</span>
+          <span>{data?.leaguePos && data.leaguePos.points > 0 ? `${data.leaguePos.pos}a de ${data.leaguePos.total} · ${data.leaguePos.points} pts` : leagueTitle(today)}</span>
         </button>
         <button type="button" className="tile" onClick={() => go("stats")}>
           {svg("M4 20V10M10 20V4M16 20v-7M22 20H2")}

@@ -11,6 +11,51 @@ export async function fetchLeague(): Promise<LeagueRow[]> {
   return (data ?? []) as LeagueRow[];
 }
 
+export type LeagueWinner = { month: string; display_name: string; points: number };
+
+export async function fetchWinners(): Promise<LeagueWinner[]> {
+  const { data, error } = await supabase().rpc("league_winners");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as LeagueWinner[];
+}
+
+/** "Octubre" a partir de "2026-10-01" o de la data d'avui. */
+export function monthName(d: string, withYear = false): string {
+  const s = new Intl.DateTimeFormat("ca-ES", { timeZone: "UTC", month: "long", ...(withYear ? { year: "numeric" } : {}) }).format(new Date(`${d.slice(0, 7)}-01T12:00:00Z`));
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** "Lliga d'octubre", "Lliga de novembre" (apostrofació catalana). */
+export function leagueTitle(d: string): string {
+  const m = monthName(d).toLowerCase();
+  return /^[aeiouàèéíòóú]/.test(m) ? `Lliga d'${m}` : `Lliga de ${m}`;
+}
+
+/** Dies que queden del mes (avui inclòs), a Barcelona. */
+export function daysLeftInMonth(today: string): number {
+  const [y, m, d] = today.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate() - d + 1;
+}
+
+/** Historial de guanyadores de la lliga (un mes per línia; empats junts). */
+export function Winners({ winners }: { winners: LeagueWinner[] }) {
+  if (winners.length === 0) return <p className="muted small" style={{ margin: 0 }}>Encara no s&apos;ha acabat cap mes.</p>;
+  const byMonth = new Map<string, LeagueWinner[]>();
+  for (const w of winners) byMonth.set(w.month, [...(byMonth.get(w.month) ?? []), w]);
+  return (
+    <ul className="list">
+      {[...byMonth.entries()].map(([m, ws]) => (
+        <li key={m} className="row between">
+          <span>
+            <span className="winner-cup" aria-hidden="true">🏆</span> <b>{monthName(m, true)}</b>
+          </span>
+          <span>{ws.map((w) => w.display_name).join(" i ")} · <b>{ws[0].points} pts</b></span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export async function fetchTeamLevel(): Promise<number | null> {
   const { data, error } = await supabase().from("team_settings").select("commitment_level").maybeSingle();
   if (error) throw new Error(error.message);
@@ -44,7 +89,7 @@ export function LevelBadge({ level }: { level: number | null }) {
 
 /**
  * Classificació de la lliga. Les files es mouen amb animació quan canvia l'ordre.
- * Amb "fromPrevious", primer es mostra l'ordre d'inici de mes i després es mou fins a l'actual.
+ * Amb "fromPrevious", primer es mostra l'ordre d'ahir i després es mou fins al d'avui.
  */
 export function LeagueTable({
   rows,
@@ -116,7 +161,7 @@ export function LeagueTable({
               {r.profile_id === meId && <span className="chip fet" style={{ marginLeft: 6 }}>Tu</span>}
             </span>
             {move != null && (
-              <span className={`league-move ${move > 0 ? "up" : move < 0 ? "down" : "same"}`} title="Respecte a l'inici del mes">
+              <span className={`league-move ${move > 0 ? "up" : move < 0 ? "down" : "same"}`} title="Posicions guanyades o perdudes des d'ahir">
                 {move > 0 ? `▲${move}` : move < 0 ? `▼${-move}` : "="}
               </span>
             )}

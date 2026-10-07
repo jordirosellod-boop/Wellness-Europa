@@ -453,3 +453,4 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .league-row:has(.league-actions) .league-move { min-width: 24px; }
 .league-row:has(.league-actions) .league-pos { flex-basis: 30px; height: 30px; font-size: 1rem; }
 .league-row:has(.league-actions) .pt-btn { width: 40px; height: 40px; }
+.winner-cup { font-size: 1.1rem; }

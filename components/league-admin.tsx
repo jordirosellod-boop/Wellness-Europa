@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchLeague, fetchTeamLevel, LeagueTable, LevelBadge, type LeagueRow } from "@/components/league";
+import { daysLeftInMonth, fetchLeague, fetchTeamLevel, fetchWinners, LeagueTable, leagueTitle, LevelBadge, Winners, type LeagueRow, type LeagueWinner } from "@/components/league";
 import { supabase } from "@/lib/supabase";
-import { friendlyError } from "@/lib/wellness";
+import { friendlyError, todayMadrid } from "@/lib/wellness";
 
 /** Mini apartat: nivell de compromís de l'equip. */
 export function LevelEditor() {
@@ -55,6 +55,8 @@ export function LevelEditor() {
 /** Lliga interna: sumar/restar punts d'un en un, o posar-los directament. */
 export function LeagueEditor() {
   const [rows, setRows] = useState<LeagueRow[] | null>(null);
+  const [winners, setWinners] = useState<LeagueWinner[]>([]);
+  const today = todayMadrid();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -66,6 +68,7 @@ export function LeagueEditor() {
   );
   useEffect(() => {
     load();
+    fetchWinners().then(setWinners, () => {});
   }, [load]);
 
   async function add(r: LeagueRow, delta: number) {
@@ -109,7 +112,7 @@ export function LeagueEditor() {
   return (
     <section className="card">
       <div className="row between" style={{ marginBottom: 6 }}>
-        <h2 style={{ margin: 0 }}>Lliga interna</h2>
+        <h2 style={{ margin: 0 }}>{leagueTitle(today)}</h2>
         {!editing ? (
           <button className="btn small secondary" onClick={() => setEditing(true)}>Escriure punts</button>
         ) : (
@@ -117,7 +120,8 @@ export function LeagueEditor() {
         )}
       </div>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Toca + o − per sumar o restar d&apos;un en un. Cada dia 1 de mes es desa la posició, i les jugadores veuen quantes posicions han pujat o baixat.
+        Toca + o − per sumar o restar d&apos;un en un. Cada mes és una lliga nova: el dia 1 tothom torna a 0 i la primera del mes queda com a
+        guanyadora. Queden {daysLeftInMonth(today)} dies. Les fletxes indiquen qui ha pujat o baixat des d&apos;ahir.
       </p>
       {editing ? (
         <div className="stack">
@@ -148,6 +152,8 @@ export function LeagueEditor() {
         />
       )}
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
+      <h3 style={{ marginTop: 18 }}>Guanyadores</h3>
+      <Winners winners={winners} />
     </section>
   );
 }

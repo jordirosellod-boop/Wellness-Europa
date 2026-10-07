@@ -284,29 +284,43 @@ reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.fcf_players$$, 'Anònim no pot llegir les estadístiques');
 
 -- =============== NIVELL I LLIGA INTERNA ===============
--- Jugadores ara: B (...b2), Elna (...e5), Fiona (...f6)
+-- Jugadores ara: B/Berta (...b2), Elna (...e5), Fiona (...f6)
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 with u as (update public.team_settings set commitment_level = 2 returning commitment_level) select pg_temp.check(bool_and(commitment_level = 2), 'El staff posa l''equip al Nivell 2') from u;
 select pg_temp.expect_error($$update public.team_settings set commitment_level = 4$$, 'Nivell 4 rebutjat (només 1, 2 o 3)');
-select pg_temp.check(public.league_set('00000000-0000-0000-0000-0000000000b2', 5) = 5, 'El staff carrega punts inicials (B: 5)');
+select pg_temp.check(public.league_set('00000000-0000-0000-0000-0000000000b2', 5) = 5, 'El staff carrega punts del mes (Berta: 5)');
 select public.league_set('00000000-0000-0000-0000-0000000000e5', 7);
 select pg_temp.check(public.league_add('00000000-0000-0000-0000-0000000000f6', 1) = 1, 'Sumar 1 punt a una jugadora sense punts');
 select pg_temp.check(public.league_add('00000000-0000-0000-0000-0000000000f6', -5) = 0, 'Restar mai deixa punts negatius');
 select pg_temp.expect_error($$select public.league_add('00000000-0000-0000-0000-00000000000a', 1)$$, 'No es poden donar punts al staff');
+-- Final del dia: es desa la posició (qui té 0 punts no en té)
 reset role; select public.snapshot_league();
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 select pg_temp.check((select string_agg(display_name || ':' || points || ':' || coalesce(prev_rank::text, '-'), ', ' order by points desc, display_name) from public.league_table())
-  = 'Elna:7:1, Berta:5:2, Fiona (nova):0:3', 'Classificació i posició d''inici de mes correctes');
+  = 'Elna:7:1, Berta:5:2, Fiona (nova):0:-', 'Classificació del mes i posició d''ahir correctes');
 select public.league_add('00000000-0000-0000-0000-0000000000b2', 3);
-select pg_temp.check((select display_name from public.league_table() limit 1) = 'Berta', 'Amb +3, B passa a ser primera');
+select pg_temp.check((select display_name from public.league_table() limit 1) = 'Berta', 'Avui Berta suma 3 i passa a ser primera');
+-- Mesos anteriors: la lliga torna a començar i queden les guanyadores
+reset role;
+insert into public.league_points (profile_id, month, points) values
+  ('00000000-0000-0000-0000-0000000000e5', date_trunc('month', now() at time zone 'Europe/Madrid')::date - interval '1 month', 20),
+  ('00000000-0000-0000-0000-0000000000b2', date_trunc('month', now() at time zone 'Europe/Madrid')::date - interval '1 month', 20),
+  ('00000000-0000-0000-0000-0000000000f6', date_trunc('month', now() at time zone 'Europe/Madrid')::date - interval '1 month', 4),
+  ('00000000-0000-0000-0000-0000000000f6', date_trunc('month', now() at time zone 'Europe/Madrid')::date - interval '2 month', 9);
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.check((select points from public.league_table() where display_name = 'Fiona (nova)') = 0, 'Els punts del mes passat no compten aquest mes');
+select pg_temp.check((select string_agg(display_name || ':' || points, ', ' order by month desc, display_name) from public.league_winners()) = 'Berta:20, Elna:20, Fiona (nova):9',
+  'Guanyadores: el mes passat empat (Berta i Elna), fa dos mesos Fiona');
+select pg_temp.expect_error($$insert into public.league_points (profile_id, month) values ('00000000-0000-0000-0000-0000000000b2', '2026-10-15')$$, 'El mes sempre és el dia 1');
 
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5', false); set role authenticated;
 select pg_temp.check((select count(*) from public.league_table()) = 3, 'Una jugadora veu tota la classificació de la lliga');
+select pg_temp.check((select count(*) from public.league_winners()) = 3, 'Una jugadora veu l''historial de guanyadores');
 select pg_temp.check((select commitment_level from public.team_settings) = 2, 'Una jugadora veu el nivell de l''equip');
 with u as (update public.team_settings set commitment_level = 3 returning 1) select pg_temp.check(count(*) = 0, 'Una jugadora no pot canviar el nivell') from u;
 select pg_temp.expect_error($$select public.league_add('00000000-0000-0000-0000-0000000000e5', 10)$$, 'Una jugadora no es pot sumar punts');
 select pg_temp.expect_error($$select public.league_set('00000000-0000-0000-0000-0000000000e5', 99)$$, 'Una jugadora no es pot posar punts');
 select pg_temp.expect_error($$select * from public.league_points$$, 'Una jugadora no pot tocar la taula de punts directament');
-select pg_temp.expect_error($$select public.snapshot_league()$$, 'Una jugadora no pot canviar les posicions del mes');
+select pg_temp.expect_error($$select public.snapshot_league()$$, 'Una jugadora no pot canviar les posicions');
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.league_table()$$, 'Anònim no pot veure la lliga');
