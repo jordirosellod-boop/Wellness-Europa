@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { CoachShell, Footer } from "@/components/ui";
 import { downloadText, sessionCsv } from "@/lib/csv";
+import { acwrBand, fmtRatio, MIN_DAYS } from "@/lib/acwr";
+import { loadTeamAcwr, type PlayerLoad } from "@/lib/acwr-data";
 import { fetchAll, supabase } from "@/lib/supabase";
 import {
   alertsOf,
@@ -14,6 +16,7 @@ import {
   fmtTime,
   RPE_LABELS,
   SESSION_COLS,
+  todayMadrid,
   shortLabel,
   WELLNESS_VARS,
   type Profile,
@@ -37,7 +40,7 @@ export default function SessionDetailPage() {
   );
 }
 
-type Row = { player: Profile; w: Wellness | null; r: Rpe | null };
+type Row = { player: Profile; w: Wellness | null; r: Rpe | null; acwr: PlayerLoad | null };
 
 async function fetchDetail(id: string): Promise<{ session: Session | null; rows: Row[] }> {
   const sb = supabase();
@@ -51,16 +54,18 @@ async function fetchDetail(id: string): Promise<{ session: Session | null; rows:
   // Sempre filtrat per sessió i paginat amb ordre fix: mai es perden files pel límit de 1.000.
   const [players, wellness, rpe] = await Promise.all([
     fetchAll<Profile>((f, t) =>
-      sb.from("profiles").select("id, role, display_name").eq("role", "player").order("display_name").order("id").range(f, t),
+      sb.from("profiles").select("id, role, display_name, created_at").eq("role", "player").order("display_name").order("id").range(f, t),
     ),
     fetchAll<Wellness>((f, t) => sb.from("wellness").select("*").eq("session_id", id).order("id").range(f, t)),
     fetchAll<Rpe>((f, t) => sb.from("rpe").select("*").eq("session_id", id).order("id").range(f, t)),
   ]);
   const wBy = new Map(wellness.map((w) => [w.player_id, w]));
   const rBy = new Map(rpe.map((r) => [r.player_id, r]));
+  // ACWR de cada jugadora el dia de la sessió (no té sentit per a sessions futures).
+  const acwr = (s as Session).session_date <= todayMadrid() ? await loadTeamAcwr((s as Session).session_date, players) : new Map<string, PlayerLoad>();
   return {
     session: s as Session,
-    rows: players.map((p) => ({ player: p, w: wBy.get(p.id) ?? null, r: rBy.get(p.id) ?? null })),
+    rows: players.map((p) => ({ player: p, w: wBy.get(p.id) ?? null, r: rBy.get(p.id) ?? null, acwr: acwr.get(p.id) ?? null })),
   };
 }
 
@@ -196,7 +201,7 @@ function Detail() {
 
       <h2>Jugadores ({rows.length})</h2>
       {rows.length === 0 && <p className="muted">Encara no has creat cap jugadora (pestanya Equip).</p>}
-      {rows.map(({ player, w, r }) => {
+      {rows.map(({ player, w, r, acwr }) => {
         const alerts = w ? alertsOf(w) : [];
         return (
           <div key={player.id} className={`player${alerts.length || w?.has_pain ? " has-alert" : ""}`}>
@@ -240,6 +245,17 @@ function Detail() {
                 <span className="chip pendent">RPE pendent</span>
               )}
             </div>
+            {acwr?.result?.acwr != null && (
+              <div className="line">
+                {acwr.result.days >= MIN_DAYS ? (
+                  <span className={`chip ${acwrBand(acwr.result.acwr).cls}`}>
+                    ACWR {fmtRatio(acwr.result.acwr)} · {acwrBand(acwr.result.acwr).label}
+                  </span>
+                ) : (
+                  <span className="muted small">ACWR provisional {fmtRatio(acwr.result.acwr)} (pocs dies de dades)</span>
+                )}
+              </div>
+            )}
           </div>
         );
       })}

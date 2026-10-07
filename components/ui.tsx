@@ -79,6 +79,9 @@ export function CoachShell({ children }: { children: (me: Profile) => ReactNode 
           >
             Calendari
           </Link>
+          <Link href="/entrenador/carrega" className={path === "/entrenador/carrega" ? "active" : ""}>
+            Càrrega
+          </Link>
           <Link href="/entrenador/equip" className={path === "/entrenador/equip" ? "active" : ""}>
             Equip
           </Link>

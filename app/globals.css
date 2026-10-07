@@ -207,3 +207,11 @@ footer.foot { text-align: center; font-size: 0.85rem; color: var(--suau); paddin
 /* Que els camps de data/hora no sobresurtin en pantalles estretes */
 .row > * { min-width: 0; }
 input[type="date"], input[type="time"] { min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; }
+
+/* Capçalera en una sola línia als mòbils */
+@media (max-width: 520px) {
+  .topbar { padding: 10px 12px; gap: 6px; }
+  .brand > span:last-child { display: none; }
+  .nav { flex-wrap: nowrap; gap: 0; }
+  .nav a, .nav button { font-size: 14px; padding: 10px 8px; }
+}

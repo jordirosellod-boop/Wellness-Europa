@@ -27,7 +27,7 @@ export type SessionRule = {
   active: boolean;
 };
 
-export type Profile = { id: string; role: "coach" | "player"; display_name: string };
+export type Profile = { id: string; role: "coach" | "player"; display_name: string; created_at?: string };
 
 export type Wellness = {
   id: string;
