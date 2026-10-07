@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
 import { FcfStats } from "@/components/fcf-stats";
+import { fetchLeague, fetchTeamLevel, LeagueTable, LevelBadge, ranks, sortLeague, type LeagueRow } from "@/components/league";
 import { PlayerFines } from "@/components/player-fines";
 import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
 import { fmtEuros } from "@/lib/fines";
@@ -123,8 +124,8 @@ function PasteLink() {
   );
 }
 
-type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats";
-const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats"];
+type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga";
+const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga"];
 
 function sectionFromUrl(): Section {
   const s = new URLSearchParams(window.location.search).get("s") as Section | null;
@@ -225,6 +226,7 @@ function PlayerHome({ me }: { me: Profile }) {
       {sessions !== null && section === "multes" && <PlayerFines playerId={me.id} />}
       {sessions !== null && section === "normes" && <PlayerFines playerId={me.id} rulesOpen />}
       {sessions !== null && section === "stats" && <FcfStats mode="player" meId={me.id} />}
+      {sessions !== null && section === "lliga" && <PlayerLeague meId={me.id} />}
 
       {sessions !== null && section === "avisos" && (
         <>
@@ -238,6 +240,7 @@ function PlayerHome({ me }: { me: Profile }) {
           ["inici", "Inici", ICONS.inici],
           ["avui", "Avui", ICONS.avui],
           ["calendari", "Calendari", ICONS.calendari],
+          ["lliga", "Lliga", ICONS.lliga],
           ["multes", "Multes", ICONS.multes],
         ] as [Section, string, ReactNode][]).map(([key, label, icon]) => (
           <button key={key} type="button" aria-current={section === key || (key === "multes" && section === "normes") ? "page" : undefined} onClick={() => go(key)}>
@@ -255,7 +258,8 @@ const svg = (d: string) => (
     <path d={d} />
   </svg>
 );
-const ICONS: Record<"inici" | "avui" | "calendari" | "multes", ReactNode> = {
+const ICONS: Record<"inici" | "avui" | "calendari" | "multes" | "lliga", ReactNode> = {
+  lliga: svg("M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"),
   inici: svg("M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"),
   avui: svg("M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"),
   calendari: svg("M7 3v4M17 3v4M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"),
@@ -263,6 +267,8 @@ const ICONS: Record<"inici" | "avui" | "calendari" | "multes", ReactNode> = {
 };
 
 type DashData = {
+  level: number | null;
+  leaguePos: { pos: number; points: number; total: number } | null;
   mine: Map<string, { w: boolean; r: boolean }>;
   pending: number;
   next: Session | null;
@@ -272,7 +278,7 @@ type DashData = {
 async function loadDashboard(playerId: string, today: string, sessions: Session[]): Promise<DashData> {
   const sb = supabase();
   const ids = sessions.map((s) => s.id);
-  const [w, r, fines, next, reminders] = await Promise.all([
+  const [w, r, fines, next, reminders, level, league] = await Promise.all([
     ids.length ? sb.from("wellness").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     ids.length ? sb.from("rpe").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     fetchAll<{ amount_cents: number; paid: boolean }>((f, t) =>
@@ -281,18 +287,46 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     sb.from("sessions").select(SESSION_COLS).gt("session_date", today)
       .order("session_date").order("start_time", { nullsFirst: true }).order("id").range(0, 0),
     detectReminders().catch((): ReminderStatus => "unsupported"),
+    fetchTeamLevel().catch(() => null),
+    fetchLeague().catch((): LeagueRow[] => []),
   ]);
   for (const res of [w, r, next]) if (res.error) throw new Error(res.error.message);
   const mine = new Map<string, { w: boolean; r: boolean }>();
   for (const id of ids) mine.set(id, { w: false, r: false });
   for (const x of (w.data ?? []) as { session_id: string }[]) mine.get(x.session_id)!.w = true;
   for (const x of (r.data ?? []) as { session_id: string }[]) mine.get(x.session_id)!.r = true;
+  const sorted = sortLeague(league);
+  const myRow = sorted.find((x) => x.profile_id === playerId);
   return {
+    level,
+    leaguePos: myRow ? { pos: ranks(sorted).get(playerId)!, points: myRow.points, total: sorted.length } : null,
     mine,
     pending: fines.filter((f) => !f.paid).reduce((a, f) => a + f.amount_cents, 0),
     next: ((next.data ?? []) as Session[])[0] ?? null,
     reminders,
   };
+}
+
+/** Lliga interna: classificació de tot l'equip, amb animació des de l'inici del mes. */
+function PlayerLeague({ meId }: { meId: string }) {
+  const [rows, setRows] = useState<LeagueRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    fetchLeague().then(setRows, (e) => setError(e instanceof Error ? e.message : String(e)));
+  }, []);
+  return (
+    <>
+      <h1>Lliga interna</h1>
+      <p className="muted" style={{ marginTop: -6 }}>Classificació de tot l&apos;equip. Les fletxes indiquen quantes posicions has pujat o baixat aquest mes.</p>
+      {error && <p className="msg error">{error}</p>}
+      {!rows && !error && <p className="muted">Carregant…</p>}
+      {rows && (
+        <section className="card">
+          <LeagueTable rows={rows} meId={meId} fromPrevious />
+        </section>
+      )}
+    </>
+  );
 }
 
 /** Inici: resum d'avui i accessos a cada apartat. */
@@ -316,7 +350,10 @@ function Dashboard({
   return (
     <>
       <h1>Hola, {me.display_name}!</h1>
-      <p className="muted" style={{ marginTop: -6 }}>{fmtDate(today)}</p>
+      <p className="muted row" style={{ marginTop: -6, gap: 8 }}>
+        <span>{fmtDate(today)}</span>
+        {data?.level ? <LevelBadge level={data.level} /> : null}
+      </p>
       {error && <p className="msg error">{error}</p>}
 
       <section className="card today-card">
@@ -365,6 +402,11 @@ function Dashboard({
           {svg("M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0")}
           <b>Avisos 7:30</b>
           <span>{data ? (data.reminders === "on" ? "Activats" : "Activa'ls aquí") : "…"}</span>
+        </button>
+        <button type="button" className="tile" onClick={() => go("lliga")}>
+          {ICONS.lliga}
+          <b>Lliga interna</b>
+          <span>{data?.leaguePos ? `Ets ${data.leaguePos.pos}a de ${data.leaguePos.total} · ${data.leaguePos.points} pts` : "Classificació"}</span>
         </button>
         <button type="button" className="tile" onClick={() => go("stats")}>
           {svg("M4 20V10M10 20V4M16 20v-7M22 20H2")}

@@ -209,6 +209,23 @@ create table if not exists public.fcf_appearances (
   primary key (acta_id, fcf_id)
 );
 
+-- NIVELL DE COMPROMÍS DE L'EQUIP (1, 2 o 3). Una sola fila.
+create table if not exists public.team_settings (
+  id               boolean primary key default true check (id),
+  commitment_level smallint check (commitment_level between 1 and 3),
+  updated_at       timestamptz not null default now()
+);
+insert into public.team_settings (id) values (true) on conflict do nothing;
+
+-- LLIGA INTERNA: punts de cada jugadora. "prev_rank" és la posició a l'inici del mes
+-- (la desa la base de dades cada dia 1) per mostrar quantes posicions s'ha pujat o baixat.
+create table if not exists public.league_points (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  points     integer not null default 0 check (points between 0 and 100000),
+  prev_rank  integer,
+  updated_at timestamptz not null default now()
+);
+
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);
 alter table public.rpe add column if not exists load integer generated always as (rpe * duration_min) stored;
@@ -458,6 +475,69 @@ begin
   );
 end $$;
 
+-- LLIGA INTERNA ---------------------------------------------------------
+-- Classificació per a tot l'equip (nom i punts de cada jugadora; res més).
+create or replace function public.league_table()
+returns table (profile_id uuid, display_name text, points integer, prev_rank integer)
+language sql stable security definer set search_path = '' as $$
+  select p.id, p.display_name, coalesce(l.points, 0), l.prev_rank
+  from public.profiles p
+  left join public.league_points l on l.profile_id = p.id
+  where p.role = 'player' and ((select public.is_coach()) or (select public.is_player()))
+  order by coalesce(l.points, 0) desc, p.display_name, p.id;
+$$;
+
+-- Sumar o restar punts (d'un en un o els que calgui). Només el staff. Mai per sota de 0.
+create or replace function public.league_add(pid uuid, delta integer)
+returns integer language plpgsql security definer set search_path = '' as $$
+declare
+  result integer;
+begin
+  if not (select public.is_coach()) then
+    raise exception 'Només el staff pot canviar la lliga' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.profiles where id = pid and role = 'player') then
+    raise exception 'Jugadora no trobada';
+  end if;
+  insert into public.league_points (profile_id, points) values (pid, greatest(0, delta))
+  on conflict (profile_id) do update
+    set points = greatest(0, public.league_points.points + delta), updated_at = now()
+  returning points into result;
+  return result;
+end $$;
+
+-- Posar directament els punts d'una jugadora (per carregar la classificació inicial).
+create or replace function public.league_set(pid uuid, value integer)
+returns integer language plpgsql security definer set search_path = '' as $$
+begin
+  if not (select public.is_coach()) then
+    raise exception 'Només el staff pot canviar la lliga' using errcode = '42501';
+  end if;
+  if value < 0 or value > 100000 then
+    raise exception 'Punts no vàlids';
+  end if;
+  if not exists (select 1 from public.profiles where id = pid and role = 'player') then
+    raise exception 'Jugadora no trobada';
+  end if;
+  insert into public.league_points (profile_id, points) values (pid, value)
+  on conflict (profile_id) do update set points = value, updated_at = now();
+  return value;
+end $$;
+
+-- Cada dia 1 de mes: desa la posició de cada jugadora (empats = mateixa posició).
+create or replace function public.snapshot_league()
+returns void language sql security definer set search_path = '' as $$
+  insert into public.league_points (profile_id)
+  select id from public.profiles where role = 'player'
+  on conflict do nothing;
+  update public.league_points l set prev_rank = r.rk
+  from (
+    select l2.profile_id, rank() over (order by l2.points desc) as rk
+    from public.league_points l2 join public.profiles p on p.id = l2.profile_id and p.role = 'player'
+  ) r
+  where r.profile_id = l.profile_id;
+$$;
+
 -- Quan es canvia, pausa o esborra una programació: treu les sessions futures que
 -- encara no tenen cap resposta (les que en tenen es queden) i torna a generar.
 create or replace function public.refresh_rule(rid uuid, remove_rule boolean default false)
@@ -510,12 +590,15 @@ alter table public.fcf_config         enable row level security;
 alter table public.fcf_matches        enable row level security;
 alter table public.fcf_players        enable row level security;
 alter table public.fcf_appearances    enable row level security;
+alter table public.team_settings      enable row level security;
+alter table public.league_points      enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
 -- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
 revoke all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
-  public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances from anon, authenticated;
+  public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
+  public.team_settings, public.league_points from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -525,14 +608,20 @@ grant select, insert, update, delete on public.push_subscriptions            to 
 grant select, update                 on public.auto_fine_settings            to authenticated;
 grant select                         on public.fcf_config, public.fcf_matches, public.fcf_appearances to authenticated;
 grant select, update (profile_id)    on public.fcf_players                   to authenticated;
+grant select, update (commitment_level, updated_at) on public.team_settings to authenticated;
+-- (league_points: sense permisos directes; tot passa per league_table/league_add/league_set)
 grant all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
-  public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances to service_role;
+  public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
+  public.team_settings, public.league_points to service_role;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid) to authenticated;
 revoke all on function public.wellness_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
   public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
+revoke all on function public.league_table(), public.league_add(uuid, integer), public.league_set(uuid, integer), public.snapshot_league() from public, anon;
+grant execute on function public.league_table(), public.league_add(uuid, integer), public.league_set(uuid, integer) to authenticated;
+revoke all on function public.snapshot_league() from authenticated;
 
 -- PROFILES: cadascú es veu a si mateix; el staff ho veu tot. Ningú en crea des del navegador.
 drop policy if exists profiles_select on public.profiles;
@@ -610,6 +699,14 @@ drop policy if exists fcf_players_link on public.fcf_players;
 create policy fcf_players_link on public.fcf_players for update to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 
+-- NIVELL DE COMPROMÍS: tot l'equip el veu; només el staff el canvia.
+drop policy if exists team_settings_read on public.team_settings;
+create policy team_settings_read on public.team_settings for select to authenticated
+  using ((select public.is_coach()) or (select public.is_player()));
+drop policy if exists team_settings_write on public.team_settings;
+create policy team_settings_write on public.team_settings for update to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+
 -- WELLNESS: la jugadora només llegeix/escriu les seves files, i només el dia de la sessió.
 -- El staff ho llegeix tot però no ho modifica. Ningú no pot esborrar des del navegador.
 drop policy if exists wellness_select on public.wellness;
@@ -640,12 +737,14 @@ create policy rpe_update on public.rpe for update to authenticated
 --    · cada 15 minuts: multes automàtiques
 --    · 5:30 i 6:30 UTC: recordatori de les 7:30 (només actua a les 7 de Barcelona)
 --    · cada 6 hores: estadístiques de la Federació
+--    · cada dia 1 de mes: posició de la lliga interna (per a les fletxes de pujada/baixada)
 -- =====================================================================
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 select cron.schedule('multes-automatiques', '*/15 * * * *', 'select public.apply_auto_fines()');
 select cron.schedule('recordatori-wellness', '30 5,6 * * *', 'select public.send_wellness_reminder()');
 select cron.schedule('estadistiques-fcf', '20 */6 * * *', 'select public.trigger_fcf_sync()');
+select cron.schedule('lliga-inici-de-mes', '5 0 1 * *', 'select public.snapshot_league()');
 
 -- =====================================================================
 -- 5. EL TEU COMPTE D'ENTRENADOR (només la primera vegada)

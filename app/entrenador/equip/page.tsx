@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { LeagueEditor, LevelEditor } from "@/components/league-admin";
 import { CoachShell, Footer } from "@/components/ui";
 import { adminAction, fetchAll, supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
@@ -64,6 +65,8 @@ function Team({ me }: { me: Profile }) {
   return (
     <>
       <h1>Equip</h1>
+      <LevelEditor />
+      <LeagueEditor />
       <AddPlayer onDone={load} />
       <section className="card">
         <h2>Jugadores ({players.length})</h2>

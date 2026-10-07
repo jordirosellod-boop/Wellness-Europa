@@ -407,3 +407,49 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 @media (max-width: 520px) {
   .topbar:not(:has(.nav)) .brand { font-size: 1.15rem; }
 }
+
+/* ---------- Nivell de compromís ---------- */
+.level-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px;
+  background: var(--navy); color: #fff; font-family: var(--display); text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.85rem;
+}
+.level-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+.level-bars i { display: block; width: 4px; background: rgba(255, 255, 255, 0.3); border-radius: 1px; }
+.level-bars i:nth-child(1) { height: 5px; } .level-bars i:nth-child(2) { height: 8px; } .level-bars i:nth-child(3) { height: 12px; }
+.level-bars i.on { background: var(--or); }
+
+/* ---------- Lliga interna ---------- */
+.league { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.league-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; min-height: 52px;
+  background: #fff; border: 1px solid var(--vora); border-radius: var(--radi); position: relative;
+}
+.league-row.mine { background: #fff7e0; border-color: var(--or); }
+.league-pos {
+  flex: 0 0 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--blau-clar); color: var(--blau); font-family: var(--display); font-size: 1.15rem;
+}
+.league-row.top1 .league-pos { background: var(--or); color: var(--navy); }
+.league-row.top2 .league-pos { background: #c9ced8; color: var(--navy); }
+.league-row.top3 .league-pos { background: #d79a63; color: #fff; }
+.league-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: break-word; }
+.league-move { font-size: 0.8rem; font-weight: 700; min-width: 30px; text-align: center; }
+.league-move.up { color: var(--verd); } .league-move.down { color: var(--vermell); } .league-move.same { color: var(--suau); }
+.league-pts { text-align: right; white-space: nowrap; color: var(--suau); font-size: 0.8rem; }
+.league-pts b { font-family: var(--display); font-weight: 400; font-size: 1.5rem; color: var(--blau); }
+.league-actions { display: flex; gap: 6px; }
+.pt-btn {
+  width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--blau); background: #fff; color: var(--blau);
+  font-size: 1.4rem; font-weight: 700; cursor: pointer; touch-action: manipulation; line-height: 1;
+}
+.pt-btn.plus { background: var(--blau); color: #fff; }
+.pt-btn:disabled { opacity: 0.4; }
+.bottom-nav { grid-template-columns: repeat(5, 1fr); }
+.bottom-nav button { font-size: 0.82rem; }
+/* Vista del staff (amb botons): més compacta perquè els noms no es parteixin */
+.league-row:has(.league-actions) { gap: 6px; padding: 8px 8px 8px 10px; }
+.league-row:has(.league-actions) .league-pts span { display: none; }
+.league-row:has(.league-actions) .league-pts b { font-size: 1.3rem; }
+.league-row:has(.league-actions) .league-move { min-width: 24px; }
+.league-row:has(.league-actions) .league-pos { flex-basis: 30px; height: 30px; font-size: 1rem; }
+.league-row:has(.league-actions) .pt-btn { width: 40px; height: 40px; }
