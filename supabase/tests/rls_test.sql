@@ -16,7 +16,8 @@ select id, 'coach', 'Entrenador' from auth.users where email = 'coach@test'
 on conflict (id) do update set role = 'coach';
 insert into public.sessions (id, session_date, kind, name) values
  ('11111111-0000-0000-0000-000000000001', (now() at time zone 'Europe/Madrid')::date, 'Partit', 'Avui'),
- ('11111111-0000-0000-0000-000000000002', (now() at time zone 'Europe/Madrid')::date - 1, 'Partit', 'Ahir');
+ ('11111111-0000-0000-0000-000000000002', (now() at time zone 'Europe/Madrid')::date - 2, 'Partit', 'Abans d''ahir'),
+ ('11111111-0000-0000-0000-000000000003', (now() at time zone 'Europe/Madrid')::date - 1, 'Partit', 'Ahir');
 
 create function pg_temp.expect_error(q text, label text) returns text language plpgsql as $$
 begin
@@ -69,7 +70,11 @@ reset role;
 insert into public.rpe (session_id, player_id, rpe) values ('11111111-0000-0000-0000-000000000002','00000000-0000-0000-0000-0000000000b2', 5);
 set role authenticated;
 with u as (update public.rpe set rpe = 9 where session_id = '11111111-0000-0000-0000-000000000002' returning 1)
-select pg_temp.check(count(*) = 0, 'B no pot editar un RPE d''un dia passat') from u;
+select pg_temp.check(count(*) = 0, 'B no pot editar un RPE de fa 2 dies') from u;
+insert into public.rpe (session_id, rpe) values ('11111111-0000-0000-0000-000000000003', 6);
+select pg_temp.check(true, 'B pot fer l''RPE d''ahir fora de termini');
+select pg_temp.expect_error($$insert into public.wellness (session_id, sleep, fatigue, mood) values ('11111111-0000-0000-0000-000000000003', 5,5,5)$$, 'B no pot fer el wellness d''ahir');
+select pg_temp.expect_error($$insert into public.rpe (session_id, rpe) values ('11111111-0000-0000-0000-000000000002', 6)$$, 'B no pot fer l''RPE de fa 2 dies');
 
 -- ---------------- USUARI SENSE PERFIL ----------------
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000cc', false); set role authenticated;
@@ -207,9 +212,14 @@ insert into public.sessions (id, session_date, kind, name) values
   ('55555555-0000-0000-0000-000000000001', '2026-03-10', 'Entrenament', 'Entreno límit'),
   ('55555555-0000-0000-0000-000000000002', '2026-03-10', 'Partit', 'Partit límit');
 select pg_temp.check(public.wellness_open_at('55555555-0000-0000-0000-000000000001', '2026-03-10 13:59'), 'Entrenament: wellness obert a les 13:59');
-select pg_temp.check(not public.wellness_open_at('55555555-0000-0000-0000-000000000001', '2026-03-10 14:00'), 'Entrenament: wellness tancat a les 14:00');
+select pg_temp.check(public.wellness_open_at('55555555-0000-0000-0000-000000000001', '2026-03-10 23:59'), 'Entrenament: wellness encara es pot fer a les 23:59 (fora de termini, amb multa)');
 select pg_temp.check(public.wellness_open_at('55555555-0000-0000-0000-000000000002', '2026-03-10 20:00'), 'Partit: wellness obert a les 20:00 (sense límit de 14:00)');
 select pg_temp.check(not public.wellness_open_at('55555555-0000-0000-0000-000000000001', '2026-03-11 09:00'), 'L''endemà el wellness està tancat');
+select pg_temp.check(not public.wellness_open_at('55555555-0000-0000-0000-000000000001', '2026-03-09 23:00'), 'El dia abans el wellness encara no està obert');
+select pg_temp.check(public.rpe_open_at('55555555-0000-0000-0000-000000000001', '2026-03-10 22:00'), 'RPE obert el dia de la sessió');
+select pg_temp.check(public.rpe_open_at('55555555-0000-0000-0000-000000000001', '2026-03-11 23:59'), 'RPE fora de termini: l''endemà encara es pot fer');
+select pg_temp.check(not public.rpe_open_at('55555555-0000-0000-0000-000000000001', '2026-03-12 00:00'), 'RPE tancat dos dies després');
+select pg_temp.check(not public.rpe_open_at('55555555-0000-0000-0000-000000000001', '2026-03-09 20:00'), 'RPE no obert abans del dia de la sessió');
 
 -- Escenari de multes automàtiques: sessions d'ahir
 insert into auth.users values ('00000000-0000-0000-0000-0000000000e5','e@jug'), ('00000000-0000-0000-0000-0000000000f6','f@jug');
@@ -223,6 +233,14 @@ insert into public.sessions (id, session_date, kind, name, created_at, cancelled
   ('66666666-0000-0000-0000-000000000003', (select today from vars) - 1, 'Entrenament', 'Entreno cancel·lat', now() - interval '5 days', true),
   ('66666666-0000-0000-0000-000000000004', (select today from vars) - 1, 'Entrenament', 'Entreno creat tard', now(), false);
 insert into public.wellness (session_id, player_id, sleep, fatigue, mood) values ('66666666-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b2', 7, 7, 7);
+-- B el va fer a temps (ahir a les 10:00)
+alter table public.wellness disable trigger wellness_stamp;
+update public.wellness set submitted_at = (((select today from vars) - 1) + time '10:00') at time zone 'Europe/Madrid'
+  where session_id = '66666666-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000b2';
+alter table public.wellness enable trigger wellness_stamp;
+-- Elna els fa fora de termini (ara): s'han de multar igualment
+insert into public.wellness (session_id, player_id, sleep, fatigue, mood) values ('66666666-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000e5', 6, 6, 6);
+insert into public.rpe (session_id, player_id, rpe) values ('66666666-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000e5', 6);
 insert into public.fine_rules (id, name, amount_cents) values ('33333333-0000-0000-0000-000000000009', 'Wellness/RPE no fet', 100);
 
 -- El staff tria la norma; la data d'inici la posa el servidor
@@ -235,7 +253,7 @@ select pg_temp.check(public.apply_auto_fines() = 0, 'Recent activades: no es mul
 alter table public.auto_fine_settings disable trigger auto_fine_settings_stamp;
 update public.auto_fine_settings set wellness_since = now() - interval '10 days', rpe_since = now() - interval '10 days';
 alter table public.auto_fine_settings enable trigger auto_fine_settings_stamp;
-select pg_temp.check(public.apply_auto_fines() = 3, 'Multes automàtiques: 3 (B sense RPE; Elna sense wellness ni RPE)');
+select pg_temp.check(public.apply_auto_fines() = 3, 'Multes automàtiques: 3 (B sense RPE; Elna wellness i RPE fets fora de termini)');
 select pg_temp.check((select count(*) from public.fines where notes like 'Automàtica%' and person_id = '00000000-0000-0000-0000-0000000000b2') = 1
   and (select count(*) from public.fines where notes like 'Automàtica%' and person_id = '00000000-0000-0000-0000-0000000000e5') = 2
   and (select bool_and(amount_cents = 100 and fine_date = (select today from vars) - 1) from public.fines where notes like 'Automàtica%'),

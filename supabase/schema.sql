@@ -326,20 +326,35 @@ returns boolean language sql stable security definer set search_path = '' as $$
   );
 $$;
 
--- WELLNESS: els dies d'ENTRENAMENT es pot omplir fins a les 14:00 (hora de Barcelona).
--- Els dies de partit, fins a les 23:59 com l'RPE.
+-- WELLNESS: es pot omplir tot el dia de la sessió (hora de Barcelona).
+-- Els dies d'ENTRENAMENT el termini és a les 14:00: després encara es pot fer
+-- ("fora de termini"), però la multa automàtica s'aplica igualment.
 create or replace function public.wellness_open_at(sid uuid, at_local timestamp)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
     select 1 from public.sessions
     where id = sid and not cancelled and session_date = at_local::date
-      and (kind <> 'Entrenament' or at_local::time < time '14:00')
   );
 $$;
 
 create or replace function public.wellness_is_open(sid uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select public.wellness_open_at(sid, (now() at time zone 'Europe/Madrid'));
+$$;
+
+-- RPE: es pot omplir el dia de la sessió i, fora de termini, també l'endemà (fins a les 23:59).
+-- Si és un entrenament i es fa després de les 00:00, la multa automàtica s'aplica igualment.
+create or replace function public.rpe_open_at(sid uuid, at_local timestamp)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.sessions
+    where id = sid and not cancelled and session_date in (at_local::date, at_local::date - 1)
+  );
+$$;
+
+create or replace function public.rpe_is_open(sid uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select public.rpe_open_at(sid, (now() at time zone 'Europe/Madrid'));
 $$;
 
 -- GENERACIÓ AUTOMÀTICA: crea les sessions de les programacions actives per als
@@ -389,8 +404,9 @@ $$;
 
 -- MULTES AUTOMÀTIQUES. La crida la base de dades sola cada 15 minuts.
 -- Per a cada sessió d'ENTRENAMENT dels últims dies (no cancel·lada) i cada jugadora:
---   · sense wellness a les 14:00 del dia de la sessió  -> multa de la norma triada
---   · sense RPE a les 00:00 (final del dia de la sessió) -> multa de la norma triada
+--   · sense wellness enviat abans de les 14:00 del dia de la sessió  -> multa de la norma triada
+--   · sense RPE enviat abans de les 00:00 (final del dia de la sessió) -> multa de la norma triada
+-- Si es fa tard (fora de termini), la multa es posa igualment: compta l'hora d'enviament.
 -- Mai multa: sessions o jugadores creades després del límit, ni límits anteriors a
 -- quan es va activar la norma. Cada cas es revisa una sola vegada (auto_fine_log).
 create or replace function public.apply_auto_fines()
@@ -423,8 +439,10 @@ begin
         and d.deadline > (case k when 'wellness' then cfg.wellness_since else cfg.rpe_since end at time zone 'Europe/Madrid')
         and (select created_at from public.sessions where id = d.sid) < (d.deadline at time zone 'Europe/Madrid')
         and (select created_at from public.profiles where id = d.pid) < (d.deadline at time zone 'Europe/Madrid')
-        and (k <> 'wellness' or not exists (select 1 from public.wellness w where w.session_id = d.sid and w.player_id = d.pid))
-        and (k <> 'rpe' or not exists (select 1 from public.rpe r where r.session_id = d.sid and r.player_id = d.pid))
+        and (k <> 'wellness' or not exists (select 1 from public.wellness w where w.session_id = d.sid and w.player_id = d.pid
+                                             and w.submitted_at < (d.deadline at time zone 'Europe/Madrid')))
+        and (k <> 'rpe' or not exists (select 1 from public.rpe r where r.session_id = d.sid and r.player_id = d.pid
+                                        and r.submitted_at < (d.deadline at time zone 'Europe/Madrid')))
     ), logged as (
       insert into public.auto_fine_log (session_id, person_id, kind)
       select sid, pid, k from missing
@@ -687,8 +705,8 @@ grant all on public.profiles, public.player_links, public.sessions, public.welln
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points to service_role;
-grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid) to authenticated;
-revoke all on function public.wellness_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
+grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
+revoke all on function public.wellness_open_at(uuid, timestamp), public.rpe_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
   public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
@@ -782,7 +800,8 @@ drop policy if exists team_settings_write on public.team_settings;
 create policy team_settings_write on public.team_settings for update to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 
--- WELLNESS: la jugadora només llegeix/escriu les seves files, i només el dia de la sessió.
+-- WELLNESS: la jugadora només llegeix/escriu les seves files, i només el dia de la sessió
+-- (l'RPE, també l'endemà).
 -- El staff ho llegeix tot però no ho modifica. Ningú no pot esborrar des del navegador.
 drop policy if exists wellness_select on public.wellness;
 create policy wellness_select on public.wellness for select to authenticated
@@ -801,11 +820,11 @@ create policy rpe_select on public.rpe for select to authenticated
   using (player_id = (select auth.uid()) or (select public.is_coach()));
 drop policy if exists rpe_insert on public.rpe;
 create policy rpe_insert on public.rpe for insert to authenticated
-  with check (player_id = (select auth.uid()) and (select public.is_player()) and public.session_is_open(session_id));
+  with check (player_id = (select auth.uid()) and (select public.is_player()) and public.rpe_is_open(session_id));
 drop policy if exists rpe_update on public.rpe;
 create policy rpe_update on public.rpe for update to authenticated
-  using (player_id = (select auth.uid()) and public.session_is_open(session_id))
-  with check (player_id = (select auth.uid()) and (select public.is_player()) and public.session_is_open(session_id));
+  using (player_id = (select auth.uid()) and public.rpe_is_open(session_id))
+  with check (player_id = (select auth.uid()) and (select public.is_player()) and public.rpe_is_open(session_id));
 
 -- =====================================================================
 -- 6. TASQUES PROGRAMADES (dins la mateixa base de dades)

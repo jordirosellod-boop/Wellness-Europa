@@ -114,6 +114,7 @@ input:focus, textarea:focus, select:focus, button:focus-visible { outline: 3px s
 .msg.ok { background: var(--verd-clar); color: var(--verd); }
 .msg.error { background: var(--vermell-clar); color: var(--vermell); }
 .msg.info { background: var(--blau-clar); color: var(--blau-fosc); }
+.msg.warn { background: var(--taronja-clar); color: var(--taronja); }
 
 .chip {
   display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 700;

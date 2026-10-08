@@ -17,9 +17,11 @@ import {
   fmtSessionTime,
   fmtTime,
   SESSION_COLS,
+  dayBefore,
+  rpeLate,
   todayMadrid,
   WELLNESS_DEADLINE,
-  wellnessClosed,
+  wellnessLate,
   type Profile,
   type Rpe,
   type Session,
@@ -139,6 +141,7 @@ function sectionFromUrl(): Section {
  */
 function PlayerHome({ me }: { me: Profile }) {
   const today = todayMadrid();
+  const yesterday = dayBefore(today);
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -160,15 +163,19 @@ function PlayerHome({ me }: { me: Profile }) {
       const { data, error } = await sb
         .from("sessions")
         .select(SESSION_COLS)
-        .eq("session_date", today)
+        .gte("session_date", yesterday)
+        .lte("session_date", today)
+        .order("session_date", { ascending: false })
         .order("start_time", { ascending: true, nullsFirst: true })
         .order("id")
         .range(0, 49);
       if (error) return setError(error.message);
-      setSessions(data as Session[]);
-      if (data.length > 0) setSelected(data[0].id);
+      const list = data as Session[];
+      setSessions(list);
+      const first = list.find((s) => s.session_date === today);
+      if (first) setSelected(first.id);
     })();
-  }, [today]);
+  }, [today, yesterday]);
 
   function go(next: Section) {
     if (next !== section) {
@@ -185,6 +192,11 @@ function PlayerHome({ me }: { me: Profile }) {
   }
 
   const session = sessions?.find((s) => s.id === selected) ?? null;
+  const todaySessions = sessions?.filter((s) => s.session_date === today) ?? [];
+  // Sessions d'ahir: l'RPE encara es pot fer (fora de termini) fins a les 23:59 d'avui.
+  const yesterdaySessions = sessions?.filter((s) => s.session_date === yesterday && !s.cancelled) ?? [];
+  // A "Avui" hi surten les sessions d'avui i, si se n'ha obert una d'ahir, també aquella.
+  const tabSessions = session && session.session_date !== today ? [...todaySessions, session] : todaySessions;
   const saved = () => setVersion((v) => v + 1);
 
   return (
@@ -193,22 +205,23 @@ function PlayerHome({ me }: { me: Profile }) {
       {sessions === null && !error && <p className="muted">Carregant…</p>}
 
       {sessions !== null && section === "inici" && (
-        <Dashboard me={me} today={today} sessions={sessions} version={version} go={go} onOpenSession={openSession} />
+        <Dashboard me={me} today={today} sessions={todaySessions} yesterdaySessions={yesterdaySessions} version={version} go={go} onOpenSession={openSession} />
       )}
 
       {sessions !== null && section === "avui" && (
         <>
           <h1>Avui</h1>
           <p className="muted" style={{ marginTop: -6 }}>{fmtDate(today)}</p>
-          {sessions.length === 0 && (
+          {tabSessions.length === 0 && (
             <div className="card">
               <p style={{ margin: 0 }}>Avui no hi ha cap sessió programada.</p>
             </div>
           )}
-          {sessions.length > 1 && (
+          {tabSessions.length > 1 && (
             <div className="tabs" style={{ marginBottom: 12 }}>
-              {sessions.map((s) => (
+              {tabSessions.map((s) => (
                 <button key={s.id} aria-pressed={s.id === selected} onClick={() => setSelected(s.id)}>
+                  {s.session_date !== today && "Ahir · "}
                   {fmtSessionTime(s.start_time) && `${fmtSessionTime(s.start_time)} · `}
                   {s.name}
                 </button>
@@ -220,7 +233,7 @@ function PlayerHome({ me }: { me: Profile }) {
       )}
 
       {sessions !== null && section === "calendari" && (
-        <PlayerCalendar me={me} today={today} version={version} onOpenToday={openSession} />
+        <PlayerCalendar me={me} today={today} version={version} onOpenSession={openSession} />
       )}
 
       {sessions !== null && section === "multes" && <PlayerFines playerId={me.id} />}
@@ -344,11 +357,12 @@ function PlayerLeague({ meId }: { meId: string }) {
 
 /** Inici: resum d'avui i accessos a cada apartat. */
 function Dashboard({
-  me, today, sessions, version, go, onOpenSession,
+  me, today, sessions, yesterdaySessions, version, go, onOpenSession,
 }: {
   me: Profile;
   today: string;
   sessions: Session[];
+  yesterdaySessions: Session[];
   version: number;
   go: (s: Section) => void;
   onOpenSession: (id: string) => void;
@@ -357,8 +371,10 @@ function Dashboard({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadDashboard(me.id, today, sessions).then(setData, (e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [me.id, today, sessions, version]);
+    loadDashboard(me.id, today, [...sessions, ...yesterdaySessions]).then(setData, (e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [me.id, today, sessions, yesterdaySessions, version]);
+
+  const lateRpe = data ? yesterdaySessions.filter((s) => !data.mine.get(s.id)?.r) : [];
 
   return (
     <>
@@ -374,7 +390,7 @@ function Dashboard({
         {sessions.length === 0 && <p style={{ margin: 0 }}>Avui no hi ha cap sessió. Bon descans!</p>}
         {sessions.map((s) => {
           const m = data?.mine.get(s.id);
-          const wClosed = wellnessClosed(s);
+          const wLate = wellnessLate(s);
           const done = m?.w && m?.r;
           return (
             <div key={s.id} className="today-item">
@@ -385,8 +401,8 @@ function Dashboard({
               <div className="row" style={{ marginTop: 8 }}>
                 {m?.w ? (
                   <span className="chip fet">Wellness fet</span>
-                ) : wClosed ? (
-                  <span className="chip band-baix">Wellness tancat</span>
+                ) : wLate ? (
+                  <span className="chip band-baix">Wellness fora de termini</span>
                 ) : (
                   <span className="chip pendent">Wellness pendent{s.kind === "Entrenament" ? ` · fins ${WELLNESS_DEADLINE}` : ""}</span>
                 )}
@@ -399,6 +415,24 @@ function Dashboard({
           );
         })}
       </section>
+
+      {lateRpe.length > 0 && (
+        <section className="card today-card">
+          <h2>Pendent d&apos;ahir</h2>
+          {lateRpe.map((s) => (
+            <div key={s.id} className="today-item">
+              <div className="row between">
+                <b>{s.name}</b>
+                <span className="chip">{s.kind}{s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""}</span>
+              </div>
+              <div className="row" style={{ marginTop: 8 }}>
+                <span className="chip band-baix">RPE fora de termini · fins avui 23:59</span>
+              </div>
+              <button className="btn block" style={{ marginTop: 10 }} onClick={() => onOpenSession(s.id)}>Fer l&apos;RPE ara</button>
+            </div>
+          ))}
+        </section>
+      )}
 
       <div className="tiles">
         <button type="button" className="tile" onClick={() => go("calendari")}>
@@ -443,8 +477,10 @@ function Dashboard({
 }
 
 function SessionForms({ me, session, onSaved }: { me: Profile; session: Session; onSaved: () => void }) {
-  const editable = true;
-  const wellnessOpen = !wellnessClosed(session);
+  const isToday = session.session_date === todayMadrid();
+  const wLate = wellnessLate(session);
+  const rLate = rpeLate(session);
+  const training = session.kind === "Entrenament";
   const [w, setW] = useState<Wellness | null | undefined>(undefined);
   const [r, setR] = useState<Rpe | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -475,30 +511,38 @@ function SessionForms({ me, session, onSaved }: { me: Profile; session: Session;
           </h2>
           <span className="chip">{session.kind}{session.start_time ? ` · ${fmtSessionTime(session.start_time)}` : ""}</span>
         </div>
+        {!isToday && <p className="muted small" style={{ margin: "6px 0 0" }}>Ahir · {fmtDate(session.session_date)}</p>}
       </div>
       <section className="card">
         <div className="row between" style={{ marginBottom: 10 }}>
           <h2 style={{ margin: 0 }}>Wellness <span className="muted small">(abans)</span></h2>
           {w ? <span className="chip fet">Enviat {fmtTime(w.submitted_at)}</span> : <span className="chip pendent">Pendent</span>}
         </div>
-        {!wellnessOpen && (
-          <p className="msg error" style={{ marginTop: 0 }}>
-            El termini del wellness d&apos;avui ({WELLNESS_DEADLINE}) ja ha passat.
+        {!isToday ? (
+          <p className="msg info" style={{ marginTop: 0 }}>El wellness d&apos;ahir ja està tancat.</p>
+        ) : wLate && !w ? (
+          <p className="msg warn" style={{ marginTop: 0 }}>
+            Fora de termini (era fins a les {WELLNESS_DEADLINE}). Encara el pots fer fins a les 23:59, però es posarà la multa automàtica.
           </p>
-        )}
-        <WellnessForm sessionId={session.id} existing={w} editable={editable && wellnessOpen} onSaved={(x) => { setW(x); onSaved(); }} />
+        ) : null}
+        {(isToday || w) && <WellnessForm sessionId={session.id} existing={w} editable={isToday} onSaved={(x) => { setW(x); onSaved(); }} />}
       </section>
       <section className="card">
         <div className="row between" style={{ marginBottom: 10 }}>
           <h2 style={{ margin: 0 }}>RPE <span className="muted small">(després)</span></h2>
           {r ? <span className="chip fet">Enviat {fmtTime(r.submitted_at)}</span> : <span className="chip pendent">Pendent</span>}
         </div>
-        <RpeForm sessionId={session.id} plannedDuration={session.duration_min} existing={r} editable={editable} onSaved={(x) => { setR(x); onSaved(); }} />
+        {rLate && !r && (
+          <p className="msg warn" style={{ marginTop: 0 }}>
+            Fora de termini (era fins a les 00:00). Encara el pots fer fins avui a les 23:59{training ? ", però es posarà la multa automàtica" : ""}.
+          </p>
+        )}
+        <RpeForm sessionId={session.id} plannedDuration={session.duration_min} existing={r} editable onSaved={(x) => { setR(x); onSaved(); }} />
       </section>
       <p className="muted small center">
-        {session.kind === "Entrenament"
-          ? `Límits d'avui: wellness fins a les ${WELLNESS_DEADLINE} · RPE fins a les 00:00. Si no es fan, hi ha multa.`
-          : "Pots omplir i modificar les respostes fins a les 00:00 d'avui."}
+        {training
+          ? `Terminis: wellness fins a les ${WELLNESS_DEADLINE} · RPE fins a les 00:00. Fora de termini encara es poden fer (wellness fins a les 23:59 i RPE fins a les 23:59 de l'endemà), però hi ha multa.`
+          : "Pots fer el wellness fins a les 23:59 d'avui i l'RPE fins a les 23:59 de demà."}
       </p>
     </>
   );
@@ -513,7 +557,7 @@ function playerStatus(s: Session, today: string, m: Mine): CalStatus {
 }
 
 /** Calendari de la jugadora: les sessions i com les ha omplert ella (només veu les seves dades). */
-function PlayerCalendar({ me, today, version, onOpenToday }: { me: Profile; today: string; version: number; onOpenToday: (id: string) => void }) {
+function PlayerCalendar({ me, today, version, onOpenSession }: { me: Profile; today: string; version: number; onOpenSession: (id: string) => void }) {
   const [view, setView] = useState<CalView>("mes");
   const [anchor, setAnchor] = useState(today);
   const [data, setData] = useState<{ sessions: Session[]; mine: Map<string, Mine> }>({ sessions: [], mine: new Map() });
@@ -571,8 +615,13 @@ function PlayerCalendar({ me, today, version, onOpenToday }: { me: Profile; toda
                 </div>
               )}
               {s.session_date === today && (
-                <button className="btn small" style={{ marginTop: 8 }} onClick={() => onOpenToday(s.id)}>
+                <button className="btn small" style={{ marginTop: 8 }} onClick={() => onOpenSession(s.id)}>
                   {status === "completada" ? "Veure o editar" : "Omplir ara"}
+                </button>
+              )}
+              {s.session_date === dayBefore(today) && !s.cancelled && (
+                <button className="btn small" style={{ marginTop: 8 }} onClick={() => onOpenSession(s.id)}>
+                  {m.r ? "Veure o editar l'RPE" : "Fer l'RPE (fora de termini)"}
                 </button>
               )}
             </div>
