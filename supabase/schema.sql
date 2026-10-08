@@ -233,6 +233,17 @@ create table if not exists public.league_points (
 -- Entrenaments assistits aquell mes (els porta el staff). Promig = punts ÷ entrenaments.
 alter table public.league_points add column if not exists trainings integer not null default 0 check (trainings between 0 and 100);
 
+-- ASSISTÈNCIA: el staff passa llista (present / absent) a cada sessió.
+create table if not exists public.attendance (
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  player_id  uuid not null references public.profiles(id) on delete cascade,
+  present    boolean not null,
+  marked_by  uuid default auth.uid() references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (session_id, player_id)
+);
+create index if not exists attendance_player_idx on public.attendance (player_id);
+
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);
 alter table public.rpe add column if not exists load integer generated always as (rpe * duration_min) stored;
@@ -600,6 +611,61 @@ end $$;
 drop function if exists public.league_add(uuid, integer);
 drop function if exists public.league_set(uuid, integer);
 
+-- ASSISTÈNCIA -> LLIGA: cada "present" a un ENTRENAMENT suma 1 entrenament a la lliga
+-- del mes d'aquell entrenament; si es treu (absent o esborrat), en resta 1.
+-- Així els entrenaments que ja s'havien posat a mà es conserven i l'assistència hi suma.
+create or replace function public.attendance_stamp()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  new.marked_by := (select auth.uid());
+  new.updated_at := now();
+  if tg_op = 'UPDATE' then
+    new.session_id := old.session_id;   -- no es pot moure a una altra sessió
+    new.player_id := old.player_id;     -- ni a una altra jugadora
+  end if;
+  return new;
+end $$;
+
+-- (després de desar: així un "upsert" només compta una vegada)
+create or replace function public.attendance_to_league()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  was integer := case when tg_op in ('UPDATE', 'DELETE') and old.present then 1 else 0 end;
+  now_ integer := case when tg_op in ('INSERT', 'UPDATE') and new.present then 1 else 0 end;
+  pid uuid := case when tg_op = 'DELETE' then old.player_id else new.player_id end;
+  s public.sessions;
+begin
+  select * into s from public.sessions where id = case when tg_op = 'DELETE' then old.session_id else new.session_id end;
+  if now_ <> was and s.kind = 'Entrenament'
+     and exists (select 1 from public.profiles where id = pid and role = 'player') then
+    insert into public.league_points (profile_id, month, trainings)
+    values (pid, date_trunc('month', s.session_date)::date, greatest(0, now_ - was))
+    on conflict (profile_id, month) do update
+      set trainings = least(100, greatest(0, public.league_points.trainings + (now_ - was))), updated_at = now();
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists attendance_league_ins on public.attendance;
+drop trigger if exists attendance_league_del on public.attendance;
+drop trigger if exists attendance_stamp on public.attendance;
+create trigger attendance_stamp before insert or update on public.attendance
+  for each row execute function public.attendance_stamp();
+drop trigger if exists attendance_league on public.attendance;
+create trigger attendance_league after insert or update or delete on public.attendance
+  for each row execute function public.attendance_to_league();
+
+-- Si s'esborra una sessió, primer es treu la seva assistència (i es resta de la lliga).
+create or replace function public.session_delete_attendance()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.attendance where session_id = old.id;
+  return old;
+end $$;
+drop trigger if exists sessions_delete_attendance on public.sessions;
+create trigger sessions_delete_attendance before delete on public.sessions
+  for each row execute function public.session_delete_attendance();
+
 -- Cada nit a les 00:05 (Barcelona): desa la posició de cada jugadora classificada, per
 -- mostrar l'endemà qui ha pujat i qui ha baixat.
 create or replace function public.snapshot_league()
@@ -643,7 +709,8 @@ begin
   delete from public.sessions s
   where s.rule_id = rid and s.session_date >= today and (remove_rule or not s.cancelled)
     and not exists (select 1 from public.wellness w where w.session_id = s.id)
-    and not exists (select 1 from public.rpe r where r.session_id = s.id);
+    and not exists (select 1 from public.rpe r where r.session_id = s.id)
+    and not exists (select 1 from public.attendance a where a.session_id = s.id);
   get diagnostics removed = row_count;
   if remove_rule then
     delete from public.session_rules where id = rid;
@@ -683,13 +750,14 @@ alter table public.fcf_players        enable row level security;
 alter table public.fcf_appearances    enable row level security;
 alter table public.team_settings      enable row level security;
 alter table public.league_points      enable row level security;
+alter table public.attendance         enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
 -- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
 revoke all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
-  public.team_settings, public.league_points from anon, authenticated;
+  public.team_settings, public.league_points, public.attendance from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -704,10 +772,11 @@ grant select, update (commitment_level, league_min_trainings, updated_at) on pub
 grant all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
-  public.team_settings, public.league_points to service_role;
+  public.team_settings, public.league_points, public.attendance to service_role;
+grant select, insert, update, delete on public.attendance to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
 revoke all on function public.wellness_open_at(uuid, timestamp), public.rpe_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
-  public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync() from public, anon, authenticated;
+  public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync(), public.attendance_to_league(), public.session_delete_attendance() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
 revoke all on function public.league_table(date), public.league_winners(), public.league_change(uuid, text, integer),
@@ -793,6 +862,20 @@ create policy fcf_players_link on public.fcf_players for update to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 
 -- NIVELL DE COMPROMÍS: tot l'equip el veu; només el staff el canvia.
+-- ASSISTÈNCIA: només el staff passa llista; cada jugadora veu només la seva.
+drop policy if exists attendance_select on public.attendance;
+create policy attendance_select on public.attendance for select to authenticated
+  using (player_id = (select auth.uid()) or (select public.is_coach()));
+drop policy if exists attendance_insert on public.attendance;
+create policy attendance_insert on public.attendance for insert to authenticated
+  with check ((select public.is_coach()) and exists (select 1 from public.profiles where id = player_id and role = 'player'));
+drop policy if exists attendance_update on public.attendance;
+create policy attendance_update on public.attendance for update to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists attendance_delete on public.attendance;
+create policy attendance_delete on public.attendance for delete to authenticated
+  using ((select public.is_coach()));
+
 drop policy if exists team_settings_read on public.team_settings;
 create policy team_settings_read on public.team_settings for select to authenticated
   using ((select public.is_coach()) or (select public.is_player()));

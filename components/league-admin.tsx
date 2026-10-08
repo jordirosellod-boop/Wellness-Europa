@@ -138,6 +138,10 @@ export function LeagueEditor() {
         Promig = punts ÷ entrenaments. Per classificar-se calen <b>{min} entrenaments</b> al mes; guanya el millor promig. Cada mes és una lliga
         nova (el dia 1 tot torna a 0). Queden {daysLeftInMonth(today)} dies.
       </p>
+      <p className="msg info small" style={{ marginTop: 0 }}>
+        Els entrenaments se sumen sols quan passes llista a <b>Llista</b> (cada «Present» a un entrenament = +1). Fes servir − / + només per
+        corregir.
+      </p>
       {editing ? (
         <div className="stack">
           <div className="row between muted small" style={{ flexWrap: "nowrap" }}>

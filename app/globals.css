@@ -477,3 +477,24 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .league-row:has(.league-actions) .pt-btn { width: 38px; height: 38px; font-size: 1.25rem; }
 .mini-stepper { gap: 4px; }
 .mini-label { font-size: 0.7rem; min-width: 26px; }
+
+/* Assistència (passar llista) */
+.roll li { gap: 8px; flex-wrap: nowrap; }
+.roll .pname { min-width: 0; overflow-wrap: anywhere; }
+.roll-btn {
+  min-height: 40px; padding: 6px 12px; border-radius: 999px; font: inherit; font-weight: 600; font-size: 0.9rem;
+  background: #fff; color: var(--suau); border: 1.5px solid var(--vora); cursor: pointer;
+}
+.roll-btn.yes.on { background: var(--verd); border-color: var(--verd); color: #fff; }
+.roll-btn.no.on { background: var(--vermell); border-color: var(--vermell); color: #fff; }
+.roll-btn:disabled { opacity: 0.6; }
+
+/* Menú del staff amb 6 apartats: que hi càpiga als mòbils */
+@media (max-width: 520px) {
+  .nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .nav a { font-size: 0.86rem; padding: 10px 4px; letter-spacing: 0.2px; }
+}
+@media (max-width: 380px) {
+  .topbar .brand-logo { width: 32px; height: 32px; }
+  .nav a { font-size: 0.8rem; padding: 10px 3px; letter-spacing: 0; }
+}

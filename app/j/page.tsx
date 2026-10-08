@@ -5,7 +5,9 @@ import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components
 import { RpeForm, WellnessForm } from "@/components/forms";
 import { FcfStats } from "@/components/fcf-stats";
 import { average, daysLeftInMonth, fetchLeague, fmtAvg, qualified, fetchTeamLevel, fetchWinners, LeagueTable, leagueTitle, LevelBadge, ranks, sortLeague, Winners, type LeagueRow, type LeagueWinner } from "@/components/league";
+import { PlayerAttendance } from "@/components/player-attendance";
 import { PlayerFines } from "@/components/player-fines";
+import { fetchAttendance, fetchSessionsBetween, monthBounds, summarize } from "@/lib/attendance";
 import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
 import { fmtEuros } from "@/lib/fines";
 import { Brand, Footer } from "@/components/ui";
@@ -126,8 +128,8 @@ function PasteLink() {
   );
 }
 
-type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga";
-const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga"];
+type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia";
+const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia"];
 
 function sectionFromUrl(): Section {
   const s = new URLSearchParams(window.location.search).get("s") as Section | null;
@@ -240,6 +242,7 @@ function PlayerHome({ me }: { me: Profile }) {
       {sessions !== null && section === "normes" && <PlayerFines playerId={me.id} rulesOpen />}
       {sessions !== null && section === "stats" && <FcfStats mode="player" meId={me.id} />}
       {sessions !== null && section === "lliga" && <PlayerLeague meId={me.id} />}
+      {sessions !== null && section === "assistencia" && <PlayerAttendance meId={me.id} />}
 
       {sessions !== null && section === "avisos" && (
         <>
@@ -286,12 +289,18 @@ type DashData = {
   pending: number;
   next: Session | null;
   reminders: ReminderStatus;
+  attendance: { present: number; marked: number; pct: number | null } | null;
 };
+
+async function loadMonthAttendance(playerId: string, today: string) {
+  const sessions = await fetchSessionsBetween(monthBounds(today).from, today);
+  return summarize(sessions, await fetchAttendance(sessions.map((s) => s.id), playerId), playerId);
+}
 
 async function loadDashboard(playerId: string, today: string, sessions: Session[]): Promise<DashData> {
   const sb = supabase();
   const ids = sessions.map((s) => s.id);
-  const [w, r, fines, next, reminders, level, league] = await Promise.all([
+  const [w, r, fines, next, reminders, level, league, attendance] = await Promise.all([
     ids.length ? sb.from("wellness").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     ids.length ? sb.from("rpe").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     fetchAll<{ amount_cents: number; paid: boolean }>((f, t) =>
@@ -302,6 +311,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     detectReminders().catch((): ReminderStatus => "unsupported"),
     fetchTeamLevel().catch(() => null),
     fetchLeague().catch((): LeagueRow[] => []),
+    loadMonthAttendance(playerId, today).catch(() => null),
   ]);
   for (const res of [w, r, next]) if (res.error) throw new Error(res.error.message);
   const mine = new Map<string, { w: boolean; r: boolean }>();
@@ -319,6 +329,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     pending: fines.filter((f) => !f.paid).reduce((a, f) => a + f.amount_cents, 0),
     next: ((next.data ?? []) as Session[])[0] ?? null,
     reminders,
+    attendance,
   };
 }
 
@@ -459,6 +470,17 @@ function Dashboard({
               : data.leaguePos.pos != null
                 ? `${data.leaguePos.pos}a · promig ${fmtAvg(data.leaguePos.avg)}`
                 : `Et falten ${data.leaguePos.missing} entrenaments`}
+          </span>
+        </button>
+        <button type="button" className="tile" onClick={() => go("assistencia")}>
+          {svg("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M16 11l2 2 4-4")}
+          <b>Assistència</b>
+          <span>
+            {!data
+              ? "…"
+              : data.attendance?.marked
+                ? `${data.attendance.present} de ${data.attendance.marked} · ${data.attendance.pct}%`
+                : "Encara sense dades"}
           </span>
         </button>
         <button type="button" className="tile" onClick={() => go("stats")}>

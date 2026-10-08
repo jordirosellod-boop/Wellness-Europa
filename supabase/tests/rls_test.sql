@@ -351,3 +351,46 @@ select pg_temp.expect_error($$select * from public.league_points$$, 'Una jugador
 select pg_temp.expect_error($$select public.snapshot_league()$$, 'Una jugadora no pot canviar les posicions');
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.league_table()$$, 'Anònim no pot veure la lliga');
+
+-- =============== ASSISTÈNCIA ===============
+reset role;
+insert into public.sessions (id, session_date, kind, name) values
+  ('77777777-0000-0000-0000-000000000001', (select today from vars), 'Entrenament', 'Entreno llista'),
+  ('77777777-0000-0000-0000-000000000002', (select today from vars), 'Partit', 'Partit llista'),
+  ('77777777-0000-0000-0000-000000000003', (select today from vars), 'Entrenament', 'Entreno que s''esborrarà');
+create temp table att0 as select trainings from public.league_points where profile_id = '00000000-0000-0000-0000-0000000000e5' and month = public.league_month();
+grant select on att0 to authenticated, anon;
+create function pg_temp.elna_tr() returns integer language sql security definer as $$
+  select trainings from public.league_points where profile_id = '00000000-0000-0000-0000-0000000000e5' and month = public.league_month() $$;
+grant execute on function pg_temp.elna_tr() to authenticated, anon;
+
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000e5', true);
+select pg_temp.check(pg_temp.elna_tr() = (select trainings from att0) + 1, 'Present a un entrenament: +1 entrenament a la lliga');
+insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000e5', true)
+  on conflict (session_id, player_id) do update set present = excluded.present;
+select pg_temp.check(pg_temp.elna_tr() = (select trainings from att0) + 1, 'Tornar a marcar present no suma dues vegades');
+update public.attendance set present = false where session_id = '77777777-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000e5';
+select pg_temp.check(pg_temp.elna_tr() = (select trainings from att0), 'Canviar a absent el resta');
+update public.attendance set present = true where session_id = '77777777-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000e5';
+insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000e5', true);
+select pg_temp.check(pg_temp.elna_tr() = (select trainings from att0) + 1, 'Present a un partit no compta com a entrenament');
+insert into public.attendance (session_id, player_id, present) values ('55555555-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000e5', true);
+insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000003', '00000000-0000-0000-0000-0000000000e5', true);
+select pg_temp.check(pg_temp.elna_tr() = (select trainings from att0) + 2, 'Un segon entrenament avui: +1');
+delete from public.sessions where id = '77777777-0000-0000-0000-000000000003';
+select pg_temp.check(pg_temp.elna_tr() = (select trainings from att0) + 1, 'Esborrar la sessió treu també l''entrenament de la lliga');
+select pg_temp.check((select marked_by from public.attendance where session_id = '77777777-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000e5') = '00000000-0000-0000-0000-00000000000a', 'Queda guardat qui ha passat llista');
+select pg_temp.expect_error($$insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', true)$$, 'No es pot passar llista al staff');
+insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b2', false);
+reset role;
+select pg_temp.check((select trainings from public.league_points where profile_id = '00000000-0000-0000-0000-0000000000e5' and month = date_trunc('month', date '2026-03-10')::date) = 1,
+  'Un entrenament d''un altre mes suma a la lliga d''aquell mes');
+
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5', false); set role authenticated;
+select pg_temp.check((select count(*) from public.attendance) = 3 and (select bool_and(player_id = '00000000-0000-0000-0000-0000000000e5') from public.attendance), 'Una jugadora veu només la seva assistència');
+select pg_temp.expect_error($$insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000000b2', true)$$, 'Una jugadora no pot passar llista');
+with u as (update public.attendance set present = true returning 1) select pg_temp.check(count(*) = 0, 'Una jugadora no pot canviar la seva assistència') from u;
+with d as (delete from public.attendance returning 1) select pg_temp.check(count(*) = 0, 'Una jugadora no pot esborrar l''assistència') from d;
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.attendance$$, 'Anònim no pot veure l''assistència');
