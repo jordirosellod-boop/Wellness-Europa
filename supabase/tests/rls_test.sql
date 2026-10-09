@@ -394,3 +394,34 @@ with u as (update public.attendance set present = true returning 1) select pg_te
 with d as (delete from public.attendance returning 1) select pg_temp.check(count(*) = 0, 'Una jugadora no pot esborrar l''assistència') from d;
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.attendance$$, 'Anònim no pot veure l''assistència');
+
+-- =============== ABSENT -> SENSE MULTA DE L'RPE ===============
+reset role;
+select pg_temp.check((select count(*) from public.fines where auto_session_id = '66666666-0000-0000-0000-000000000001' and auto_kind = 'rpe') = 2,
+  'Les multes automàtiques saben de quina sessió i tipus són');
+update public.fines set paid = true where auto_session_id = '66666666-0000-0000-0000-000000000001' and auto_kind = 'rpe' and person_id = '00000000-0000-0000-0000-0000000000e5';
+insert into public.fines (person_id, reason, amount_cents, fine_date, notes, auto_session_id, auto_kind)
+  values ('00000000-0000-0000-0000-0000000000b2', 'Wellness', 100, (select today from vars) - 1, 'Automàtica · wellness no fet · x', '66666666-0000-0000-0000-000000000001', 'wellness');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.attendance (session_id, player_id, present) values
+  ('66666666-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b2', false),
+  ('66666666-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000e5', false);
+reset role;
+select pg_temp.check((select count(*) from public.fines where auto_session_id = '66666666-0000-0000-0000-000000000001' and person_id = '00000000-0000-0000-0000-0000000000b2' and auto_kind = 'rpe') = 0,
+  'Absent a la llista: es treu la multa de l''RPE');
+select pg_temp.check((select count(*) from public.fines where auto_session_id = '66666666-0000-0000-0000-000000000001' and person_id = '00000000-0000-0000-0000-0000000000b2' and auto_kind = 'wellness') = 1,
+  'Absent a la llista: la multa del wellness es queda');
+select pg_temp.check((select count(*) from public.fines where auto_session_id = '66666666-0000-0000-0000-000000000001' and person_id = '00000000-0000-0000-0000-0000000000e5' and auto_kind = 'rpe') = 1,
+  'Una multa de l''RPE ja pagada no s''esborra');
+select pg_temp.check(public.apply_auto_fines() = 0, 'Absent: no es torna a posar la multa de l''RPE');
+
+-- Entrenament nou d'ahir: Berta consta com a absent abans que passi la revisió
+insert into public.sessions (id, session_date, kind, name, created_at) values
+  ('66666666-0000-0000-0000-000000000005', (select today from vars) - 1, 'Entrenament', 'Entreno ahir 2', now() - interval '5 days');
+insert into public.attendance (session_id, player_id, present) values ('66666666-0000-0000-0000-000000000005', '00000000-0000-0000-0000-0000000000b2', false);
+select pg_temp.check(public.apply_auto_fines() = 3, 'Revisió: Berta (absent) només multa de wellness; Elna wellness i RPE');
+select pg_temp.check((select string_agg(auto_kind, ',' order by auto_kind) from public.fines where auto_session_id = '66666666-0000-0000-0000-000000000005' and person_id = '00000000-0000-0000-0000-0000000000b2') = 'wellness',
+  'Absent: sense multa de l''RPE, però sí del wellness');
+update public.attendance set present = true where session_id = '66666666-0000-0000-0000-000000000005' and player_id = '00000000-0000-0000-0000-0000000000b2';
+update public.attendance set present = true where session_id = '66666666-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000b2';
+select pg_temp.check(public.apply_auto_fines() = 2, 'Si es corregeix a present, la multa de l''RPE es torna a posar');

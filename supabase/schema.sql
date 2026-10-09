@@ -150,6 +150,14 @@ create table if not exists public.auto_fine_log (
   created_at timestamptz not null default now(),
   primary key (session_id, person_id, kind)
 );
+-- De quina sessió i de quin tipus és cada multa automàtica (per poder-la treure si cal).
+alter table public.fines add column if not exists auto_session_id uuid references public.sessions(id) on delete set null;
+alter table public.fines add column if not exists auto_kind text check (auto_kind in ('wellness', 'rpe'));
+-- (multes automàtiques posades abans d'existir aquestes columnes: es relacionen pel registre)
+update public.fines f set auto_session_id = l.session_id, auto_kind = l.kind
+from public.auto_fine_log l join public.sessions s on s.id = l.session_id
+where f.auto_session_id is null and f.person_id = l.person_id and f.fine_date = s.session_date
+  and f.notes = 'Automàtica · ' || case l.kind when 'wellness' then 'wellness' else 'RPE' end || ' no fet · ' || s.name;
 
 -- Secrets interns (clau de les tasques programades i claus de les notificacions).
 -- Ningú hi té accés des del navegador; només el servidor de l'app i la base de dades.
@@ -454,15 +462,18 @@ begin
                                              and w.submitted_at < (d.deadline at time zone 'Europe/Madrid')))
         and (k <> 'rpe' or not exists (select 1 from public.rpe r where r.session_id = d.sid and r.player_id = d.pid
                                         and r.submitted_at < (d.deadline at time zone 'Europe/Madrid')))
+        -- Si a la llista consta com a absent, no hi ha multa de l'RPE (la del wellness, sí).
+        and (k <> 'rpe' or not exists (select 1 from public.attendance a where a.session_id = d.sid and a.player_id = d.pid and not a.present))
     ), logged as (
       insert into public.auto_fine_log (session_id, person_id, kind)
       select sid, pid, k from missing
       on conflict do nothing
       returning session_id, person_id
     )
-    insert into public.fines (person_id, rule_id, reason, amount_cents, fine_date, notes)
+    insert into public.fines (person_id, rule_id, reason, amount_cents, fine_date, notes, auto_session_id, auto_kind)
     select l.person_id, rule.id, rule.name, rule.amount_cents, m.session_date,
-           'Automàtica · ' || case k when 'wellness' then 'wellness' else 'RPE' end || ' no fet · ' || m.name
+           'Automàtica · ' || case k when 'wellness' then 'wellness' else 'RPE' end || ' no fet · ' || m.name,
+           m.sid, k
     from logged l join missing m on m.sid = l.session_id and m.pid = l.person_id;
     get diagnostics added = row_count;
     n := n + added;
@@ -655,6 +666,26 @@ drop trigger if exists attendance_league on public.attendance;
 create trigger attendance_league after insert or update or delete on public.attendance
   for each row execute function public.attendance_to_league();
 
+-- ABSENT -> SENSE MULTA DE L'RPE. Si el staff marca una jugadora com a absent, es treu la
+-- multa automàtica de l'RPE d'aquella sessió (si encara no s'ha pagat). La del wellness es queda.
+-- Si després es torna a marcar com a present, la multa es torna a revisar (cada 15 minuts).
+create or replace function public.attendance_rpe_fine()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if not new.present and (tg_op = 'INSERT' or old.present) then
+    delete from public.fines
+    where auto_session_id = new.session_id and person_id = new.player_id and auto_kind = 'rpe' and not paid;
+  elsif tg_op = 'UPDATE' and new.present and not old.present then
+    delete from public.auto_fine_log l
+    where l.session_id = new.session_id and l.person_id = new.player_id and l.kind = 'rpe'
+      and not exists (select 1 from public.fines f where f.auto_session_id = new.session_id and f.person_id = new.player_id and f.auto_kind = 'rpe');
+  end if;
+  return null;
+end $$;
+drop trigger if exists attendance_rpe_fine on public.attendance;
+create trigger attendance_rpe_fine after insert or update on public.attendance
+  for each row execute function public.attendance_rpe_fine();
+
 -- Si s'esborra una sessió, primer es treu la seva assistència (i es resta de la lliga).
 create or replace function public.session_delete_attendance()
 returns trigger language plpgsql security definer set search_path = '' as $$
@@ -776,7 +807,7 @@ grant all on public.profiles, public.player_links, public.sessions, public.welln
 grant select, insert, update, delete on public.attendance to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
 revoke all on function public.wellness_open_at(uuid, timestamp), public.rpe_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
-  public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync(), public.attendance_to_league(), public.session_delete_attendance() from public, anon, authenticated;
+  public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync(), public.attendance_to_league(), public.session_delete_attendance(), public.attendance_rpe_fine() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
 revoke all on function public.league_table(date), public.league_winners(), public.league_change(uuid, text, integer),

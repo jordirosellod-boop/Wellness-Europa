@@ -90,7 +90,8 @@ function Roll() {
     <>
       <h1>Assistència</h1>
       <p className="muted" style={{ marginTop: -6 }}>
-        Passa llista a cada sessió. Cada «Present» a un entrenament suma 1 entrenament a la Lliga interna del mes.
+        Passa llista a cada sessió. Cada «Present» a un entrenament suma 1 entrenament a la Lliga interna del mes. «Absent» treu la
+        multa automàtica de l&apos;RPE d&apos;aquell entrenament (la del wellness es manté).
       </p>
 
       <div className="row between card" style={{ padding: "8px 10px" }}>
