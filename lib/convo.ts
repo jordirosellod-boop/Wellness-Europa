@@ -46,13 +46,13 @@ export const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 // posició i es mou cap al lloc nou.
 export type Spot = { x: number; y: number; label: string };
 
-const GK: Spot = { x: 50, y: 7, label: "POR" };
+const GK: Spot = { x: 50, y: 5, label: "POR" };
 const D4: Spot[] = [
   { x: 12, y: 26, label: "LI" }, { x: 37, y: 21, label: "DFC" }, { x: 63, y: 21, label: "DFC" }, { x: 88, y: 26, label: "LD" },
 ];
-const D3: Spot[] = [{ x: 26, y: 22, label: "DFC" }, { x: 50, y: 20, label: "DFC" }, { x: 74, y: 22, label: "DFC" }];
+const D3: Spot[] = [{ x: 24, y: 24, label: "DFC" }, { x: 50, y: 23, label: "DFC" }, { x: 76, y: 24, label: "DFC" }];
 const D5: Spot[] = [
-  { x: 8, y: 32, label: "CI" }, { x: 29, y: 22, label: "DFC" }, { x: 50, y: 20, label: "DFC" }, { x: 71, y: 22, label: "DFC" }, { x: 92, y: 32, label: "CD" },
+  { x: 8, y: 33, label: "CI" }, { x: 29, y: 24, label: "DFC" }, { x: 50, y: 23, label: "DFC" }, { x: 71, y: 24, label: "DFC" }, { x: 92, y: 33, label: "CD" },
 ];
 const M4: Spot[] = [
   { x: 12, y: 52, label: "MI" }, { x: 37, y: 47, label: "MC" }, { x: 63, y: 47, label: "MC" }, { x: 88, y: 52, label: "MD" },

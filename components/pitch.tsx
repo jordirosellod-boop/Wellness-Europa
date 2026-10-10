@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { FORMATION_NAMES, FORMATIONS, hhmm, type Convocation, type RosterRow } from "@/lib/convo";
 import { escapulada } from "@/lib/fonts";
 import { supabase } from "@/lib/supabase";
@@ -10,22 +10,17 @@ type Kit = "home" | "away";
 type Lineup = { formation: string; slots: Record<string, string>; kit: Kit };
 
 const KIT_IMG: Record<Kit | "gk", string> = { home: "/kits/home.webp", away: "/kits/away.webp", gk: "/kits/gk.webp" };
-const TILT = { min: 18, max: 62, start: 44 };
-const SPIN = { min: -35, max: 35 };
 
 /**
  * Pissarra de l'onze inicial (NOMÉS staff): estadi en 3D, tots els sistemes, i les jugadores
  * com a hologrames amb la samarreta oficial. Es posen tocant la posició i triant la jugadora.
- * Es pot inclinar i girar el camp arrossegant-lo. Tipografia Escapulada.
+ * Vista fixa (no es mou) perquè es llegeixin bé tots els noms. Tipografia Escapulada.
  */
 export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[] }) {
   const [lineup, setLineup] = useState<Lineup | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [picking, setPicking] = useState<number | null>(null);
-  const [view, setView] = useState({ tilt: TILT.start, spin: 0 });
-  const drag = useRef<{ x: number; y: number; tilt: number; spin: number; moved: boolean } | null>(null);
-  const justDragged = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -97,30 +92,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
     save({ slots: next });
   }
 
-  // Arrossegar el camp: amunt/avall inclina, als costats gira.
-  function onDown(e: PointerEvent<HTMLDivElement>) {
-    drag.current = { x: e.clientX, y: e.clientY, tilt: view.tilt, spin: view.spin, moved: false };
-  }
-  function onMove(e: PointerEvent<HTMLDivElement>) {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    if (!d.moved && Math.hypot(dx, dy) < 8) return;
-    if (!d.moved) e.currentTarget.setPointerCapture(e.pointerId);
-    d.moved = true;
-    setView({
-      tilt: Math.min(TILT.max, Math.max(TILT.min, d.tilt - dy * 0.25)),
-      spin: Math.min(SPIN.max, Math.max(SPIN.min, d.spin + dx * 0.25)),
-    });
-  }
-  function onUp() {
-    justDragged.current = !!drag.current?.moved;
-    drag.current = null;
-  }
-
   const pickedSpot = picking != null ? spots[picking] : null;
-  const vars = { "--tilt": `${view.tilt}deg`, "--spin": `${view.spin}deg` } as CSSProperties;
 
   return (
     <section className={`card lineup ${escapulada.variable}`}>
@@ -150,8 +122,6 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
       <div className="row no-print" style={{ gap: 8, margin: "8px 0" }}>
         <button className="btn small" disabled={bench.length === 0 || Object.keys(slots).length >= 11} onClick={autoFill}>Omplir els buits</button>
         <button className="btn small secondary" disabled={Object.keys(slots).length === 0} onClick={() => save({ slots: {} })}>Buidar</button>
-        <button className="btn small secondary" onClick={() => setView({ tilt: TILT.start, spin: 0 })}>Centrar</button>
-        <button className="btn small secondary" onClick={() => setView({ tilt: TILT.min, spin: 0 })}>Vista de dalt</button>
         <button className="btn small secondary" onClick={() => window.print()}>🖨 Imprimir</button>
       </div>
       {status && <p className={`small ${status.ok ? "muted" : "msg error"} no-print`} role="status" style={{ margin: "0 0 6px" }}>{status.text}</p>}
@@ -166,22 +136,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
           </div>
         </div>
 
-        <div
-          className="stadium"
-          style={vars}
-          onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onUp}
-          onClickCapture={(e) => {
-            // Si s'acaba d'arrossegar, no s'obre cap posició.
-            if (justDragged.current) {
-              e.stopPropagation();
-              e.preventDefault();
-              justDragged.current = false;
-            }
-          }}
-        >
+        <div className="stadium">
           <div className="pitch">
             <div className="pitch-edge front" />
             <div className="pitch-edge left" />
@@ -217,7 +172,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
                 <button
                   key={i}
                   type="button"
-                  className={`holo-player${p ? " filled" : ""}${picking === i ? " picking" : ""}`}
+                  className={`holo-player${p ? " filled" : ""}${picking === i ? " picking" : ""}${s.x < 16 ? " edge-l" : s.x > 84 ? " edge-r" : ""}`}
                   style={{ left: `${s.x}%`, top: `${100 - s.y}%`, "--kit": `url(${img})`, animationDelay: `${(i % 4) * -0.7}s` } as CSSProperties}
                   onClick={() => setPicking(i)}
                   aria-label={p ? `${s.label}: ${p.display_name}. Canviar` : `${s.label}: posar jugadora`}
@@ -243,7 +198,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
               );
             })}
           </div>
-          <p className="stadium-hint no-print">Arrossega el camp per girar-lo · toca una posició per posar-hi una jugadora</p>
+          <p className="stadium-hint no-print">Toca una samarreta o un cercle per posar-hi una jugadora</p>
         </div>
 
         <div className="bench">
