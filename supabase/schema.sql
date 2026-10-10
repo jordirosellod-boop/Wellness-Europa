@@ -252,6 +252,51 @@ create table if not exists public.attendance (
 );
 create index if not exists attendance_player_idx on public.attendance (player_id);
 
+-- DORSALS (si no se'n posa cap, es fa servir el de la FCF)
+create table if not exists public.player_numbers (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  dorsal     smallint not null check (dorsal between 0 and 99),
+  updated_at timestamptz not null default now()
+);
+
+-- CONVOCATÒRIES: el staff les prepara; les jugadores només veuen les publicades.
+create table if not exists public.convocations (
+  id           uuid primary key default gen_random_uuid(),
+  match_date   date not null,
+  kickoff      time,
+  meet_time    time,
+  rival        text not null check (char_length(trim(rival)) between 1 and 80),
+  is_home      boolean not null default true,
+  competition  text check (competition is null or char_length(competition) <= 80),
+  venue        text check (venue is null or char_length(venue) <= 120),
+  address      text check (address is null or char_length(address) <= 200),
+  kit          text check (kit is null or char_length(kit) <= 80),
+  notes        text check (notes is null or char_length(notes) <= 500),
+  published    boolean not null default false,
+  published_at timestamptz,
+  notified_at  timestamptz,
+  created_by   uuid default auth.uid() references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists convocations_date_idx on public.convocations (match_date);
+
+create table if not exists public.convocation_players (
+  convocation_id uuid not null references public.convocations(id) on delete cascade,
+  player_id      uuid not null references public.profiles(id) on delete cascade,
+  called         boolean not null,
+  updated_at     timestamptz not null default now(),
+  primary key (convocation_id, player_id)
+);
+
+-- ONZE INICIAL (només staff): sistema i qui va a cada posició ({"0": id, "1": id, ...}).
+create table if not exists public.convocation_lineups (
+  convocation_id uuid primary key references public.convocations(id) on delete cascade,
+  formation      text not null default '4-4-2' check (char_length(formation) between 1 and 12),
+  slots          jsonb not null default '{}'::jsonb check (jsonb_typeof(slots) = 'object'),
+  updated_at     timestamptz not null default now()
+);
+
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);
 alter table public.rpe add column if not exists load integer generated always as (rpe * duration_min) stored;
@@ -686,6 +731,46 @@ drop trigger if exists attendance_rpe_fine on public.attendance;
 create trigger attendance_rpe_fine after insert or update on public.attendance
   for each row execute function public.attendance_rpe_fine();
 
+-- CONVOCATÒRIES: hores que posa el servidor.
+create or replace function public.stamp_convocation()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  new.updated_at := now();
+  if tg_op = 'INSERT' then
+    new.created_at := now();
+    new.notified_at := null;
+    new.published_at := case when new.published then now() end;
+  else
+    new.created_at := old.created_at;
+    new.created_by := old.created_by;
+    -- només la posa el servidor (sense usuari) quan envia l'avís
+    if (select auth.uid()) is not null then new.notified_at := old.notified_at; end if;
+    new.published_at := case when new.published then coalesce(old.published_at, now()) end;
+  end if;
+  return new;
+end $$;
+drop trigger if exists convocations_stamp on public.convocations;
+create trigger convocations_stamp before insert or update on public.convocations
+  for each row execute function public.stamp_convocation();
+
+-- Llista de la convocatòria: totes les jugadores, amb el dorsal i si estan convocades.
+-- El staff la veu sempre; una jugadora, només si la convocatòria està publicada.
+create or replace function public.convo_roster(cid uuid)
+returns table (player_id uuid, display_name text, dorsal smallint, called boolean)
+language sql stable security definer set search_path = '' as $$
+  select p.id, p.display_name,
+         coalesce(n.dorsal, (select case when f.dorsal ~ '^[0-9]{1,2}$' then f.dorsal::smallint end
+                             from public.fcf_players f where f.profile_id = p.id limit 1)),
+         coalesce(cp.called, false)
+  from public.profiles p
+  left join public.player_numbers n on n.profile_id = p.id
+  left join public.convocation_players cp on cp.convocation_id = cid and cp.player_id = p.id
+  where p.role = 'player'
+    and exists (select 1 from public.convocations c where c.id = cid
+                and ((select public.is_coach()) or (c.published and (select public.is_player()))))
+  order by coalesce(cp.called, false) desc, 3 nulls last, p.display_name, p.id;
+$$;
+
 -- Si s'esborra una sessió, primer es treu la seva assistència (i es resta de la lliga).
 create or replace function public.session_delete_attendance()
 returns trigger language plpgsql security definer set search_path = '' as $$
@@ -782,13 +867,18 @@ alter table public.fcf_appearances    enable row level security;
 alter table public.team_settings      enable row level security;
 alter table public.league_points      enable row level security;
 alter table public.attendance         enable row level security;
+alter table public.player_numbers     enable row level security;
+alter table public.convocations       enable row level security;
+alter table public.convocation_players enable row level security;
+alter table public.convocation_lineups enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
 -- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
 revoke all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
-  public.team_settings, public.league_points, public.attendance from anon, authenticated;
+  public.team_settings, public.league_points, public.attendance,
+  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -805,6 +895,10 @@ grant all on public.profiles, public.player_links, public.sessions, public.welln
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance to service_role;
 grant select, insert, update, delete on public.attendance to authenticated;
+grant all on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to service_role;
+grant select, insert, update, delete on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to authenticated;
+revoke all on function public.convo_roster(uuid) from public, anon;
+grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
 revoke all on function public.wellness_open_at(uuid, timestamp), public.rpe_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
   public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync(), public.attendance_to_league(), public.session_delete_attendance(), public.attendance_rpe_fine() from public, anon, authenticated;
@@ -906,6 +1000,31 @@ create policy attendance_update on public.attendance for update to authenticated
 drop policy if exists attendance_delete on public.attendance;
 create policy attendance_delete on public.attendance for delete to authenticated
   using ((select public.is_coach()));
+
+-- DORSALS, CONVOCATÒRIES I ONZE: només el staff escriu. Les jugadores veuen les
+-- convocatòries publicades (i la llista, amb convo_roster). L'onze és NOMÉS del staff.
+drop policy if exists player_numbers_coach on public.player_numbers;
+create policy player_numbers_coach on public.player_numbers for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists convocations_select on public.convocations;
+create policy convocations_select on public.convocations for select to authenticated
+  using ((select public.is_coach()) or (published and (select public.is_player())));
+drop policy if exists convocations_write on public.convocations;
+create policy convocations_write on public.convocations for insert to authenticated
+  with check ((select public.is_coach()));
+drop policy if exists convocations_update on public.convocations;
+create policy convocations_update on public.convocations for update to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists convocations_delete on public.convocations;
+create policy convocations_delete on public.convocations for delete to authenticated
+  using ((select public.is_coach()));
+drop policy if exists convocation_players_coach on public.convocation_players;
+create policy convocation_players_coach on public.convocation_players for all to authenticated
+  using ((select public.is_coach()))
+  with check ((select public.is_coach()) and exists (select 1 from public.profiles where id = player_id and role = 'player'));
+drop policy if exists convocation_lineups_coach on public.convocation_lineups;
+create policy convocation_lineups_coach on public.convocation_lineups for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
 
 drop policy if exists team_settings_read on public.team_settings;
 create policy team_settings_read on public.team_settings for select to authenticated

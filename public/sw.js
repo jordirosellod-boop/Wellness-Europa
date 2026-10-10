@@ -17,7 +17,14 @@ self.addEventListener("notificationclick", (event) => {
   const url = (event.notification.data && event.notification.data.url) || "/j";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const c of list) if (new URL(c.url).pathname === url && "focus" in c) return c.focus();
+      const target = new URL(url, self.location.origin);
+      for (const c of list) {
+        if (new URL(c.url).pathname === target.pathname && "focus" in c) {
+          // Obre l'apartat de l'avís (p. ex. la convocatòria) mantenint l'enllaç personal (#).
+          const hash = new URL(c.url).hash;
+          return c.focus().then((w) => (w && "navigate" in w ? w.navigate(target.pathname + target.search + hash) : w));
+        }
+      }
       return self.clients.openWindow(url);
     }),
   );

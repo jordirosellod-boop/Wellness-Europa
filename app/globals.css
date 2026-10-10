@@ -498,3 +498,166 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
   .topbar .brand-logo { width: 32px; height: 32px; }
   .nav a { font-size: 0.8rem; padding: 10px 3px; letter-spacing: 0; }
 }
+
+/* =====================================================================
+   CONVOCATÒRIA (la veuen les jugadores)
+   ===================================================================== */
+.convo {
+  background: linear-gradient(160deg, var(--navy) 0%, #0f2366 55%, var(--blau) 100%);
+  color: #fff; border-radius: 16px; padding: 18px 16px 20px; overflow: hidden; position: relative;
+}
+.convo::after {
+  content: ""; position: absolute; inset: auto -40px -60px auto; width: 220px; height: 220px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(219,179,77,.18), transparent 70%); pointer-events: none;
+}
+.convo-head { display: flex; align-items: center; gap: 12px; }
+.convo-head img { width: 56px; height: 56px; }
+.convo-kicker { display: block; color: var(--or); font-family: var(--display); text-transform: uppercase; letter-spacing: 1px; font-size: .9rem; }
+.convo-title { color: #fff; margin: 0; font-size: 2.1rem; line-height: 1; }
+.convo-match {
+  display: flex; align-items: center; justify-content: center; gap: 10px; margin: 18px 0 4px; text-align: center;
+  font-family: var(--font-kit), var(--display); font-weight: 800; text-transform: uppercase; font-size: 1.7rem; line-height: 1.05;
+}
+.convo-match span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.convo-match span.us { color: var(--or); }
+.convo-match i { font-style: normal; font-size: .9rem; opacity: .7; }
+.convo-date { text-align: center; margin: 0 0 12px; color: rgba(255,255,255,.85); font-size: .95rem; }
+.convo-me { text-align: center; border-radius: 999px; padding: 8px 12px; font-weight: 700; margin: 0 auto 12px; max-width: 320px; }
+.convo-me.yes { background: var(--or); color: var(--navy); }
+.convo-me.no { background: rgba(255,255,255,.12); color: #fff; }
+.convo-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 16px; }
+.convo-info div { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.convo-info div.wide { grid-column: 1 / -1; }
+.convo-info dt { font-family: var(--display); text-transform: uppercase; letter-spacing: .6px; color: var(--or); font-size: .8rem; }
+.convo-info dd { margin: 2px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.convo-info a { color: #fff; }
+.convo-sub { color: #fff; display: flex; align-items: center; gap: 8px; margin: 6px 0 10px; font-size: 1.35rem; }
+.convo-sub span { background: var(--or); color: var(--navy); border-radius: 999px; padding: 0 10px; font-size: 1rem; }
+.convo-sub.muted-sub { font-size: 1.05rem; opacity: .8; margin-top: 16px; }
+.convo-sub.muted-sub span { background: rgba(255,255,255,.2); color: #fff; }
+.convo-grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.convo-grid li {
+  background: #fff; color: var(--navy); border-radius: 12px; padding: 8px 6px 8px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; --kit-chevron: #fff;
+}
+.convo-grid li.mine { background: var(--or); outline: 3px solid #fff; }
+.kit-number { display: block; overflow: visible; }
+.kit-name {
+  font-family: var(--font-kit), var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+  font-size: 1.05rem; line-height: 1.05; overflow-wrap: anywhere;
+}
+.convo-out { margin: 0; color: rgba(255,255,255,.75); font-family: var(--font-kit), var(--cos); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+@media (max-width: 380px) { .convo-info { grid-template-columns: 1fr 1fr; } .convo-match { font-size: 1.4rem; } }
+
+.convo-banner {
+  width: 100%; text-align: left; border: 0; cursor: pointer; font: inherit; color: #fff; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px;
+  background: linear-gradient(135deg, var(--navy), var(--blau)); display: flex; flex-direction: column; gap: 2px;
+}
+.convo-banner.yes { box-shadow: inset 0 0 0 3px var(--or); }
+.convo-banner-k { color: var(--or); font-family: var(--display); text-transform: uppercase; letter-spacing: .8px; font-size: .85rem; }
+.convo-banner b { font-family: var(--display); text-transform: uppercase; font-size: 1.35rem; font-weight: 400; letter-spacing: .4px; }
+.convo-tabs { overflow-x: auto; flex-wrap: nowrap; }
+.convo-tabs button { white-space: nowrap; }
+
+/* Llista per convocar (staff) */
+.convo-toggle { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.convo-toggle button {
+  width: 100%; min-height: 46px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; cursor: pointer;
+  background: #fff; border: 1.5px solid var(--vora); color: var(--suau); font: inherit; text-align: left;
+}
+.convo-toggle button b { min-width: 22px; font-family: var(--display); font-weight: 400; font-size: 1.1rem; color: inherit; }
+.convo-toggle button span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.convo-toggle button i { font-style: normal; font-weight: 700; }
+.convo-toggle button.on { background: var(--blau); border-color: var(--blau); color: #fff; }
+.dorsal-edit { display: flex; align-items: center; gap: 8px; }
+.dorsal-edit input { width: 54px; text-align: center; }
+
+/* =====================================================================
+   ONZE INICIAL (NOMÉS STAFF) · tipografia Escapulada
+   ===================================================================== */
+.esc { font-family: var(--font-escapulada), var(--display); font-weight: 400; text-transform: uppercase; letter-spacing: .5px; }
+.formations { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.formations button {
+  font-family: var(--font-escapulada), var(--display); font-size: 1.05rem; letter-spacing: .5px; padding: 6px 10px; min-height: 38px;
+  border-radius: 999px; border: 1.5px solid var(--vora); background: #fff; color: var(--blau); cursor: pointer;
+}
+.formations button[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--or); }
+
+.pitch-wrap { perspective: 1100px; perspective-origin: 50% 0%; padding: 6px 0 0; }
+.pitch {
+  position: relative; width: min(100%, 520px); margin: 0 auto; aspect-ratio: 68 / 105; border-radius: 6px;
+  transform: rotateX(34deg) scale(.96); transform-origin: 50% 100%; transform-style: preserve-3d; transition: transform .6s ease;
+  background:
+    repeating-linear-gradient(0deg, #2f8f3e 0 9.5238%, #2a8238 9.5238% 19.0476%);
+  box-shadow: 0 30px 40px -20px rgba(0,0,0,.45), inset 0 0 0 2px rgba(0,0,0,.08);
+  margin-top: -19%; margin-bottom: -2%;
+}
+.pitch-wrap.flat .pitch { transform: none; margin-top: 0; margin-bottom: 0; }
+.pitch-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.marker {
+  position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 80px; margin-left: -40px;
+  transform: translateY(-62%) rotateX(-34deg); transform-origin: 50% 100%;
+  background: none; border: 0; padding: 0; cursor: pointer; color: #fff;
+  transition: left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1), transform .6s ease;
+}
+.pitch-wrap.flat .marker { transform: translateY(-50%); }
+.marker .shirt {
+  width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 1.45rem; line-height: 1;
+  background: rgba(255,255,255,.18); border: 2px dashed rgba(255,255,255,.85); color: #fff;
+  box-shadow: 0 6px 8px -4px rgba(0,0,0,.5);
+}
+.marker.filled .shirt { background: var(--blau); border: 2px solid #fff; color: #fff; }
+.marker.picking .shirt { outline: 3px solid var(--or); outline-offset: 2px; }
+.marker .mname {
+  max-width: 80px; font-size: .92rem; line-height: 1; padding: 3px 6px; border-radius: 4px; background: var(--navy); color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.marker:not(.filled) .mname { background: rgba(11,24,70,.55); color: var(--or); }
+@media (max-width: 420px) {
+  .marker { width: 64px; margin-left: -32px; }
+  .marker .shirt { width: 34px; height: 34px; font-size: 1.15rem; }
+  .marker .mname { max-width: 64px; font-size: .78rem; padding: 2px 4px; }
+}
+.bench { margin-top: 14px; }
+.bench h3 { color: var(--navy); margin: 0 0 6px; font-size: 1.35rem; display: flex; align-items: center; gap: 8px; }
+.bench h3 span { background: var(--navy); color: var(--or); border-radius: 999px; padding: 0 9px; font-size: 1rem; }
+.bench ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.bench li { background: #fff; border: 1.5px solid var(--vora); border-radius: 999px; padding: 4px 12px; font-size: 1.1rem; color: var(--navy); }
+.bench li b { color: var(--blau); font-weight: 400; margin-right: 4px; }
+.print-head { display: none; }
+
+.picker-backdrop { position: fixed; inset: 0; background: rgba(11,24,70,.45); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+.picker {
+  background: #fff; width: min(100%, 520px); max-height: 75vh; overflow-y: auto; border-radius: 16px 16px 0 0; padding: 14px 16px 20px;
+  box-shadow: 0 -10px 30px rgba(0,0,0,.25);
+}
+.picker ul { list-style: none; margin: 10px 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.picker .pick {
+  width: 100%; min-height: 46px; text-align: left; padding: 6px 10px; border-radius: 10px; border: 1.5px solid var(--vora); background: #fff;
+  color: var(--navy); cursor: pointer; font-size: 1.15rem;
+}
+.picker .pick b { color: var(--blau); font-weight: 400; margin-right: 4px; }
+.picker .pick small { color: var(--suau); font-size: .8rem; }
+.picker .pick.current { background: var(--navy); color: #fff; border-color: var(--navy); }
+.picker .pick.current b { color: var(--or); }
+
+/* Impressió de l'onze: només la pissarra, gran i amb colors */
+@page { size: A4 portrait; margin: 12mm; }
+@media print {
+  body * { visibility: hidden !important; }
+  .print-lineup, .print-lineup * { visibility: visible !important; }
+  .print-lineup { position: absolute; left: 0; top: 0; width: 100%; }
+  .print-lineup, .print-lineup * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .print-head b { display: block; font-size: 26pt; color: #0b1846; line-height: 1; }
+  .print-head span { color: #55608a; font-size: 11pt; }
+  .pitch { width: 150mm; }
+  .bench li { font-size: 14pt; }
+  .no-print { display: none !important; }
+}
+
+/* Menú del staff amb 7 apartats */
+@media (max-width: 400px) {
+  .nav a { font-size: 0.74rem; padding: 10px 2.5px; letter-spacing: 0; }
+  .topbar .brand-logo { width: 30px; height: 30px; }
+}
