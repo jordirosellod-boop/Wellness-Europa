@@ -296,6 +296,8 @@ create table if not exists public.convocation_lineups (
   slots          jsonb not null default '{}'::jsonb check (jsonb_typeof(slots) = 'object'),
   updated_at     timestamptz not null default now()
 );
+-- Equipació de la pissarra: 1a (blanca) o 2a (blava). La portera sempre de groc.
+alter table public.convocation_lineups add column if not exists kit text not null default 'home' check (kit in ('home', 'away'));
 
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);

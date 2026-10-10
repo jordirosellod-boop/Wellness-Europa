@@ -584,41 +584,6 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 }
 .formations button[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--or); }
 
-.pitch-wrap { perspective: 1100px; perspective-origin: 50% 0%; padding: 6px 0 0; }
-.pitch {
-  position: relative; width: min(100%, 520px); margin: 0 auto; aspect-ratio: 68 / 105; border-radius: 6px;
-  transform: rotateX(34deg) scale(.96); transform-origin: 50% 100%; transform-style: preserve-3d; transition: transform .6s ease;
-  background:
-    repeating-linear-gradient(0deg, #2f8f3e 0 9.5238%, #2a8238 9.5238% 19.0476%);
-  box-shadow: 0 30px 40px -20px rgba(0,0,0,.45), inset 0 0 0 2px rgba(0,0,0,.08);
-  margin-top: -19%; margin-bottom: -2%;
-}
-.pitch-wrap.flat .pitch { transform: none; margin-top: 0; margin-bottom: 0; }
-.pitch-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
-.marker {
-  position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 80px; margin-left: -40px;
-  transform: translateY(-62%) rotateX(-34deg); transform-origin: 50% 100%;
-  background: none; border: 0; padding: 0; cursor: pointer; color: #fff;
-  transition: left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1), transform .6s ease;
-}
-.pitch-wrap.flat .marker { transform: translateY(-50%); }
-.marker .shirt {
-  width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 1.45rem; line-height: 1;
-  background: rgba(255,255,255,.18); border: 2px dashed rgba(255,255,255,.85); color: #fff;
-  box-shadow: 0 6px 8px -4px rgba(0,0,0,.5);
-}
-.marker.filled .shirt { background: var(--blau); border: 2px solid #fff; color: #fff; }
-.marker.picking .shirt { outline: 3px solid var(--or); outline-offset: 2px; }
-.marker .mname {
-  max-width: 80px; font-size: .92rem; line-height: 1; padding: 3px 6px; border-radius: 4px; background: var(--navy); color: #fff;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.marker:not(.filled) .mname { background: rgba(11,24,70,.55); color: var(--or); }
-@media (max-width: 420px) {
-  .marker { width: 64px; margin-left: -32px; }
-  .marker .shirt { width: 34px; height: 34px; font-size: 1.15rem; }
-  .marker .mname { max-width: 64px; font-size: .78rem; padding: 2px 4px; }
-}
 .bench { margin-top: 14px; }
 .bench h3 { color: var(--navy); margin: 0 0 6px; font-size: 1.35rem; display: flex; align-items: center; gap: 8px; }
 .bench h3 span { background: var(--navy); color: var(--or); border-radius: 999px; padding: 0 9px; font-size: 1rem; }
@@ -652,7 +617,12 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
   .print-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
   .print-head b { display: block; font-size: 26pt; color: #0b1846; line-height: 1; }
   .print-head span { color: #55608a; font-size: 11pt; }
+  .stadium { background: none !important; padding: 0 !important; overflow: visible !important; --tilt: 36deg !important; --spin: 0deg !important; }
+  .stadium .pitch { margin: 0 auto 34mm !important; transition: none !important; box-shadow: 0 0 0 4px #1d6b2c !important; }
   .pitch { width: 150mm; }
+  .holo-body, .spot-ring, .shirt-wrap img { animation: none !important; }
+  .shirt-wrap img { filter: none !important; opacity: 1 !important; }
+  .scan, .beam, .stadium-hint { display: none !important; }
   .bench li { font-size: 14pt; }
   .no-print { display: none !important; }
 }
@@ -661,4 +631,122 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 @media (max-width: 400px) {
   .nav a { font-size: 0.74rem; padding: 10px 2.5px; letter-spacing: 0; }
   .topbar .brand-logo { width: 30px; height: 30px; }
+}
+
+/* ---------- Estadi 3D i jugadores holograma (pissarra de l'onze, staff) ---------- */
+.kit-pick { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.kit-pick button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 12px 4px 6px; border-radius: 999px;
+  border: 1.5px solid var(--vora); background: #fff; color: var(--blau); cursor: pointer;
+  font-family: var(--font-escapulada), var(--display); font-size: 1rem; letter-spacing: .4px;
+}
+.kit-pick button img { width: 26px; height: auto; }
+.kit-pick button[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--or); }
+
+.stadium {
+  position: relative; perspective: 1000px; perspective-origin: 50% 0%; padding: 26px 0 10px; border-radius: 14px; overflow: hidden;
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% -8%, rgba(255,255,255,.28), transparent 70%),
+    radial-gradient(circle at 6% 4%, rgba(190,225,255,.55), transparent 9%),
+    radial-gradient(circle at 94% 4%, rgba(190,225,255,.55), transparent 9%),
+    radial-gradient(ellipse 80% 30% at 50% 100%, rgba(10,46,160,.6), transparent 70%),
+    linear-gradient(180deg, #030716 0%, #071338 45%, #0b1846 100%);
+}
+.stadium:active { cursor: grabbing; }
+.stadium::before {
+  /* graderia */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 30%;
+  background: repeating-linear-gradient(180deg, rgba(255,255,255,.05) 0 3px, transparent 3px 9px);
+  mask-image: linear-gradient(#000, transparent); -webkit-mask-image: linear-gradient(#000, transparent); pointer-events: none;
+}
+.stadium-hint { position: relative; text-align: center; color: rgba(255,255,255,.6); font-size: .78rem; margin: 26px 12px 0; }
+
+.pitch {
+  position: relative; width: min(84%, 440px); margin: -14% auto -4%; aspect-ratio: 68 / 105; border-radius: 3px;
+  transform-style: preserve-3d; transform-origin: 50% 55%;
+  transform: rotateX(var(--tilt)) rotateZ(var(--spin));
+  transition: transform .25s ease-out;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 45%, rgba(255,255,255,.14), transparent 70%),
+    repeating-linear-gradient(0deg, #2f9a42 0 7.1428%, #298a3a 7.1428% 14.2857%);
+  box-shadow: 0 0 0 4px #1d6b2c, 0 50px 60px -10px rgba(0,0,0,.85);
+}
+.pitch-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pitch-edge { position: absolute; background: linear-gradient(#1d6b2c, #0b3214); }
+.pitch-edge.front { left: -4px; right: -4px; top: calc(100% + 4px); height: 16px; transform-origin: 50% 0; transform: rotateX(-90deg); }
+.pitch-edge.left { top: -4px; bottom: -4px; right: calc(100% + 4px); width: 16px; transform-origin: 100% 50%; transform: rotateY(90deg); background: linear-gradient(90deg, #0b3214, #1d6b2c); }
+.pitch-edge.right { top: -4px; bottom: -4px; left: calc(100% + 4px); width: 16px; transform-origin: 0 50%; transform: rotateY(-90deg); background: linear-gradient(270deg, #0b3214, #1d6b2c); }
+.goal {
+  position: absolute; left: 50%; width: 12%; margin-left: -6%; height: 22px;
+  border: 2px solid #fff; border-bottom: 0; border-radius: 2px 2px 0 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.45) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.45) 0 1px, transparent 1px 5px);
+}
+.goal.top { top: -22px; transform-origin: 50% 100%; transform: rotateX(-90deg); }
+.goal.bottom { top: 100%; transform-origin: 50% 0; transform: rotateX(90deg); border-bottom: 2px solid #fff; border-top: 0; border-radius: 0 0 2px 2px; }
+
+.spot-ring {
+  position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+  border: 2px dashed rgba(255,255,255,.55); transition: left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1);
+}
+.spot-ring.on {
+  border: 2px solid rgba(127,231,255,.9);
+  background: radial-gradient(circle, rgba(127,231,255,.7) 0, rgba(127,231,255,.25) 45%, transparent 70%);
+  box-shadow: 0 0 14px rgba(127,231,255,.8); animation: ring 2.4s ease-in-out infinite;
+}
+@keyframes ring { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.18); opacity: .75; } }
+
+.holo-player {
+  position: absolute; width: 0; height: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  transform-style: preserve-3d; transform-origin: 0 0;
+  transform: rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1));
+  transition: left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1), transform .25s ease-out;
+}
+.holo-player > * { pointer-events: auto; }
+.holo-body {
+  position: absolute; bottom: 20px; left: -36px; width: 72px; display: flex; flex-direction: column; align-items: center;
+  animation: float 3.2s ease-in-out infinite;
+}
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.beam {
+  position: absolute; left: 50%; bottom: -20px; width: 46px; height: 66px; margin-left: -23px;
+  background: linear-gradient(to top, rgba(127,231,255,.55), rgba(127,231,255,0));
+  clip-path: polygon(32% 100%, 68% 100%, 100% 0, 0 0); opacity: 0; transition: opacity .3s;
+}
+.holo-player.filled .beam { opacity: .8; }
+.shirt-wrap { position: relative; width: 56px; display: block; }
+.shirt-wrap img { display: block; width: 100%; height: auto; }
+.holo-player.filled .shirt-wrap img {
+  opacity: .95; filter: drop-shadow(0 0 5px rgba(127,231,255,.85));
+  animation: flicker 5s linear infinite;
+}
+@keyframes flicker { 0%, 96%, 100% { opacity: .93; } 97% { opacity: .55; } 98% { opacity: .9; } 99% { opacity: .65; } }
+.holo-player:not(.filled) .shirt-wrap img { opacity: .28; filter: grayscale(1) brightness(1.8); }
+.scan {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: repeating-linear-gradient(0deg, rgba(170,240,255,.28) 0 1px, transparent 1px 5px);
+  mask-image: var(--kit); -webkit-mask-image: var(--kit); mask-size: 100% 100%; -webkit-mask-size: 100% 100%;
+  animation: scan 1.8s linear infinite;
+}
+.holo-player.filled .scan { opacity: 1; }
+@keyframes scan { from { background-position: 0 0; } to { background-position: 0 20px; } }
+.holo-player.picking .shirt-wrap { outline: 3px solid var(--or); outline-offset: 3px; border-radius: 6px; }
+.holo-label {
+  position: absolute; bottom: -2px; left: 0; transform: translateX(-50%); max-width: 96px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .95rem; line-height: 1; padding: 3px 5px; border-radius: 4px; color: #fff;
+  background: rgba(3,7,22,.82); border: 1px solid rgba(127,231,255,.7); box-shadow: 0 0 8px rgba(127,231,255,.35);
+}
+.holo-label b { color: var(--or); font-weight: 400; margin-right: 2px; }
+.holo-player:not(.filled) .holo-label { color: rgba(255,255,255,.75); border-style: dashed; box-shadow: none; }
+@media (max-width: 420px) {
+  .holo-body { left: -28px; width: 56px; bottom: 17px; }
+  .shirt-wrap { width: 42px; }
+  .holo-label { font-size: .7rem; max-width: 66px; padding: 2px 3px; }
+  .spot-ring { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+  .beam { width: 34px; margin-left: -17px; height: 52px; bottom: -17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .holo-body, .spot-ring.on, .shirt-wrap img, .scan { animation: none !important; }
 }
