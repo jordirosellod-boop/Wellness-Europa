@@ -1,41 +1,12 @@
 "use client";
 
-import { useId } from "react";
 import { hhmm, type Convocation, type RosterRow } from "@/lib/convo";
 import { kitFont } from "@/lib/fonts";
 import { fmtDate } from "@/lib/wellness";
 
-/**
- * Dorsal d'estil samarreta (com la tipografia de hummel): número estret i gruixut amb
- * les fletxes (chevrons) dins del traç esquerre de cada xifra.
- */
-export function KitNumber({ n, height = 56 }: { n: number | null; height?: number }) {
-  const id = useId().replace(/:/g, "");
-  const text = n == null ? "–" : String(n);
-  const cw = 52;
-  const w = cw * text.length + 8;
-  const digits = [...text].map((d, i) => ({ d, x: 4 + i * cw + cw / 2 }));
-  return (
-    <svg className="kit-number" viewBox={`0 0 ${w} 100`} height={height} role="img" aria-label={`Dorsal ${text}`}>
-      <defs>
-        <clipPath id={`k${id}`}>
-          {digits.map(({ d, x }, i) => (
-            <text key={i} x={x} y={92} textAnchor="middle" fontSize={118} fontWeight={800} style={{ fontFamily: "var(--font-kit)" }}>{d}</text>
-          ))}
-        </clipPath>
-      </defs>
-      {digits.map(({ d, x }, i) => (
-        <text key={i} x={x} y={92} textAnchor="middle" fontSize={118} fontWeight={800} fill="currentColor" style={{ fontFamily: "var(--font-kit)" }}>{d}</text>
-      ))}
-      {text !== "–" && (
-        <g clipPath={`url(#k${id})`} fill="none" stroke="var(--kit-chevron, #fff)" strokeWidth={3.2} strokeLinejoin="miter">
-          {digits.map(({ x }, i) =>
-            [26, 38, 50, 62, 74].map((y) => <path key={`${i}-${y}`} d={`M${x - 15} ${y} l7 6 l7 -6 M${x - 15} ${y + 5} l7 6 l7 -6`} />),
-          )}
-        </g>
-      )}
-    </svg>
-  );
+/** Dorsal amb la tipografia de samarreta (les fletxes ja formen part de la lletra). */
+export function KitNumber({ n }: { n: number | null }) {
+  return <span className="kit-number" aria-label={n == null ? "Sense dorsal" : `Dorsal ${n}`}>{n == null ? "–" : n}</span>;
 }
 
 function mapsUrl(q: string) {
