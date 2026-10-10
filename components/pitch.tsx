@@ -30,12 +30,10 @@ function labelRoom(spots: { x: number; y: number }[], i: number): number {
 // Amplada aproximada d'una etiqueta (lletra Escapulada a 3.1% de l'amplada del camp).
 const labelWidth = (text: string) => (text.length + 1) * 1.5 + 3;
 
-/** Nom sencer si hi cap; si no, nom + inicial del cognom; si no, només el nom. */
+/** Nom sencer si hi cap; si no, només el nom (sense el cognom). */
 function fitName(name: string, dorsal: number | null, room: number): string {
   const pre = dorsal == null ? "· " : `${dorsal} `;
-  const parts = name.trim().split(/\s+/);
-  const options = [name, parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : name, parts[0]];
-  return options.find((o) => labelWidth(pre + o) <= room) ?? parts[0];
+  return labelWidth(pre + name) <= room ? name : name.trim().split(/\s+/)[0];
 }
 
 /**
