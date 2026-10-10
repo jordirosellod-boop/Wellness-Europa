@@ -618,11 +618,11 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
   .print-head b { display: block; font-size: 26pt; color: #0b1846; line-height: 1; }
   .print-head span { color: #55608a; font-size: 11pt; }
   .stadium { background: none !important; padding: 0 !important; overflow: visible !important; --tilt: 30deg !important; --spin: 0deg !important; }
-  .stadium .pitch { margin: 0 auto 34mm !important; transition: none !important; box-shadow: 0 0 0 4px #1d6b2c !important; }
+  .stadium .pitch { margin: 0 auto 6mm !important; transition: none !important; box-shadow: 0 0 0 4px #1d6b2c !important; }
   .pitch { width: 150mm; }
-  .holo-body, .spot-ring, .shirt-wrap img { animation: none !important; }
-  .shirt-wrap img { filter: none !important; opacity: 1 !important; }
-  .scan, .beam, .stadium-hint { display: none !important; }
+  .players-layer, .stadium-hint, .pitch-edge, .goal, .spot-ring { display: none !important; }
+  .stadium .pitch { transform: none !important; }
+  .print-pitch { display: block !important; }
   .bench li { font-size: 14pt; }
   .no-print { display: none !important; }
 }
@@ -633,7 +633,7 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
   .topbar .brand-logo { width: 30px; height: 30px; }
 }
 
-/* ---------- Estadi 3D i jugadores holograma (pissarra de l'onze, staff) ---------- */
+/* ---------- Estadi 3D de la pissarra de l'onze (staff) ---------- */
 .kit-pick { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .kit-pick button {
   display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 12px 4px 6px; border-radius: 999px;
@@ -687,59 +687,39 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 
 .spot-ring {
   position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
-  border: 2px dashed rgba(255,255,255,.55); transition: left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1);
+  border: 2px dashed rgba(255,255,255,.6); transition: left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1);
 }
-.spot-ring.on {
-  border: 2px solid rgba(127,231,255,.9);
-  background: radial-gradient(circle, rgba(127,231,255,.7) 0, rgba(127,231,255,.25) 45%, transparent 70%);
-  box-shadow: 0 0 14px rgba(127,231,255,.8);
-}
+.spot-ring.on { border: 0; background: radial-gradient(circle, rgba(0,0,0,.45) 0, rgba(0,0,0,.2) 45%, transparent 70%); }
 
-.holo-player {
-  position: absolute; width: 0; height: 0; padding: 0; border: 0; background: none; cursor: pointer;
-  transform-style: preserve-3d; transform-origin: 0 0;
-  transform: rotateZ(calc(var(--spin) * -1)) rotateX(calc(var(--tilt) * -1));
+
+/* Jugadores sobre el camp: capa plana (no es tallen mai) */
+.players-layer { position: absolute; inset: 0; pointer-events: none; }
+.pl {
+  position: absolute; width: 0; height: 0; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto;
   transition: left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1);
 }
-.holo-player > * { pointer-events: auto; }
-.holo-body {
-  position: absolute; bottom: 20px; left: -36px; width: 72px; display: flex; flex-direction: column; align-items: center;
+.pl-shirt {
+  position: absolute; bottom: 2px; left: 0; width: calc(54px * var(--k, 1)); max-width: none; transform: translateX(-50%); z-index: 1;
+  filter: drop-shadow(0 5px 4px rgba(0,0,0,.45));
 }
-.beam {
-  position: absolute; left: 50%; bottom: -20px; width: 46px; height: 66px; margin-left: -23px;
-  background: linear-gradient(to top, rgba(127,231,255,.55), rgba(127,231,255,0));
-  clip-path: polygon(32% 100%, 68% 100%, 100% 0, 0 0); opacity: 0; transition: opacity .3s;
+.pl:not(.filled) .pl-shirt { opacity: .33; filter: grayscale(1) brightness(1.7); }
+.pl.picking .pl-shirt { outline: 3px solid var(--or); outline-offset: 2px; border-radius: 6px; }
+.pl-label {
+  position: absolute; top: 4px; left: 0; transform: translateX(var(--lx, -50%)); z-index: 2; white-space: nowrap;
+  font-size: calc(.95rem * var(--k, 1)); line-height: 1; padding: 3px 6px; border-radius: 4px;
+  color: #fff; background: var(--navy); border: 1px solid rgba(255,255,255,.55); box-shadow: 0 2px 6px rgba(0,0,0,.35);
 }
-.holo-player.filled .beam { opacity: .8; }
-.shirt-wrap { position: relative; width: 56px; display: block; }
-.shirt-wrap img { display: block; width: 100%; height: auto; }
-.holo-player.filled .shirt-wrap img {
-  opacity: .95; filter: drop-shadow(0 0 5px rgba(127,231,255,.85));
-}
-.holo-player:not(.filled) .shirt-wrap img { opacity: .28; filter: grayscale(1) brightness(1.8); }
-.scan {
-  position: absolute; inset: 0; pointer-events: none; opacity: 0;
-  background: repeating-linear-gradient(0deg, rgba(170,240,255,.28) 0 1px, transparent 1px 5px);
-  mask-image: var(--kit); -webkit-mask-image: var(--kit); mask-size: 100% 100%; -webkit-mask-size: 100% 100%;
-}
-.holo-player.filled .scan { opacity: 1; }
-.holo-player.picking .shirt-wrap { outline: 3px solid var(--or); outline-offset: 3px; border-radius: 6px; }
-.holo-label {
-  position: absolute; bottom: -4px; left: 0; transform: translateX(var(--lx, -50%)) translateZ(36px); text-align: center; white-space: nowrap;
-  font-size: .95rem; line-height: 1; padding: 3px 5px; border-radius: 4px; color: #fff; z-index: 2;
-  background: rgba(3,7,22,.82); border: 1px solid rgba(127,231,255,.7); box-shadow: 0 0 8px rgba(127,231,255,.35);
-}
-.holo-label b { color: var(--or); font-weight: 400; margin-right: 2px; }
-.holo-player:not(.filled) .holo-label { color: rgba(255,255,255,.75); border-style: dashed; box-shadow: none; }
+.pl-label b { color: var(--or); font-weight: 400; margin-right: 2px; }
+.pl:not(.filled) .pl-label { background: rgba(11,24,70,.6); border-style: dashed; color: rgba(255,255,255,.85); }
+.pl.edge-l .pl-label { --lx: -22%; }
+.pl.edge-r .pl-label { --lx: -78%; }
 @media (max-width: 420px) {
-  .holo-body { left: -24px; width: 48px; bottom: 15px; }
-  .shirt-wrap { width: 36px; }
-  .holo-label { font-size: .72rem; padding: 2px 3px; letter-spacing: 0; }
+  .pl-shirt { width: calc(40px * var(--k, 1)); }
+  .pl-label { font-size: calc(.74rem * var(--k, 1)); padding: 2px 4px; letter-spacing: 0; }
   .spot-ring { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
-  .beam { width: 34px; margin-left: -17px; height: 52px; bottom: -17px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .holo-body, .spot-ring.on, .shirt-wrap img, .scan { animation: none !important; }
-}
-.holo-player.edge-l .holo-label { --lx: -22%; }
-.holo-player.edge-r .holo-label { --lx: -78%; }
+.print-pitch { display: none; position: absolute; inset: 0; }
+.print-pitch .pp { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -78%); }
+.print-pitch .pp img { width: 13mm; height: auto; }
+.print-pitch .pp span { background: #0b1846; color: #fff; font-size: 9pt; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
+.print-pitch .pp b { color: #dbb34d; font-weight: 400; }

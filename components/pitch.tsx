@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { FORMATION_NAMES, FORMATIONS, hhmm, type Convocation, type RosterRow } from "@/lib/convo";
 import { escapulada } from "@/lib/fonts";
 import { supabase } from "@/lib/supabase";
@@ -11,16 +11,55 @@ type Lineup = { formation: string; slots: Record<string, string>; kit: Kit };
 
 const KIT_IMG: Record<Kit | "gk", string> = { home: "/kits/home.webp", away: "/kits/away.webp", gk: "/kits/gk.webp" };
 
+// Han de coincidir amb el CSS de .stadium/.pitch (perspectiva, inclinació i punt de gir).
+const PERSPECTIVE = 1000;
+const TILT = (30 * Math.PI) / 180;
+const ORIGIN_Y = 0.55;
+
+type Box = { sw: number; pl: number; pt: number; pw: number; ph: number };
+
 /**
- * Pissarra de l'onze inicial (NOMÉS staff): estadi en 3D, tots els sistemes, i les jugadores
- * com a hologrames amb la samarreta oficial. Es posen tocant la posició i triant la jugadora.
- * Vista fixa (no es mou) perquè es llegeixin bé tots els noms. Tipografia Escapulada.
+ * On es veu a la pantalla un punt del camp inclinat (x d'esquerra a dreta en %, y des de la
+ * porteria pròpia en %), i a quina escala. Les samarretes es dibuixen en una capa plana a sobre,
+ * així no es tallen mai amb el camp en 3D.
+ */
+function project(b: Box, x: number, y: number) {
+  const dx = (x / 100 - 0.5) * b.pw;
+  const dy = ((100 - y) / 100 - ORIGIN_Y) * b.ph;
+  const X3 = b.pl + b.pw / 2 + dx;
+  const Y3 = b.pt + ORIGIN_Y * b.ph + dy * Math.cos(TILT);
+  const z = dy * Math.sin(TILT);
+  const k = PERSPECTIVE / (PERSPECTIVE - z);
+  const ox = b.sw / 2;
+  return { left: ox + (X3 - ox) * k, top: Y3 * k, k };
+}
+
+/**
+ * Pissarra de l'onze inicial (NOMÉS staff): camp en perspectiva, tots els sistemes i les
+ * jugadores amb la samarreta oficial, el dorsal i el nom. Es posen tocant la posició i triant
+ * la jugadora. Vista fixa perquè es llegeixin bé tots els noms. Tipografia Escapulada.
  */
 export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[] }) {
   const [lineup, setLineup] = useState<Lineup | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [picking, setPicking] = useState<number | null>(null);
+  const stadiumRef = useRef<HTMLDivElement>(null);
+  const pitchRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<Box | null>(null);
+
+  // Mesura el camp (i torna-ho a fer si canvia la mida de la pantalla).
+  const ready = lineup != null;
+  useLayoutEffect(() => {
+    const st = stadiumRef.current;
+    const pi = pitchRef.current;
+    if (!st || !pi) return;
+    const measure = () => setBox({ sw: st.clientWidth, pl: pi.offsetLeft, pt: pi.offsetTop, pw: pi.offsetWidth, ph: pi.offsetHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(st);
+    return () => ro.disconnect();
+  }, [ready]);
 
   useEffect(() => {
     let alive = true;
@@ -136,8 +175,8 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
           </div>
         </div>
 
-        <div className="stadium">
-          <div className="pitch">
+        <div className="stadium" ref={stadiumRef}>
+          <div className="pitch" ref={pitchRef}>
             <div className="pitch-edge front" />
             <div className="pitch-edge left" />
             <div className="pitch-edge right" />
@@ -160,44 +199,59 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
             </svg>
             <div className="goal top"><i /></div>
             <div className="goal bottom"><i /></div>
-
+            {/* Per imprimir: camp pla amb les jugadores posades en % */}
+            <div className="print-pitch" aria-hidden="true">
+              {spots.map((s, i) => {
+                const p = slots[String(i)] ? byId.get(slots[String(i)]) : undefined;
+                return (
+                  <span key={i} className="pp" style={{ left: `${s.x}%`, top: `${100 - s.y}%` }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={i === 0 ? KIT_IMG.gk : KIT_IMG[lineup.kit]} alt="" style={{ opacity: p ? 1 : 0.25 }} />
+                    <span className="esc">{p ? <><b>{p.dorsal ?? "·"}</b> {p.display_name}</> : s.label}</span>
+                  </span>
+                );
+              })}
+            </div>
+            {/* ombra / cercle a terra de cada posició */}
             {spots.map((s, i) => (
               <span key={`r${i}`} className={`spot-ring${slots[String(i)] ? " on" : ""}`} style={{ left: `${s.x}%`, top: `${100 - s.y}%` }} />
             ))}
-
-            {spots.map((s, i) => {
-              const p = slots[String(i)] ? byId.get(slots[String(i)]) : undefined;
-              const img = i === 0 ? KIT_IMG.gk : KIT_IMG[lineup.kit];
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  className={`holo-player${p ? " filled" : ""}${picking === i ? " picking" : ""}${s.x < 16 ? " edge-l" : s.x > 84 ? " edge-r" : ""}`}
-                  style={{ left: `${s.x}%`, top: `${100 - s.y}%`, "--kit": `url(${img})`, animationDelay: `${(i % 4) * -0.7}s` } as CSSProperties}
-                  onClick={() => setPicking(i)}
-                  aria-label={p ? `${s.label}: ${p.display_name}. Canviar` : `${s.label}: posar jugadora`}
-                >
-                  <span className="holo-body">
-                    <span className="beam" />
-                    <span className="shirt-wrap">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img} alt="" draggable={false} />
-                      <span className="scan" />
-                    </span>
-                  </span>
-                  <span className="holo-label esc">
-                    {p ? (
-                      <>
-                        <b>{p.dorsal ?? "·"}</b> {p.display_name}
-                      </>
-                    ) : (
-                      <>+ {s.label}</>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
           </div>
+
+          {/* Jugadores: capa plana a sobre del camp (no es tallen mai) */}
+          <div className="players-layer">
+            {box &&
+              spots
+                .map((s, i) => ({ s, i, pos: project(box, s.x, s.y) }))
+                .sort((a, b) => a.pos.top - b.pos.top)
+                .map(({ s, i, pos }) => {
+                  const p = slots[String(i)] ? byId.get(slots[String(i)]) : undefined;
+                  const img = i === 0 ? KIT_IMG.gk : KIT_IMG[lineup.kit];
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`pl${p ? " filled" : ""}${picking === i ? " picking" : ""}${s.x < 16 ? " edge-l" : s.x > 84 ? " edge-r" : ""}`}
+                      style={{ left: pos.left, top: pos.top, "--k": pos.k } as CSSProperties}
+                      onClick={() => setPicking(i)}
+                      aria-label={p ? `${s.label}: ${p.display_name}. Canviar` : `${s.label}: posar jugadora`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img className="pl-shirt" src={img} alt="" draggable={false} />
+                      <span className="pl-label esc">
+                        {p ? (
+                          <>
+                            <b>{p.dorsal ?? "·"}</b> {p.display_name}
+                          </>
+                        ) : (
+                          <>+ {s.label}</>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+          </div>
+
           <p className="stadium-hint no-print">Toca una samarreta o un cercle per posar-hi una jugadora</p>
         </div>
 
