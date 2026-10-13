@@ -8,6 +8,7 @@ import {
   CONTENTS, fetchPlans, newTask, PLAN_COLS, uid, POSITION_NAMES, POSITIONS, STATUS_LABEL, TASK_TYPES,
   type Guest, type Plan, type PlayerStatus, type Position, type Task,
 } from "@/lib/plan";
+import { ABSENCE_REASONS, reasonLabel, type AbsenceReason } from "@/lib/attendance";
 import { activeOn, fetchInjuries } from "@/lib/rehab";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
@@ -181,7 +182,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
       ([p, r]) => {
         if (p.error) return setError(p.error.message);
         if (!p.data) return setError("No s'ha trobat la plantilla (o no és teva).");
-        setPlan({ ...(p.data as Plan), guests: (p.data as Plan).guests ?? [] });
+        setPlan({ ...(p.data as Plan), guests: (p.data as Plan).guests ?? [], reasons: (p.data as Plan).reasons ?? {} });
         setRoster(r);
       },
       (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -346,13 +347,19 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
           ) : (
             <PositionBoard plan={plan} roster={roster} onToggle={(pid) => {
               const g = plan.guests.find((x) => x.id === pid);
-              if (g) return updGuest(pid, { status: g.status === "disp" ? "part" : g.status === "part" ? "baixa" : "disp" });
+              const reasons = { ...plan.reasons };
+              delete reasons[pid]; // en sortir de «baixa» es treu el motiu
+              if (g) {
+                const st = g.status === "disp" ? "part" : g.status === "part" ? "baixa" : "disp";
+                return upd({ guests: plan.guests.map((x) => (x.id === pid ? { ...x, status: st } : x)), reasons });
+              }
               const cur = statusOf(pid);
               if (cur === "les") return;
               const next: PlayerStatus = cur === "disp" ? "part" : cur === "part" ? "baixa" : "disp";
-              upd({ players: { ...plan.players, [pid]: next } });
+              upd({ players: { ...plan.players, [pid]: next }, reasons });
             }} />
           )}
+          {!editPos && <AbsenceReasons plan={plan} roster={roster} onChange={(reasons) => upd({ reasons })} />}
           <AddGuest onAdd={(g) => upd({ guests: [...plan.guests, g] })} full={plan.guests.length >= 40} />
         </section>
 
@@ -422,6 +429,39 @@ function PositionBoard({ plan, roster, onToggle, print = false }: { plan: Plan; 
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Llista de les baixes amb el motiu de cadascuna. */
+function baixes(plan: Plan, roster: Roster) {
+  return [
+    ...roster.players.filter((p) => plan.players[p.id] === "baixa").map((p) => ({ id: p.id, name: p.display_name })),
+    ...plan.guests.filter((g) => g.status === "baixa").map((g) => ({ id: g.id, name: g.name })),
+  ];
+}
+
+function AbsenceReasons({ plan, roster, onChange }: { plan: Plan; roster: Roster; onChange: (r: Record<string, AbsenceReason>) => void }) {
+  const list = baixes(plan, roster);
+  if (!list.length) return null;
+  return (
+    <div className="plan-reasons">
+      <b className="esc">Baixes · motiu</b>
+      {list.map((b) => (
+        <label key={b.id} className="row" style={{ gap: 8, flexWrap: "nowrap" }}>
+          <span className="pname" style={{ flex: 1 }}>{b.name}</span>
+          <select value={plan.reasons[b.id] ?? ""} aria-label={`Motiu de ${b.name}`} style={{ width: "auto" }}
+            onChange={(e) => {
+              const next = { ...plan.reasons };
+              if (e.target.value) next[b.id] = e.target.value as AbsenceReason;
+              else delete next[b.id];
+              onChange(next);
+            }}>
+            <option value="">Tria el motiu…</option>
+            {ABSENCE_REASONS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          </select>
+        </label>
+      ))}
     </div>
   );
 }
@@ -565,6 +605,9 @@ function PlanSheet({ plan, roster }: { plan: Plan; roster: Roster }) {
           {cell("Continguts", plan.contents.join(" · "))}
           <div className="ps-cell wide"><span>Observacions</span><b>{plan.observations || "–"}</b></div>
           <div className="ps-cell wide"><span>Puntuació</span><b>{plan.score_notes || "–"}</b></div>
+          {baixes(plan, roster).length > 0 && (
+            <div className="ps-cell wide"><span>Baixes</span><b>{baixes(plan, roster).map((b) => `${b.name.split(" ")[0]}${plan.reasons[b.id] ? ` (${reasonLabel(plan.reasons[b.id])})` : ""}`).join(" · ")}</b></div>
+          )}
         </div>
         <PositionBoard plan={plan} roster={roster} print />
       </div>

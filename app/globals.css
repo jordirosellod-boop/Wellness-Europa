@@ -481,6 +481,15 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 /* Assistència (passar llista) */
 .roll li { gap: 8px; flex-wrap: nowrap; }
 .roll .pname { min-width: 0; overflow-wrap: anywhere; }
+.roll li.roll-item { display: block; }
+.roll li.roll-item > .row { gap: 8px; flex-wrap: nowrap; }
+.reason-sum { display: block; font-size: .75rem; }
+.reason-tag { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 0; background: var(--vermell-clar); color: var(--vermell); font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; vertical-align: middle; }
+.reason-tag.empty { background: #eceff5; color: #5a6485; }
+.reason-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 6px; padding: 8px; background: #f6f7fb; border-radius: 10px; }
+.reason-pick button:not(.linkbtn) { border: 1.5px solid var(--vora); background: #fff; border-radius: 999px; padding: 5px 10px; font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; color: var(--navy); }
+.reason-pick button[aria-pressed="true"] { background: var(--vermell); border-color: var(--vermell); color: #fff; }
+.reason-pick .linkbtn { margin-left: auto; min-height: 0; padding: 4px 6px; }
 .roll-btn {
   min-height: 40px; padding: 6px 12px; border-radius: 999px; font: inherit; font-weight: 600; font-size: 0.9rem;
   background: #fff; color: var(--suau); border: 1.5px solid var(--vora); cursor: pointer;
@@ -703,6 +712,8 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .pchip.part { background: var(--groc-clar); color: var(--groc); }
 .pchip.baixa { background: #eceff5; color: #8a93ad; text-decoration: line-through; }
 .pchip.guest { outline: 1.5px dashed currentColor; outline-offset: -2px; }
+.plan-reasons { display: grid; gap: 6px; margin-top: 10px; padding: 8px 10px; background: #f6f7fb; border-radius: 10px; }
+.plan-reasons > b { color: var(--blau); font-weight: 400; font-size: 1.05rem; }
 .add-guest { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
 .add-guest input { flex: 1; min-width: 0; }
 .add-guest select { width: auto; }

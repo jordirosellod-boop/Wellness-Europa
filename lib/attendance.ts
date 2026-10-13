@@ -5,7 +5,22 @@ import { addDays, addMonths, startOfMonth } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { SESSION_COLS, type Session } from "@/lib/wellness";
 
-export type Attendance = { session_id: string; player_id: string; present: boolean };
+/** Motius d'absència (només una categoria: dades mínimes). Han de coincidir amb la base de dades. */
+export const ABSENCE_REASONS = [
+  ["estudis", "Estudis / exàmens"],
+  ["malaltia", "Malaltia"],
+  ["lesio", "Lesió"],
+  ["familia", "Motius familiars"],
+  ["viatge", "Viatge"],
+  ["altre_esport", "Altra activitat"],
+  ["sense_avisar", "Sense avisar"],
+  ["altres", "Altres"],
+] as const;
+export type AbsenceReason = (typeof ABSENCE_REASONS)[number][0];
+export const reasonLabel = (r: string | null | undefined) => ABSENCE_REASONS.find(([k]) => k === r)?.[1] ?? null;
+
+export type Attendance = { session_id: string; player_id: string; present: boolean; reason: AbsenceReason | null };
+export const ATT_COLS = "session_id, player_id, present, reason";
 
 /** Sessions no cancel·lades entre dues dates (incloses). */
 export async function fetchSessionsBetween(from: string, to: string): Promise<Session[]> {
@@ -26,7 +41,7 @@ export async function fetchAttendance(sessionIds: string[], playerId?: string): 
     const ids = sessionIds.slice(i, i + 100);
     out.push(
       ...(await fetchAll<Attendance>((f, t) => {
-        let q = sb.from("attendance").select("session_id, player_id, present").in("session_id", ids);
+        let q = sb.from("attendance").select(ATT_COLS).in("session_id", ids);
         if (playerId) q = q.eq("player_id", playerId);
         return q.order("session_id").order("player_id").range(f, t);
       })),

@@ -254,6 +254,12 @@ create table if not exists public.attendance (
   primary key (session_id, player_id)
 );
 create index if not exists attendance_player_idx on public.attendance (player_id);
+-- Motiu de l'absència (només una categoria, sense text lliure: dades mínimes).
+alter table public.attendance add column if not exists reason text;
+alter table public.attendance drop constraint if exists attendance_reason_check;
+alter table public.attendance add constraint attendance_reason_check check (
+  reason is null or (not present and reason in ('estudis', 'malaltia', 'lesio', 'familia', 'viatge', 'altre_esport', 'sense_avisar', 'altres'))
+);
 
 -- DORSALS (si no se'n posa cap, es fa servir el de la FCF)
 create table if not exists public.player_numbers (
@@ -365,6 +371,11 @@ create table if not exists public.training_plans (
   updated_at   timestamptz not null default now()
 );
 create index if not exists training_plans_owner_idx on public.training_plans (owner_id, plan_date desc);
+-- Motiu de les baixes de la plantilla: {id_jugadora: motiu}
+alter table public.training_plans add column if not exists reasons jsonb not null default '{}'::jsonb;
+alter table public.training_plans drop constraint if exists training_plans_reasons_check;
+alter table public.training_plans add constraint training_plans_reasons_check
+  check (jsonb_typeof(reasons) = 'object' and octet_length(reasons::text) < 8000);
 -- Jugadores afegides a mà en una plantilla (no són del club a l'app): [{id, name, pos, status}]
 alter table public.training_plans add column if not exists guests jsonb not null default '[]'::jsonb;
 alter table public.training_plans drop constraint if exists training_plans_guests_check;
@@ -846,6 +857,7 @@ returns trigger language plpgsql set search_path = '' as $$
 begin
   new.marked_by := (select auth.uid());
   new.updated_at := now();
+  if new.present then new.reason := null; end if;   -- present: sense motiu
   if tg_op = 'UPDATE' then
     new.session_id := old.session_id;   -- no es pot moure a una altra sessió
     new.player_id := old.player_id;     -- ni a una altra jugadora

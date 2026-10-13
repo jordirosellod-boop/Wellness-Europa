@@ -1,5 +1,6 @@
 // Plantilla d'entrenament (privada de qui la fa): tipus i dades.
 
+import type { AbsenceReason } from "@/lib/attendance";
 import { fetchAll, supabase } from "@/lib/supabase";
 
 export const POSITIONS = ["PO", "LT", "CT", "MC", "INT", "EXT", "PT"] as const;
@@ -66,12 +67,13 @@ export type Plan = {
   score_notes: string | null;
   players: Record<string, PlayerStatus>;
   guests: Guest[];
+  reasons: Record<string, AbsenceReason>; // motiu de cada baixa (id de jugadora o d'afegida)
   tasks: Task[];
   updated_at?: string;
 };
 
 export const PLAN_COLS =
-  "id, session_id, plan_date, start_time, session_no, jornada, rival, microcycle, mesocycle, duration_min, contents, observations, score_notes, players, guests, tasks, updated_at";
+  "id, session_id, plan_date, start_time, session_no, jornada, rival, microcycle, mesocycle, duration_min, contents, observations, score_notes, players, guests, reasons, tasks, updated_at";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 

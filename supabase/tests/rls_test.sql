@@ -383,6 +383,12 @@ select pg_temp.check(pg_temp.elna_tr() = (select trainings from att0) + 1, 'Esbo
 select pg_temp.check((select marked_by from public.attendance where session_id = '77777777-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000e5') = '00000000-0000-0000-0000-00000000000a', 'Queda guardat qui ha passat llista');
 select pg_temp.expect_error($$insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', true)$$, 'No es pot passar llista al staff');
 insert into public.attendance (session_id, player_id, present) values ('77777777-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000b2', false);
+with u as (update public.attendance set reason = 'estudis' where session_id = '77777777-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000b2' returning reason)
+  select pg_temp.check((select reason from u) = 'estudis', 'El staff posa el motiu de l''absència');
+select pg_temp.expect_error($$update public.attendance set reason = 'perquè sí' where player_id = '00000000-0000-0000-0000-0000000000b2'$$, 'Només es pot triar un motiu de la llista');
+with u as (update public.attendance set present = true where session_id = '77777777-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000b2' returning reason)
+  select pg_temp.check((select reason from u) is null, 'Si passa a present, el motiu s''esborra sol');
+update public.attendance set present = false, reason = 'malaltia' where session_id = '77777777-0000-0000-0000-000000000001' and player_id = '00000000-0000-0000-0000-0000000000b2';
 reset role;
 select pg_temp.check((select trainings from public.league_points where profile_id = '00000000-0000-0000-0000-0000000000e5' and month = date_trunc('month', date '2026-03-10')::date) = 1,
   'Un entrenament d''un altre mes suma a la lliga d''aquell mes');
@@ -497,6 +503,7 @@ insert into public.profiles (id, role, display_name) values ('00000000-0000-0000
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 insert into public.training_plans (plan_date, rival, tasks) values ((select today from vars), 'Damm', '[{"name":"RDP"}]');
 select pg_temp.check((select count(*) from public.training_plans) = 1, 'L''entrenador crea la seva plantilla');
+with u as (update public.training_plans set reasons = '{"x":"estudis"}' returning 1) select pg_temp.check(count(*) = 1, 'Pot posar el motiu de les baixes a la plantilla') from u;
 with u as (update public.training_plans set guests = '[{"id":"g1","name":"Marta (convidada)","pos":"MC","status":"disp"}]' returning 1) select pg_temp.check(count(*) = 1, 'Pot afegir jugadores a mà a la plantilla') from u;
 select pg_temp.expect_error($$update public.training_plans set guests = '{"a":1}'$$, 'Les jugadores afegides han de ser una llista');
 select pg_temp.expect_error($$insert into public.training_plans (plan_date, owner_id) values (current_date, '00000000-0000-0000-0000-0000000000c2')$$, 'No es pot crear una plantilla a nom d''un altre');

@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { CoachShell, Footer } from "@/components/ui";
-import { fetchAttendance, fetchSessionsBetween, monthBounds, pctClass, summarize, type Attendance } from "@/lib/attendance";
+import {
+  ABSENCE_REASONS, ATT_COLS, fetchAttendance, fetchSessionsBetween, monthBounds, pctClass, reasonLabel, summarize,
+  type AbsenceReason, type Attendance,
+} from "@/lib/attendance";
 import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, fmtSessionTime, todayMadrid, type Profile, type Session } from "@/lib/wellness";
@@ -58,27 +61,31 @@ function Roll() {
 
   const daySessions = data?.sessions.filter((s) => s.session_date === day) ?? [];
   const session = daySessions.find((s) => s.id === selected) ?? null;
-  const status = new Map((data?.att ?? []).filter((a) => a.session_id === selected).map((a) => [a.player_id, a.present]));
+  const rowsOf = (data?.att ?? []).filter((a) => a.session_id === selected);
+  const status = new Map(rowsOf.map((a) => [a.player_id, a.present]));
+  const reasons = new Map(rowsOf.map((a) => [a.player_id, a.reason]));
+  const [askReason, setAskReason] = useState<string | null>(null); // jugadora a qui es tria el motiu
 
   /** Desa i, només quan el servidor ho confirma, actualitza la pantalla. */
-  async function mark(playerIds: string[], present: boolean) {
+  async function mark(playerIds: string[], present: boolean, reason: AbsenceReason | null = null) {
     if (!session || playerIds.length === 0) return;
     setMsg(null);
     setSaving((s) => new Set([...s, ...playerIds]));
     const { data: rows, error: e } = await supabase()
       .from("attendance")
-      .upsert(playerIds.map((pid) => ({ session_id: session.id, player_id: pid, present })), { onConflict: "session_id,player_id" })
-      .select("session_id, player_id, present");
+      .upsert(playerIds.map((pid) => ({ session_id: session.id, player_id: pid, present, reason: present ? null : reason })), { onConflict: "session_id,player_id" })
+      .select(ATT_COLS);
     setSaving((s) => new Set([...s].filter((x) => !playerIds.includes(x))));
     if (e || !rows || rows.length !== playerIds.length) {
       setMsg({ ok: false, text: `No s'ha pogut desar. ${e?.message ?? "Torna-ho a provar."}` });
-      return;
+      return false;
     }
     setData((d) => d && {
       ...d,
       att: [...d.att.filter((a) => !(a.session_id === session.id && playerIds.includes(a.player_id))), ...(rows as Attendance[])],
     });
     if (playerIds.length > 1) setMsg({ ok: true, text: `Desat: ${playerIds.length} jugadores marcades com a presents.` });
+    return true;
   }
 
   const players = data?.players ?? [];
@@ -141,17 +148,41 @@ function Roll() {
             {players.map((p) => {
               const v = status.get(p.id);
               const busy = saving.has(p.id);
+              const why = reasons.get(p.id) ?? null;
+              const asking = v === false && askReason === p.id;
               return (
-                <li key={p.id} className="row between">
-                  <span className="pname">{p.display_name}{busy && <span className="muted small"> · desant…</span>}</span>
+                <li key={p.id} className="roll-item">
+                  <div className="row between">
+                  <span className="pname">
+                    {p.display_name}{busy && <span className="muted small"> · desant…</span>}
+                    {v === false && !asking && (
+                      <button type="button" className={`reason-tag${why ? "" : " empty"}`} onClick={() => setAskReason(p.id)} title="Motiu de l'absència">
+                        {why ? `${reasonLabel(why)} ✎` : "+ Motiu"}
+                      </button>
+                    )}
+                  </span>
                   <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
                     <button className={`roll-btn yes${v === true ? " on" : ""}`} aria-pressed={v === true} disabled={busy} onClick={() => v !== true && mark([p.id], true)}>
                       Present
                     </button>
-                    <button className={`roll-btn no${v === false ? " on" : ""}`} aria-pressed={v === false} disabled={busy} onClick={() => v !== false && mark([p.id], false)}>
+                    <button className={`roll-btn no${v === false ? " on" : ""}`} aria-pressed={v === false} disabled={busy}
+                      onClick={() => (v !== false ? mark([p.id], false).then((ok) => ok && setAskReason(p.id)) : setAskReason(p.id))}>
                       Absent
                     </button>
                   </span>
+                  </div>
+                  {asking && (
+                    <div className="reason-pick" role="group" aria-label={`Motiu de l'absència de ${p.display_name}`}>
+                      <span className="muted small">Motiu:</span>
+                      {ABSENCE_REASONS.map(([k, label]) => (
+                        <button key={k} type="button" aria-pressed={why === k} disabled={busy}
+                          onClick={() => mark([p.id], false, k).then((ok) => ok && setAskReason(null))}>
+                          {label}
+                        </button>
+                      ))}
+                      <button type="button" className="linkbtn" onClick={() => setAskReason(null)}>{why ? "Fet" : "Ara no"}</button>
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -168,6 +199,16 @@ function MonthSummary({ day, data }: { day: string; data: Data }) {
   const trainings = data.sessions.filter((s) => s.kind === "Entrenament");
   const markedSessions = new Set(data.att.map((a) => a.session_id));
   const done = trainings.filter((s) => markedSessions.has(s.id)).length;
+  const trainingIds = new Set(trainings.map((s) => s.id));
+  /** Motius de les absències del mes als entrenaments, p. ex. «Estudis ×2 · Malaltia». */
+  const whyOf = (pid: string) => {
+    const n = new Map<string, number>();
+    for (const a of data.att) if (a.player_id === pid && !a.present && trainingIds.has(a.session_id)) {
+      const k = reasonLabel(a.reason) ?? "Motiu no indicat";
+      n.set(k, (n.get(k) ?? 0) + 1);
+    }
+    return [...n].map(([k, c]) => (c > 1 ? `${k} ×${c}` : k)).join(" · ");
+  };
   const rows = data.players
     .map((p) => ({ p, ...summarize(data.sessions, data.att, p.id) }))
     .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1) || b.present - a.present || a.p.display_name.localeCompare(b.p.display_name, "ca"));
@@ -188,7 +229,10 @@ function MonthSummary({ day, data }: { day: string; data: Data }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.p.id}>
-                <td><span className="pname">{r.p.display_name}</span></td>
+                <td>
+                  <span className="pname">{r.p.display_name}</span>
+                  {whyOf(r.p.id) && <span className="muted small reason-sum">{whyOf(r.p.id)}</span>}
+                </td>
                 <td><b>{r.present}</b></td>
                 <td>{r.marked}</td>
                 <td>{r.pct == null ? "–" : <span className={`chip ${pctClass(r.pct)}`}>{r.pct}%</span>}</td>
