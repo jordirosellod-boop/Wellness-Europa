@@ -36,7 +36,7 @@ function Analysis() {
     setId(next);
     window.scrollTo({ top: 0 });
   };
-  return <div className={escapulada.variable}>{id ? <Workspace key={id} id={id} onBack={() => go(null)} /> : <MatchList onOpen={go} />}</div>;
+  return <div className={`an-font ${escapulada.variable}`}>{id ? <Workspace key={id} id={id} onBack={() => go(null)} /> : <MatchList onOpen={go} />}</div>;
 }
 
 // ---------------------------------------------------------------------------

@@ -843,3 +843,10 @@ body:has(.analysis) main { max-width: 1320px; }
 .score-box { display: inline-flex; align-items: center; gap: 4px; background: var(--navy); border-radius: 10px; padding: 4px 6px; }
 .score-box input { width: 42px; height: 38px; padding: 0; text-align: center; font-family: var(--font-escapulada), var(--display); font-size: 1.4rem; border-radius: 6px; }
 .score-box b { color: var(--or); font-family: var(--font-escapulada), var(--display); font-weight: 400; font-size: 1.3rem; }
+/* Tota la secció d'anàlisi amb la lletra Escapulada */
+.an-font, .an-font *, .an-font input, .an-font select, .an-font textarea, .an-font button,
+body:has(.an-font) .picker, body:has(.an-font) .picker * {
+  font-family: var(--font-escapulada), var(--display) !important; font-weight: 400 !important; letter-spacing: .4px;
+}
+.an-font p, .an-font td, .an-font label, .an-font .muted, .an-font input, .an-font select, .an-font textarea { font-size: 1.05em; }
+.an-font b { color: inherit; }
