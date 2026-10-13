@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { AnalysisStats, ZonePitch, type APlayer } from "@/components/analysis-stats";
-import { CoachShell, Footer } from "@/components/ui";
+import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
 import { VideoPlayer, type VideoHandle } from "@/components/video-player";
 import {
   ABUTTON_COLS, AEVENT_COLS, AMATCH_COLS, DEFAULT_BUTTONS, fetchAEvents, fetchAMatches, fetchButtons, fmtClock, fromVideo, halfOf,
@@ -17,7 +17,7 @@ import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
 export default function AnalysisPage() {
   return (
     <>
-      <CoachShell>{() => <Analysis />}</CoachShell>
+      <CoachShell>{() => <OwnerOnly><Analysis /></OwnerOnly>}</CoachShell>
       <Footer />
     </>
   );

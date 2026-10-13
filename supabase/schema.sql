@@ -224,6 +224,9 @@ create table if not exists public.team_settings (
   updated_at       timestamptz not null default now()
 );
 insert into public.team_settings (id) values (true) on conflict do nothing;
+-- Responsable de l'app (l'entrenador principal): l'únic que veu l'Anàlisi i les Plantilles.
+-- Per defecte és el primer compte d'entrenador que es va crear.
+alter table public.team_settings add column if not exists owner_id uuid references public.profiles(id) on delete set null;
 -- Lliga interna: entrenaments mínims al mes perquè compti el promig.
 alter table public.team_settings add column if not exists league_min_trainings smallint not null default 6
   check (league_min_trainings between 1 and 31);
@@ -904,6 +907,14 @@ language sql stable security definer set search_path = '' as $$
   order by coalesce(cp.called, false) desc, 3 nulls last, p.display_name, p.id;
 $$;
 
+-- És el responsable de l'app? (només ell veu l'Anàlisi i les Plantilles)
+create or replace function public.is_owner()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select (select auth.uid()) is not null and (select auth.uid()) = coalesce(
+    (select owner_id from public.team_settings where id),
+    (select id from public.profiles where role = 'coach' order by created_at, id limit 1));
+$$;
+
 -- Està lesionada aquesta jugadora aquest dia?
 create or replace function public.is_injured_on(pid uuid, d date)
 returns boolean language sql stable security definer set search_path = '' as $$
@@ -1114,6 +1125,8 @@ grant select, insert, update, delete on public.analysis_matches, public.analysis
 grant select, insert, update on public.rehab_entries to authenticated;
 revoke all on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) from public, anon;
 grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) to authenticated;
+revoke all on function public.is_owner() from public, anon;
+grant execute on function public.is_owner() to authenticated;
 revoke all on function public.convo_roster(uuid) from public, anon;
 grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
@@ -1276,23 +1289,23 @@ create policy player_positions_coach on public.player_positions for all to authe
 -- ANÀLISI DE PARTITS: només qui l'ha feta (i ha de ser staff). Les marques, només dins dels seus partits.
 drop policy if exists analysis_matches_owner on public.analysis_matches;
 create policy analysis_matches_owner on public.analysis_matches for all to authenticated
-  using (owner_id = (select auth.uid()) and (select public.is_coach()))
-  with check (owner_id = (select auth.uid()) and (select public.is_coach()));
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner()));
 drop policy if exists analysis_events_owner on public.analysis_events;
 create policy analysis_events_owner on public.analysis_events for all to authenticated
-  using (owner_id = (select auth.uid()) and (select public.is_coach()))
-  with check (owner_id = (select auth.uid()) and (select public.is_coach())
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner())
               and exists (select 1 from public.analysis_matches m where m.id = match_id and m.owner_id = (select auth.uid())));
 drop policy if exists analysis_buttons_owner on public.analysis_buttons;
 create policy analysis_buttons_owner on public.analysis_buttons for all to authenticated
-  using (owner_id = (select auth.uid()) and (select public.is_coach()))
-  with check (owner_id = (select auth.uid()) and (select public.is_coach()));
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner()));
 
 -- PLANTILLES D'ENTRENAMENT: només qui l'ha feta (i ha de ser staff).
 drop policy if exists training_plans_owner on public.training_plans;
 create policy training_plans_owner on public.training_plans for all to authenticated
-  using (owner_id = (select auth.uid()) and (select public.is_coach()))
-  with check (owner_id = (select auth.uid()) and (select public.is_coach()));
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner()));
 
 drop policy if exists team_settings_read on public.team_settings;
 create policy team_settings_read on public.team_settings for select to authenticated
@@ -1353,3 +1366,7 @@ select id, 'coach', 'Entrenador'
 from auth.users
 where email = lower('EL_TEU_CORREU@exemple.com')
 on conflict (id) do update set role = 'coach';
+
+-- Responsable de l'app: el primer entrenador (només es posa si encara no n'hi ha).
+update public.team_settings set owner_id = (select id from public.profiles where role = 'coach' order by created_at, id limit 1)
+where id and owner_id is null;

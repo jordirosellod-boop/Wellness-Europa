@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { DrillEditor, DrillView } from "@/components/drill-editor";
-import { CoachShell, Footer } from "@/components/ui";
+import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
 import { escapulada } from "@/lib/fonts";
 import {
   CONTENTS, fetchPlans, newTask, PLAN_COLS, POSITION_NAMES, POSITIONS, STATUS_LABEL, TASK_TYPES,
@@ -15,7 +15,7 @@ import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
 export default function PlansPage() {
   return (
     <>
-      <CoachShell>{() => <Plans />}</CoachShell>
+      <CoachShell>{() => <OwnerOnly><Plans /></OwnerOnly>}</CoachShell>
       <Footer />
     </>
   );

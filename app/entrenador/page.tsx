@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
-import { CoachShell, Footer } from "@/components/ui";
+import { CoachShell, Footer, useIsOwner } from "@/components/ui";
 import { viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, fmtSessionTime, friendlyError, SESSION_COLS, todayMadrid, type Kind, type Session } from "@/lib/wellness";
@@ -30,6 +30,7 @@ function coachStatus(s: Session, today: string, c: Counts, players: number): Cal
 
 function CoachCalendar() {
   const today = todayMadrid();
+  const owner = useIsOwner();
   const [view, setView] = useState<CalView>("mes");
   const [anchor, setAnchor] = useState(today);
   const [version, setVersion] = useState(0);
@@ -59,8 +60,12 @@ function CoachCalendar() {
       <div className="row between">
         <h1>Calendari</h1>
         <span className="row" style={{ gap: 6 }}>
-          <Link className="btn small" href="/entrenador/plantilla">📋 Plantilles</Link>
-          <Link className="btn small" href="/entrenador/analisi">🎬 Anàlisi</Link>
+          {owner && (
+            <>
+              <Link className="btn small" href="/entrenador/plantilla">📋 Plantilles</Link>
+              <Link className="btn small" href="/entrenador/analisi">🎬 Anàlisi</Link>
+            </>
+          )}
           <Link className="btn small secondary" href="/entrenador/programacio">⟳ Programacions</Link>
         </span>
       </div>

@@ -524,3 +524,12 @@ select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2'
 select pg_temp.check((select count(*) from public.analysis_matches) + (select count(*) from public.analysis_events) = 0, 'Una jugadora no veu l''anàlisi (ni les seves accions)');
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.analysis_events$$, 'Anònim no veu l''anàlisi');
+
+-- =============== NOMÉS EL RESPONSABLE (Anàlisi i Plantilles) ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c2', false); set role authenticated;
+select pg_temp.check(not public.is_owner(), 'Un altre membre del staff no és el responsable');
+select pg_temp.expect_error($$insert into public.training_plans (plan_date) values (current_date)$$, 'La resta del staff no pot fer plantilles');
+select pg_temp.expect_error($$insert into public.analysis_matches (title, match_date) values ('x', current_date)$$, 'La resta del staff no pot fer anàlisis');
+select pg_temp.expect_error($$update public.team_settings set owner_id = '00000000-0000-0000-0000-0000000000c2'$$, 'Ningú es pot fer responsable des de l''app');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false);
+select pg_temp.check(public.is_owner(), 'El primer entrenador és el responsable');

@@ -166,3 +166,26 @@ export function Footer() {
     </footer>
   );
 }
+
+/** És el responsable de l'app? (l'únic que veu l'Anàlisi i les Plantilles). null = encara no se sap. */
+export function useIsOwner(): boolean | null {
+  const [owner, setOwner] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    supabase()
+      .rpc("is_owner")
+      .then(({ data, error }) => alive && setOwner(!error && data === true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return owner;
+}
+
+/** Mostra el contingut només al responsable; a la resta, un avís. */
+export function OwnerOnly({ children }: { children: ReactNode }) {
+  const owner = useIsOwner();
+  if (owner === null) return <p className="muted">Carregant…</p>;
+  if (!owner) return <p className="card">Aquesta secció és privada de l&apos;entrenador responsable.</p>;
+  return <>{children}</>;
+}
