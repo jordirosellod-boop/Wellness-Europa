@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
+import { MatchReport } from "@/components/analysis-report";
+import { AnalysisSeason } from "@/components/analysis-season";
 import { AnalysisStats, ZonePitch, type APlayer } from "@/components/analysis-stats";
+import { DrawingEditor, DrawingOverlay, type Shape } from "@/components/telestrator";
+import { matchInsights } from "@/lib/analysis-insights";
 import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
 import { VideoPlayer, type VideoHandle } from "@/components/video-player";
 import {
@@ -50,6 +54,7 @@ function MatchList({ onOpen }: { onOpen: (id: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [f, setF] = useState({ convocation_id: "", title: "", match_date: today, rival: "", is_home: true });
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<"list" | "season">("list");
 
   useEffect(() => {
     fetchAMatches().then(setList, (e) => setError(e instanceof Error ? e.message : String(e)));
@@ -117,6 +122,13 @@ function MatchList({ onOpen }: { onOpen: (id: string) => void }) {
       </section>
 
       {list && list.length > 0 && (
+        <div className="seg-toggle" role="group" aria-label="Vista" style={{ margin: "4px 0 10px" }}>
+          <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")}>Partits</button>
+          <button type="button" aria-pressed={view === "season"} onClick={() => setView("season")}>Temporada</button>
+        </div>
+      )}
+      {list && list.length > 0 && view === "season" && <AnalysisSeason matches={list} />}
+      {list && list.length > 0 && view === "list" && (
         <section className="card">
           <h2 className="esc">Partits analitzats</h2>
           <ul className="list">
@@ -179,7 +191,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [players, setPlayers] = useState<APlayer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [tab, setTab] = useState<"tag" | "list" | "stats">("tag");
+  const [tab, setTab] = useState<"tag" | "list" | "stats" | "report">("tag");
   const [mode, setMode] = useState<"video" | "live">("video");
   const [src, setSrc] = useState<{ kind: "file" | "youtube"; url: string } | null>(null);
   const [vt, setVt] = useState(0);
@@ -193,6 +205,9 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const player = useRef<VideoHandle>(null);
   const queue = useRef<{ list: AEvent[]; i: number } | null>(null);
   const [playing, setPlaying] = useState<{ i: number; n: number } | null>(null);
+  const [frozen, setFrozen] = useState<Shape[] | null>(null);
+  const [drawEdit, setDrawEdit] = useState<AEvent | null>(null);
+  const watch = useRef<{ ev: AEvent; shown: boolean } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -226,6 +241,17 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
 
   const onTick = useCallback((t: number) => {
     setVt(t);
+    // Si l'acció té un dibuix, el vídeo s'atura uns segons al moment exacte i el mostra.
+    const w = watch.current;
+    if (w && !w.shown && match && Array.isArray(w.ev.drawing) && w.ev.drawing.length && t >= toVideo(match, w.ev.t)) {
+      w.shown = true;
+      player.current?.pause();
+      setFrozen(w.ev.drawing as Shape[]);
+      setTimeout(() => {
+        setFrozen(null);
+        player.current?.play();
+      }, 4000);
+    }
     const q = queue.current;
     if (q && match) {
       const e = q.list[q.i];
@@ -246,6 +272,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     q.i = i;
     setPlaying({ i, n: q.list.length });
     const e = q.list[i];
+    watch.current = { ev: e, shown: false };
+    setFrozen(null);
     player.current?.seek(toVideo(match, e.t) - e.pre_s);
     player.current?.play();
   }
@@ -344,8 +372,22 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (!src || mode !== "video" || !match) return;
     queue.current = null;
     setPlaying(null);
+    watch.current = { ev: e, shown: false };
+    setFrozen(null);
     player.current?.seek(toVideo(match, e.t) - e.pre_s);
     player.current?.play();
+  };
+
+  // Dibuixar sobre el vídeo: va al moment de l'acció, l'atura i obre la pissarra.
+  const startDraw = (e: AEvent) => {
+    if (!src || mode !== "video" || !match) return setMsg({ ok: false, text: "Per dibuixar, primer obre el vídeo." });
+    queue.current = null;
+    setPlaying(null);
+    watch.current = null;
+    player.current?.pause();
+    player.current?.seek(toVideo(match, e.t));
+    setDetail(null);
+    setDrawEdit(e);
   };
 
   const detailEv = events.find((e) => e.id === detail) ?? null;
@@ -387,7 +429,21 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                 </div>
               ) : (
                 <>
-                  <VideoPlayer ref={player} kind={src.kind} src={src.url} onTick={onTick} />
+                  <div className="an-stage">
+                    <VideoPlayer ref={player} kind={src.kind} src={src.url} onTick={onTick} />
+                    {frozen && !drawEdit && <DrawingOverlay shapes={frozen} />}
+                    {drawEdit && (
+                      <DrawingEditor
+                        initial={(Array.isArray(drawEdit.drawing) ? drawEdit.drawing : []) as Shape[]}
+                        onCancel={() => setDrawEdit(null)}
+                        onSave={async (sh) => {
+                          await updEvent(drawEdit.id, { drawing: sh.length ? sh : null });
+                          setDrawEdit(null);
+                          setMsg({ ok: true, text: sh.length ? "Dibuix desat: es mostrarà en reproduir aquesta acció." : "Dibuix esborrat." });
+                        }}
+                      />
+                    )}
+                  </div>
                   <div className="an-controls">
                     <button onClick={() => player.current?.seek((player.current?.time() ?? 0) - 10)} aria-label="Enrere 10 segons">−10</button>
                     <button onClick={() => player.current?.seek((player.current?.time() ?? 0) - 3)} aria-label="Enrere 3 segons">−3</button>
@@ -442,6 +498,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
             <button aria-pressed={tab === "tag"} onClick={() => setTab("tag")}>Etiquetar</button>
             <button aria-pressed={tab === "list"} onClick={() => setTab("list")}>Accions ({events.length})</button>
             <button aria-pressed={tab === "stats"} onClick={() => setTab("stats")}>Estadístiques</button>
+            <button aria-pressed={tab === "report"} onClick={() => setTab("report")}>Informe</button>
           </div>
 
           {tab === "tag" && (
@@ -485,7 +542,24 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
             />
           )}
 
-          {tab === "stats" && <AnalysisStats match={match} events={events} players={players} />}
+          {tab === "stats" && (
+            <>
+              <Insights match={match} events={events} name={(pid) => name(pid)} />
+              <AnalysisStats match={match} events={events} players={players} />
+            </>
+          )}
+
+          {tab === "report" && (
+            <>
+              <section className="card no-print">
+                <label className="field" htmlFor="anotes">Notes de l&apos;entrenador (surten a l&apos;informe)</label>
+                <textarea id="anotes" maxLength={2000} defaultValue={match.notes ?? ""} onBlur={(e) => e.target.value !== (match.notes ?? "") && saveMatch({ notes: e.target.value || null }, "Notes desades.")} />
+                <button className="btn block" style={{ marginTop: 8 }} onClick={() => window.print()}>🖨 Desar en PDF / Imprimir</button>
+                <p className="muted small" style={{ marginBottom: 0 }}>Per enviar-lo, tria «Desa com a PDF».</p>
+              </section>
+              <MatchReport match={match} events={events} players={players} />
+            </>
+          )}
         </div>
       </div>
 
@@ -498,6 +572,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
           onChange={(p) => updEvent(detailEv.id, p)}
           onDelete={() => delEvent(detailEv.id)}
           onClose={() => setDetail(null)}
+          onDraw={() => startDraw(detailEv)}
+          canDraw={!!src && mode === "video"}
         />
       )}
     </div>
@@ -587,8 +663,9 @@ function EventList({ match, events, players, name, canPlay, onSeek, onEdit, onDe
 }
 
 /** Detall d'una acció: jugadora, resultat, zona i notes. Cada canvi es desa al moment. */
-function EventDetail({ ev, match, players, button, onChange, onDelete, onClose }: {
+function EventDetail({ ev, match, players, button, onChange, onDelete, onClose, onDraw, canDraw }: {
   ev: AEvent; match: AMatch; players: APlayer[]; button?: AButton; onChange: (p: Partial<AEvent>) => void; onDelete: () => void; onClose: () => void;
+  onDraw: () => void; canDraw: boolean;
 }) {
   const [notes, setNotes] = useState(ev.notes ?? "");
   const showPlayer = ev.team === "us" && (button?.ask_player ?? true);
@@ -623,6 +700,12 @@ function EventDetail({ ev, match, players, button, onChange, onDelete, onClose }
         <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: "nowrap" }}>
           <input type="text" maxLength={500} placeholder="Nota (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ev.notes ?? "") && onChange({ notes: notes || null })} />
           <button className="btn small secondary" onClick={() => window.confirm("Esborrar aquesta acció?") && onDelete()}>Esborrar</button>
+        </div>
+        <div className="row" style={{ gap: 6, marginTop: 8 }}>
+          <button className="btn small" disabled={!canDraw} onClick={onDraw}>
+            ✏️ {Array.isArray(ev.drawing) && ev.drawing.length ? "Editar el dibuix" : "Dibuixar sobre el vídeo"}
+          </button>
+          {!canDraw && <span className="muted small">Obre el vídeo per dibuixar.</span>}
         </div>
         <div className="row" style={{ gap: 6, marginTop: 8 }}>
           <span className="muted small">Clip: </span>
@@ -670,5 +753,18 @@ function ButtonEditor({ buttons, onChange, onMsg }: { buttons: AButton[]; onChan
       <button className="btn small" onClick={add}>+ Afegir botó</button>
       <p className="muted small" style={{ marginBottom: 0 }}>«−» i «+» són els segons del clip abans i després del moment marcat. Si marques «jug.», «✓/✗» o «zona», en marcar l&apos;acció et preguntarà la jugadora, el resultat o la zona.</p>
     </div>
+  );
+}
+
+/** Conclusions automàtiques del partit (a partir de les marques). */
+function Insights({ match, events, name }: { match: AMatch; events: AEvent[]; name: (pid: string) => string }) {
+  const list = matchInsights(match, events, name);
+  return (
+    <section className="card">
+      <h3 className="esc" style={{ marginTop: 0 }}>Conclusions automàtiques</h3>
+      <ul className="rp-insights">
+        {list.map((i, k) => <li key={k} className={i.tone}>{i.text}</li>)}
+      </ul>
+    </section>
   );
 }
