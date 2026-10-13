@@ -10,6 +10,7 @@ import {
 } from "@/lib/plan";
 import { ABSENCE_REASONS, reasonLabel, type AbsenceReason } from "@/lib/attendance";
 import { deliverPdf, planPdf } from "@/lib/plan-pdf";
+import { safeName } from "@/lib/share-file";
 import { activeOn, fetchInjuries } from "@/lib/rehab";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
@@ -229,7 +230,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
     setPdfBusy(true);
     setPdf(null);
     try {
-      const file = await planPdf(el, `Sessio ${plan.plan_date}${plan.session_no ? ` (${plan.session_no})` : ""}.pdf`.replace(/[\\/:*?"<>|]/g, "-"));
+      const file = await planPdf(el, `${safeName(`Sessio ${plan.plan_date}${plan.session_no ? ` (${plan.session_no})` : ""}`)}.pdf`);
       // Ordinador: es descarrega directament. Mòbil: un botó per compartir (cal un toc nou).
       if (navigator.canShare?.({ files: [file] })) setPdf(file);
       else await deliverPdf(file);

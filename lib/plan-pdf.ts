@@ -52,22 +52,4 @@ export async function planPdf(el: HTMLElement, fileName: string): Promise<File> 
   }
 }
 
-/** Comparteix el PDF (mòbil: imprimir, desar, WhatsApp...) o el descarrega (ordinador). */
-export async function deliverPdf(file: File) {
-  if (navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: file.name });
-      return;
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return; // l'ha tancat
-    }
-  }
-  const url = URL.createObjectURL(file);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = file.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
+export { deliverFile as deliverPdf } from "@/lib/share-file";

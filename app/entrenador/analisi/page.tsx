@@ -5,6 +5,7 @@ import { MatchReport } from "@/components/analysis-report";
 import { AddToCorrection, CorrectionsPanel } from "@/components/corrections";
 import { RivalPanel } from "@/components/rival-scout";
 import { AnalysisSeason } from "@/components/analysis-season";
+import { ClipExport } from "@/components/clip-export";
 import { AnalysisStats, ZonePitch, type APlayer } from "@/components/analysis-stats";
 import { DrawingEditor, DrawingOverlay, type Shape } from "@/components/telestrator";
 import { matchInsights } from "@/lib/analysis-insights";
@@ -212,9 +213,10 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [players, setPlayers] = useState<APlayer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [tab, setTab] = useState<"tag" | "list" | "stats" | "report">("tag");
+  const [tab, setTab] = useState<"tag" | "list" | "clips" | "stats" | "report">("tag");
   const [mode, setMode] = useState<"video" | "live">("video");
   const [src, setSrc] = useState<{ kind: "file" | "youtube"; url: string } | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null); // per fer els talls
   const [vt, setVt] = useState(0);
   const [live, setLive] = useState<Live>({ running: false, startedAt: 0, acc: 0 });
   const [, force] = useState(0);
@@ -359,6 +361,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (!f) return;
     if (src?.kind === "file") URL.revokeObjectURL(src.url);
     setSrc({ kind: "file", url: URL.createObjectURL(f) });
+    setVideoFile(f);
     setMode("video");
     if (match?.video_ref !== f.name || match?.video_source !== "file") saveMatch({ video_source: "file", video_ref: f.name });
   }
@@ -367,6 +370,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     const yid = youtubeId(ytUrl);
     if (!yid) return setMsg({ ok: false, text: "Aquest enllaç de YouTube no és vàlid." });
     setSrc({ kind: "youtube", url: yid });
+    setVideoFile(null);
     setMode("video");
     saveMatch({ video_source: "youtube", video_ref: yid });
   }
@@ -536,6 +540,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
           <div className="tabs" style={{ marginBottom: 8 }}>
             <button aria-pressed={tab === "tag"} onClick={() => setTab("tag")}>Etiquetar</button>
             <button aria-pressed={tab === "list"} onClick={() => setTab("list")}>Accions ({events.length})</button>
+            <button aria-pressed={tab === "clips"} onClick={() => setTab("clips")}>Talls</button>
             <button aria-pressed={tab === "stats"} onClick={() => setTab("stats")}>Estadístiques</button>
             <button aria-pressed={tab === "report"} onClick={() => setTab("report")}>Informe</button>
           </div>
@@ -579,6 +584,10 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                 playIndex(0);
               }}
             />
+          )}
+
+          {tab === "clips" && (
+            <ClipExport match={match} events={events} buttons={buttons} file={videoFile} playerName={(pid) => (pid ? name(pid) : "")} />
           )}
 
           {tab === "stats" && (
