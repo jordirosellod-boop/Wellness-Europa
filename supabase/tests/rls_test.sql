@@ -507,3 +507,20 @@ select pg_temp.check((select count(*) from public.training_plans) + (select coun
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.training_plans$$, 'Anònim no veu plantilles');
 select pg_temp.expect_error($$select * from public.rehab_entries$$, 'Anònim no veu entrenaments a part');
+
+-- =============== ANÀLISI DE PARTITS (només qui la fa) ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.analysis_matches (id, title, match_date, rival) values ('99999999-0000-0000-0000-000000000001', 'J5 vs Damm', current_date, 'Damm');
+insert into public.analysis_events (match_id, t, action, team, player_id, result, zx, zy) values
+  ('99999999-0000-0000-0000-000000000001', 125.4, 'Xut', 'us', '00000000-0000-0000-0000-0000000000b2', 'ok', 80, 40);
+insert into public.analysis_buttons (label, color) values ('Xut', '#d32f2f');
+select pg_temp.check((select count(*) from public.analysis_events) = 1 and (select count(*) from public.analysis_buttons) = 1, 'L''analista crea partit, marques i botons');
+select pg_temp.expect_error($$insert into public.analysis_events (match_id, t, action) values ('99999999-0000-0000-0000-000000000001', -1, 'X')$$, 'El temps no pot ser negatiu');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c2', false);
+select pg_temp.check((select count(*) from public.analysis_matches) + (select count(*) from public.analysis_events) + (select count(*) from public.analysis_buttons) = 0, 'Un altre membre del staff NO veu l''anàlisi');
+select pg_temp.expect_error($$insert into public.analysis_events (match_id, t, action) values ('99999999-0000-0000-0000-000000000001', 10, 'Intrús')$$, 'Ni pot afegir marques al partit d''un altre');
+with u as (update public.analysis_matches set title = 'x' returning 1) select pg_temp.check(count(*) = 0, 'Ni el pot canviar') from u;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);
+select pg_temp.check((select count(*) from public.analysis_matches) + (select count(*) from public.analysis_events) = 0, 'Una jugadora no veu l''anàlisi (ni les seves accions)');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.analysis_events$$, 'Anònim no veu l''anàlisi');

@@ -60,6 +60,7 @@ function CoachCalendar() {
         <h1>Calendari</h1>
         <span className="row" style={{ gap: 6 }}>
           <Link className="btn small" href="/entrenador/plantilla">📋 Plantilles</Link>
+          <Link className="btn small" href="/entrenador/analisi">🎬 Anàlisi</Link>
           <Link className="btn small secondary" href="/entrenador/programacio">⟳ Programacions</Link>
         </span>
       </div>

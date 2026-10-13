@@ -363,6 +363,70 @@ create table if not exists public.training_plans (
 );
 create index if not exists training_plans_owner_idx on public.training_plans (owner_id, plan_date desc);
 
+-- ANÀLISI DE PARTITS (només qui la fa). El vídeo NO es puja: es queda al dispositiu (o és un
+-- enllaç de YouTube). Aquí només es guarden les marques (temps, acció, jugadora, zona...).
+-- Temps: "t" és el rellotge del partit en segons; al vídeo és t + video_offset.
+create table if not exists public.analysis_matches (
+  id             uuid primary key default gen_random_uuid(),
+  owner_id       uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  convocation_id uuid references public.convocations(id) on delete set null,
+  title          text not null check (char_length(trim(title)) between 1 and 120),
+  match_date     date not null,
+  rival          text check (rival is null or char_length(rival) <= 80),
+  is_home        boolean not null default true,
+  goals_for      smallint check (goals_for between 0 and 99),
+  goals_against  smallint check (goals_against between 0 and 99),
+  video_source   text check (video_source in ('file', 'youtube')),
+  video_ref      text check (video_ref is null or char_length(video_ref) <= 300),
+  video_offset   numeric(8,2) not null default 0,
+  h1_start       numeric(8,2) not null default 0,
+  h2_start       numeric(8,2),
+  notes          text check (notes is null or char_length(notes) <= 2000),
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+create index if not exists analysis_matches_owner_idx on public.analysis_matches (owner_id, match_date desc);
+-- Desfasament propi de la 2a part (si el vídeo inclou el descans o són dos vídeos).
+alter table public.analysis_matches add column if not exists video_offset_h2 numeric(8,2);
+
+create table if not exists public.analysis_events (
+  id         uuid primary key default gen_random_uuid(),
+  match_id   uuid not null references public.analysis_matches(id) on delete cascade,
+  owner_id   uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  t          numeric(8,2) not null check (t >= 0),
+  pre_s      smallint not null default 5 check (pre_s between 0 and 120),
+  post_s     smallint not null default 5 check (post_s between 0 and 120),
+  action     text not null check (char_length(trim(action)) between 1 and 40),
+  category   text check (category is null or char_length(category) <= 30),
+  color      text check (color is null or color ~ '^#[0-9a-fA-F]{6}$'),
+  team       text not null default 'us' check (team in ('us', 'rival')),
+  player_id  uuid references public.profiles(id) on delete set null,
+  result     text check (result in ('ok', 'ko')),
+  zx         numeric(5,2) check (zx between 0 and 100),
+  zy         numeric(5,2) check (zy between 0 and 100),
+  notes      text check (notes is null or char_length(notes) <= 500),
+  drawing    jsonb check (drawing is null or (jsonb_typeof(drawing) = 'array' and octet_length(drawing::text) < 200000)),
+  created_at timestamptz not null default now()
+);
+create index if not exists analysis_events_match_idx on public.analysis_events (match_id, t, id);
+
+-- Panell de botons de cada analista (accions, colors i segons abans/després).
+create table if not exists public.analysis_buttons (
+  id         uuid primary key default gen_random_uuid(),
+  owner_id   uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  label      text not null check (char_length(trim(label)) between 1 and 40),
+  category   text check (category is null or char_length(category) <= 30),
+  color      text not null default '#0a2ea0' check (color ~ '^#[0-9a-fA-F]{6}$'),
+  pre_s      smallint not null default 5 check (pre_s between 0 and 120),
+  post_s     smallint not null default 5 check (post_s between 0 and 120),
+  ask_player boolean not null default true,
+  ask_result boolean not null default false,
+  ask_zone   boolean not null default false,
+  sort       smallint not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists analysis_buttons_owner_idx on public.analysis_buttons (owner_id, sort);
+
 -- Equipació de la pissarra: 1a (blanca) o 2a (blava). La portera sempre de groc.
 alter table public.convocation_lineups add column if not exists kit text not null default 'home' check (kit in ('home', 'away'));
 
@@ -875,6 +939,27 @@ drop trigger if exists rehab_stamp on public.rehab_entries;
 create trigger rehab_stamp before insert or update on public.rehab_entries
   for each row execute function public.stamp_rehab();
 
+-- Anàlisi: el propietari no es pot canviar; les marques sempre són del propietari del partit.
+create or replace function public.stamp_analysis()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'UPDATE' then
+    new.owner_id := old.owner_id;
+    if tg_table_name = 'analysis_matches' then new.created_at := old.created_at; new.updated_at := now(); end if;
+    if tg_table_name = 'analysis_events' then new.match_id := old.match_id; end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists analysis_matches_stamp on public.analysis_matches;
+create trigger analysis_matches_stamp before insert or update on public.analysis_matches
+  for each row execute function public.stamp_analysis();
+drop trigger if exists analysis_events_stamp on public.analysis_events;
+create trigger analysis_events_stamp before insert or update on public.analysis_events
+  for each row execute function public.stamp_analysis();
+drop trigger if exists analysis_buttons_stamp on public.analysis_buttons;
+create trigger analysis_buttons_stamp before insert or update on public.analysis_buttons
+  for each row execute function public.stamp_analysis();
+
 -- Plantilles d'entrenament: hores del servidor i propietari fix.
 create or replace function public.stamp_training_plan()
 returns trigger language plpgsql set search_path = '' as $$
@@ -991,6 +1076,9 @@ alter table public.injuries           enable row level security;
 alter table public.rehab_entries      enable row level security;
 alter table public.player_positions   enable row level security;
 alter table public.training_plans     enable row level security;
+alter table public.analysis_matches   enable row level security;
+alter table public.analysis_events    enable row level security;
+alter table public.analysis_buttons   enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
 -- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
@@ -999,7 +1087,8 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups,
-  public.injuries, public.rehab_entries, public.player_positions, public.training_plans from anon, authenticated;
+  public.injuries, public.rehab_entries, public.player_positions, public.training_plans,
+  public.analysis_matches, public.analysis_events, public.analysis_buttons from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -1020,6 +1109,8 @@ grant all on public.player_numbers, public.convocations, public.convocation_play
 grant select, insert, update, delete on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to authenticated;
 grant all on public.injuries, public.rehab_entries, public.player_positions, public.training_plans to service_role;
 grant select, insert, update, delete on public.injuries, public.player_positions, public.training_plans to authenticated;
+grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons to service_role;
+grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons to authenticated;
 grant select, insert, update on public.rehab_entries to authenticated;
 revoke all on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) from public, anon;
 grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) to authenticated;
@@ -1181,6 +1272,21 @@ create policy rehab_update on public.rehab_entries for update to authenticated
 drop policy if exists player_positions_coach on public.player_positions;
 create policy player_positions_coach on public.player_positions for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
+
+-- ANÀLISI DE PARTITS: només qui l'ha feta (i ha de ser staff). Les marques, només dins dels seus partits.
+drop policy if exists analysis_matches_owner on public.analysis_matches;
+create policy analysis_matches_owner on public.analysis_matches for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_coach()))
+  with check (owner_id = (select auth.uid()) and (select public.is_coach()));
+drop policy if exists analysis_events_owner on public.analysis_events;
+create policy analysis_events_owner on public.analysis_events for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_coach()))
+  with check (owner_id = (select auth.uid()) and (select public.is_coach())
+              and exists (select 1 from public.analysis_matches m where m.id = match_id and m.owner_id = (select auth.uid())));
+drop policy if exists analysis_buttons_owner on public.analysis_buttons;
+create policy analysis_buttons_owner on public.analysis_buttons for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_coach()))
+  with check (owner_id = (select auth.uid()) and (select public.is_coach()));
 
 -- PLANTILLES D'ENTRENAMENT: només qui l'ha feta (i ha de ser staff).
 drop policy if exists training_plans_owner on public.training_plans;
