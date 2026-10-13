@@ -800,6 +800,10 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 }
+/* Paper en vertical (el navegador no ha fet cas de l'A4 horitzontal): es redueix perquè hi càpiga d'ample. */
+@media print and (orientation: portrait) {
+  .plan-sheet { zoom: var(--ps-fit-portrait, 0.67); }
+}
 .weekdays.wrap { display: flex !important; flex-wrap: wrap; gap: 6px; }
 .weekdays.wrap button { flex: 0 0 auto; padding-left: 12px; padding-right: 12px; }
 

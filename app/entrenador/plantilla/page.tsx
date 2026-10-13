@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from "react";
 import { DrillEditor, DrillView } from "@/components/drill-editor";
 import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
 import { escapulada } from "@/lib/fonts";
@@ -175,6 +175,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
   const [saving, setSaving] = useState(false);
   const [editPos, setEditPos] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const ios = useIsIOS();
   const [pdf, setPdf] = useState<File | null>(null);
 
   useEffect(() => {
@@ -311,11 +312,12 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
           <button className="btn small secondary" disabled={pdfBusy} onClick={makePdf} title="PDF d'una pàgina, per imprimir o enviar">
             {pdfBusy ? "Fent el PDF…" : "📄 PDF"}
           </button>
-          <button className="btn small secondary" onClick={() => {
+          <button className="btn small secondary" disabled={pdfBusy} onClick={() => {
+            if (ios) return makePdf(); // a l'iPad/iPhone, millor el PDF (sempre una pàgina)
             const el = document.querySelector<HTMLElement>(".plan-sheet");
             if (el) fitSheet(el); // per si el navegador no avisa abans d'imprimir
             window.print();
-          }} title="Imprimir directament des del navegador">🖨</button>
+          }} title="Imprimir">🖨</button>
         </span>
       </div>
       {pdf && (
@@ -734,8 +736,17 @@ function fitSheet(el: HTMLElement) {
     fits(k);
   }
   el.style.setProperty("--ps-fit", String(k));
+  // Si el navegador imprimeix en vertical (Safari no fa cas de la mida de pàgina), cal reduir-lo més.
+  el.style.setProperty("--ps-fit-portrait", String(k * PORTRAIT));
   return k;
 }
+// Ample útil d'un full vertical (A4 o carta, menys marges) respecte al de l'horitzontal.
+const PORTRAIT = 190 / 281;
+
+/** iPhone i iPad (també l'iPad que es fa passar per Mac): imprimir des del navegador no respecta l'A4 horitzontal. */
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const useIsIOS = () => useSyncExternalStore(() => () => {}, isIOS, () => false);
 
 function PlanSheet({ plan, roster }: { plan: Plan; roster: Roster }) {
   const sheet = useRef<HTMLDivElement>(null);
