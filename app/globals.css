@@ -712,6 +712,16 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .pchip.part { background: var(--groc-clar); color: var(--groc); }
 .pchip.baixa { background: #eceff5; color: #8a93ad; text-decoration: line-through; }
 .pchip.guest { outline: 1.5px dashed currentColor; outline-offset: -2px; }
+.squad-picker { margin-top: 10px; }
+.squad-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
+.squad-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--vora); background: #fff; border-radius: 999px; padding: 5px 10px; font: inherit; font-size: .85rem; font-weight: 600; color: var(--navy); cursor: pointer; }
+.squad-tabs button i { width: 14px; height: 14px; border-radius: 50%; background: var(--sq); border: 1px solid #8a93ad; }
+.squad-tabs button b { font-weight: 800; opacity: .7; }
+.squad-tabs button[aria-pressed="true"] { background: var(--sq); color: var(--sqf); border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy); }
+.squad-tabs button[aria-pressed="true"] i { border-color: var(--sqf); }
+.squad-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 5px; }
+.squad-pool button { display: flex; justify-content: space-between; align-items: center; gap: 4px; min-height: 38px; padding: 4px 8px; border: 1.5px solid var(--vora); border-radius: 8px; background: #fff; font: inherit; font-size: .85rem; font-weight: 600; color: var(--navy); cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.squad-pool button small { font-size: .68rem; opacity: .7; font-weight: 700; }
 .plan-reasons { display: grid; gap: 6px; margin-top: 10px; padding: 8px 10px; background: #f6f7fb; border-radius: 10px; }
 .plan-reasons > b { color: var(--blau); font-weight: 400; font-size: 1.05rem; }
 .add-guest { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
@@ -741,43 +751,52 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .drill-tools .arrow-ico { width: 22px; border-top-width: 3px; position: relative; }
 .drill-tools .arrow-ico::after { content: ""; position: absolute; right: -2px; top: -6px; border-left: 7px solid currentColor; border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; color: inherit; }
 
-/* Full imprimible: no es veu a la pantalla */
-.plan-sheet { display: none; }
+/* Full imprimible (A4 horitzontal, sempre en UNA pàgina).
+   A la pantalla no es veu: es dibuixa fora de la vista per poder-lo mesurar. Abans d'imprimir
+   es calcula quant s'ha de reduir (--ps-fit) perquè hi càpiga tot. */
 @page plan { size: A4 landscape; margin: 8mm; }
+.plan-sheet {
+  position: absolute; left: -100000px; top: 0; width: 281mm; visibility: hidden; pointer-events: none;
+  font-family: var(--cos); color: #0b1846; font-size: 8pt; line-height: 1.25; background: #fff;
+}
+.ps-head { display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #0a2ea0; padding-bottom: 4px; margin-bottom: 4px; }
+.ps-title b { display: block; font-size: 16pt; color: #0a2ea0; line-height: 1; }
+.ps-title span { font-size: 10pt; color: #55608a; }
+.ps-top { display: grid; grid-template-columns: 1.15fr 1fr; gap: 6px; break-inside: avoid; }
+.ps-info { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #b9c3e0; }
+.ps-cell { border: 1px solid #d5dbee; padding: 2px 4px; min-width: 0; }
+.ps-cell.wide { grid-column: span 2; }
+.ps-cell span { display: block; font-size: 6.5pt; text-transform: uppercase; color: #55608a; }
+.ps-cell b { font-weight: 600; font-size: 8pt; white-space: pre-line; }
+.pos-board.print { gap: 3px; }
+.pos-board.print .pos-col { padding: 2px; border-radius: 4px; }
+.pos-board.print .pos-col > b { font-size: 9pt; }
+.pos-board.print .pchip { min-height: 0; font-size: 7pt; padding: 1px 3px; border-radius: 3px; }
+.pos-board.print .pos-count { font-size: 9pt; }
+.ps-tasks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.ps-task { border: 1px solid #b9c3e0; break-inside: avoid; }
+.ps-task-head { display: grid; grid-template-columns: auto 1fr auto 1fr; background: #0b1846; color: #fff; font-size: 8pt; }
+.ps-task-head span { padding: 1px 4px; color: #dbb34d; }
+.ps-task-head b { padding: 1px 4px; font-weight: 400; }
+.ps-task-body { display: grid; grid-template-columns: 1fr 1.15fr; gap: 4px; padding: 4px; }
+.ps-text p, .ps-draw p { margin: 0 0 3px; white-space: pre-line; }
+.ps-text p b, .ps-draw p b { display: block; color: #0a2ea0; font-size: 7pt; text-transform: uppercase; }
+.ps-draw img, .ps-draw .drill { display: block; width: auto; max-width: 100%; height: 40mm; margin: 0 auto 2px; border-radius: 3px; object-fit: contain; }
+.ps-task-body { grid-template-columns: 1fr 1fr; }
+.ps-staff { width: 100%; border-collapse: collapse; font-size: 7pt; }
+.ps-staff td { border: 1px solid #d5dbee; padding: 1px 3px; }
+.ps-teams p { margin: 0 0 2px; }
+.ps-squad { display: flex; gap: 4px; align-items: baseline; }
+.ps-squad i { flex: none; width: 7px; height: 7px; border-radius: 50%; border: 1px solid; transform: translateY(1px); }
+.ps-squad b { font-size: 7pt; color: #0b1846 !important; display: inline !important; text-transform: uppercase; white-space: nowrap; }
 @media print {
   body:has(.plan-sheet) .topbar, body:has(.plan-sheet) footer, body:has(.plan-sheet) .no-print,
   body:has(.plan-sheet) main > .center { display: none !important; }
   body:has(.plan-sheet) main { padding: 0 !important; max-width: none !important; }
   .plan-sheet {
-    display: block; page: plan; font-family: var(--cos); color: #0b1846; font-size: 8pt;
+    position: static; visibility: visible; page: plan; zoom: var(--ps-fit, 1);
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .ps-head { display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #0a2ea0; padding-bottom: 4px; margin-bottom: 4px; }
-  .ps-title b { display: block; font-size: 16pt; color: #0a2ea0; line-height: 1; }
-  .ps-title span { font-size: 10pt; color: #55608a; }
-  .ps-top { display: grid; grid-template-columns: 1.15fr 1fr; gap: 6px; break-inside: avoid; }
-  .ps-info { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #b9c3e0; }
-  .ps-cell { border: 1px solid #d5dbee; padding: 2px 4px; min-width: 0; }
-  .ps-cell.wide { grid-column: span 2; }
-  .ps-cell span { display: block; font-size: 6.5pt; text-transform: uppercase; color: #55608a; }
-  .ps-cell b { font-weight: 600; font-size: 8pt; white-space: pre-line; }
-  .pos-board.print { gap: 3px; }
-  .pos-board.print .pos-col { padding: 2px; border-radius: 4px; }
-  .pos-board.print .pos-col > b { font-size: 9pt; }
-  .pos-board.print .pchip { min-height: 0; font-size: 7pt; padding: 1px 3px; border-radius: 3px; }
-  .pos-board.print .pos-count { font-size: 9pt; }
-  .ps-tasks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
-  .ps-task { border: 1px solid #b9c3e0; break-inside: avoid; }
-  .ps-task-head { display: grid; grid-template-columns: auto 1fr auto 1fr; background: #0b1846; color: #fff; font-size: 8pt; }
-  .ps-task-head span { padding: 1px 4px; color: #dbb34d; }
-  .ps-task-head b { padding: 1px 4px; font-weight: 400; }
-  .ps-task-body { display: grid; grid-template-columns: 1fr 1.15fr; gap: 4px; padding: 4px; }
-  .ps-text p, .ps-draw p { margin: 0 0 3px; white-space: pre-line; }
-  .ps-text p b, .ps-draw p b { display: block; color: #0a2ea0; font-size: 7pt; text-transform: uppercase; }
-  .ps-draw img, .ps-draw .drill { display: block; width: auto; max-width: 100%; height: 40mm; margin: 0 auto 2px; border-radius: 3px; object-fit: contain; }
-  .ps-task-body { grid-template-columns: 1fr 1fr; }
-  .ps-staff { width: 100%; border-collapse: collapse; font-size: 7pt; }
-  .ps-staff td { border: 1px solid #d5dbee; padding: 1px 3px; }
 }
 .weekdays.wrap { display: flex !important; flex-wrap: wrap; gap: 6px; }
 .weekdays.wrap button { flex: 0 0 auto; padding-left: 12px; padding-right: 12px; }

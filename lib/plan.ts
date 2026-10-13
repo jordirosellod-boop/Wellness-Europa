@@ -32,6 +32,10 @@ export type Guest = { id: string; name: string; pos: Position | ""; status: Excl
 
 export type StaffRole = { who: string; role: string; extra: string };
 
+/** Equip d'una tasca: color (com al dibuix) i les jugadores (ids de l'app o d'afegides a mà). */
+export type Squad = { c: Team; ids: string[] };
+export const SQUAD_NAMES: Record<Team, string> = { blue: "Blau", red: "Vermell", yellow: "Groc", white: "Blanc", gk: "Comodins" };
+
 export type Task = {
   id: string;
   type: string;
@@ -44,7 +48,8 @@ export type Task = {
   objective: string;
   rules: string;
   cues: string;
-  teams: string;
+  teams: string; // notes dels equips (text lliure)
+  squads?: Squad[];
   scoring: string;
   staff: StaffRole[];
   diagram: Diagram;

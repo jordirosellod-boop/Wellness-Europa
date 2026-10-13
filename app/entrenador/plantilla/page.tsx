@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { DrillEditor, DrillView } from "@/components/drill-editor";
 import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
 import { escapulada } from "@/lib/fonts";
 import {
   CONTENTS, fetchPlans, newTask, PLAN_COLS, uid, POSITION_NAMES, POSITIONS, STATUS_LABEL, TASK_TYPES,
-  type Guest, type Plan, type PlayerStatus, type Position, type Task,
+  type Guest, type Plan, type PlayerStatus, type Squad, type Team, SQUAD_NAMES, type Position, type Task,
 } from "@/lib/plan";
 import { ABSENCE_REASONS, reasonLabel, type AbsenceReason } from "@/lib/attendance";
 import { activeOn, fetchInjuries } from "@/lib/rehab";
@@ -266,6 +266,11 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
 
   const statusOf = (pid: string): PlayerStatus => plan.players[pid] ?? "disp";
   const available = roster.players.filter((p) => statusOf(p.id) === "disp").length + plan.guests.filter((g) => g.status === "disp").length;
+  // Jugadores que es poden posar als equips: les disponibles (de l'app i afegides a mà).
+  const pool: PoolPlayer[] = [
+    ...roster.players.filter((p) => statusOf(p.id) === "disp").map((p) => ({ id: p.id, name: p.display_name.split(" ")[0], pos: (roster.positions.get(p.id) ?? "") as Position | "" })),
+    ...plan.guests.filter((g) => g.status === "disp").map((g) => ({ id: g.id, name: g.name, pos: g.pos })),
+  ];
   const updGuest = (gid: string, patch: Partial<Guest>) => upd({ guests: plan.guests.map((g) => (g.id === gid ? { ...g, ...patch } : g)) });
 
   return (
@@ -282,7 +287,11 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
         <span className={status && !status.ok ? "err" : ""}>{status ? status.text : dirty ? "Canvis sense desar" : "Tot desat"}</span>
         <span className="row" style={{ gap: 6 }}>
           <button className="btn small" disabled={saving || !dirty} onClick={save}>{saving ? "Desant…" : "Desar"}</button>
-          <button className="btn small secondary" onClick={() => window.print()} title="Imprimir o desar en PDF per enviar">🖨 PDF / Imprimir</button>
+          <button className="btn small secondary" onClick={() => {
+            const el = document.querySelector<HTMLElement>(".plan-sheet");
+            if (el) fitSheet(el); // per si el navegador no avisa abans d'imprimir
+            window.print();
+          }} title="Imprimir o desar en PDF per enviar">🖨 PDF / Imprimir</button>
         </span>
       </div>
 
@@ -366,6 +375,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
         {plan.tasks.map((t, i) => (
           <TaskEditor
             key={t.id}
+            pool={pool}
             n={i + 1}
             t={t}
             last={i === plan.tasks.length - 1}
@@ -490,8 +500,99 @@ function AddGuest({ onAdd, full }: { onAdd: (g: Guest) => void; full: boolean })
   );
 }
 
-function TaskEditor({ n, t, last, onChange, onMove, onRemove }: {
-  n: number; t: Task; last: boolean; onChange: (p: Partial<Task>) => void; onMove: (d: -1 | 1) => void; onRemove: () => void;
+type PoolPlayer = { id: string; name: string; pos: Position | "" };
+const SQUAD_COLORS: Team[] = ["blue", "red", "yellow", "white", "gk"];
+const SQUAD_BG: Record<Team, string> = { blue: "#1452c8", red: "#d32f2f", yellow: "#f2c200", white: "#ffffff", gk: "#111111" };
+const SQUAD_FG: Record<Team, string> = { blue: "#fff", red: "#fff", yellow: "#0b1846", white: "#0b1846", gk: "#f2c200" };
+
+/** Fer equips tocant jugadores (en lloc d'escriure-les). També reparteix sol, equilibrant per posicions. */
+function SquadPicker({ pool, squads, onChange }: { pool: PoolPlayer[]; squads: Squad[]; onChange: (s: Squad[]) => void }) {
+  const [active, setActive] = useState<Team>("blue");
+  const teamOf = (id: string) => squads.find((s) => s.ids.includes(id))?.c ?? null;
+  const ids = (c: Team) => squads.find((s) => s.c === c)?.ids ?? [];
+  const tidy = (list: Squad[]) => SQUAD_COLORS.map((c) => list.find((s) => s.c === c)).filter((s): s is Squad => !!s && s.ids.length > 0);
+
+  function toggle(id: string) {
+    const cur = teamOf(id);
+    const without = squads.map((s) => ({ ...s, ids: s.ids.filter((x) => x !== id) }));
+    if (cur === active) return onChange(tidy(without)); // tornar-la a tocar la treu
+    const has = without.some((s) => s.c === active);
+    onChange(tidy(has ? without.map((s) => (s.c === active ? { ...s, ids: [...s.ids, id] } : s)) : [...without, { c: active, ids: [id] }]));
+  }
+
+  /** Reparteix les disponibles en n equips: porteres primer, i després per posicions perquè quedin equilibrats. */
+  function deal(n: number) {
+    const order = [...POSITIONS, ""] as string[];
+    const shuffled = [...pool].sort(() => Math.random() - 0.5).sort((a, b) => order.indexOf(a.pos) - order.indexOf(b.pos));
+    const out: Squad[] = SQUAD_COLORS.slice(0, n).map((c) => ({ c, ids: [] }));
+    shuffled.forEach((p, i) => {
+      const round = Math.floor(i / n);
+      const k = round % 2 === 0 ? i % n : n - 1 - (i % n); // anada i tornada
+      out[k].ids.push(p.id);
+    });
+    onChange(tidy(out));
+  }
+
+  const unassigned = pool.filter((p) => !teamOf(p.id)).length;
+  return (
+    <div className="squad-picker">
+      <label className="field">Equips</label>
+      <div className="row" style={{ gap: 6, marginBottom: 6 }}>
+        <span className="muted small">Repartir sola:</span>
+        {[2, 3, 4].map((k) => (
+          <button key={k} type="button" className="btn small secondary" disabled={pool.length < k}
+            onClick={() => (squads.length === 0 || window.confirm("Tornar a fer els equips?")) && deal(k)}>
+            {k} equips
+          </button>
+        ))}
+        {squads.length > 0 && <button type="button" className="btn small secondary" onClick={() => onChange([])}>Buidar</button>}
+      </div>
+      <div className="squad-tabs" role="group" aria-label="Equip on posar les jugadores">
+        {SQUAD_COLORS.map((c) => (
+          <button key={c} type="button" aria-pressed={active === c} onClick={() => setActive(c)} style={{ ["--sq" as string]: SQUAD_BG[c], ["--sqf" as string]: SQUAD_FG[c] }}>
+            <i />{SQUAD_NAMES[c]} <b>{ids(c).length}</b>
+          </button>
+        ))}
+      </div>
+      <p className="muted small" style={{ margin: "4px 0" }}>
+        Tria un color i toca les jugadores. Tornar-la a tocar la treu. {unassigned > 0 && `Sense equip: ${unassigned}.`}
+      </p>
+      <div className="squad-pool">
+        {pool.map((p) => {
+          const c = teamOf(p.id);
+          return (
+            <button key={p.id} type="button" className={c ? "in" : ""} aria-pressed={!!c} onClick={() => toggle(p.id)}
+              style={c ? { background: SQUAD_BG[c], color: SQUAD_FG[c], borderColor: c === "white" ? "#b9c3e0" : SQUAD_BG[c] } : undefined}>
+              {p.name}{p.pos && <small>{p.pos}</small>}
+            </button>
+          );
+        })}
+        {pool.length === 0 && <span className="muted small">No hi ha jugadores disponibles.</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Equips en text per al full imprès. */
+function SquadLines({ squads, pool }: { squads: Squad[]; pool: Map<string, string> }) {
+  return (
+    <>
+      {squads.map((s) => {
+        const names = s.ids.map((id) => pool.get(id)).filter(Boolean);
+        if (!names.length) return null;
+        return (
+          <p key={s.c} className="ps-squad">
+            <i style={{ background: SQUAD_BG[s.c], borderColor: s.c === "white" ? "#8a93ad" : SQUAD_BG[s.c] }} />
+            <b>{SQUAD_NAMES[s.c]} ({names.length})</b> {names.join(", ")}
+          </p>
+        );
+      })}
+    </>
+  );
+}
+
+function TaskEditor({ pool, n, t, last, onChange, onMove, onRemove }: {
+  pool: PoolPlayer[]; n: number; t: Task; last: boolean; onChange: (p: Partial<Task>) => void; onMove: (d: -1 | 1) => void; onRemove: () => void;
 }) {
   const listId = `tt-${t.id}`;
   async function onImage(e: ChangeEvent<HTMLInputElement>) {
@@ -557,7 +658,8 @@ function TaskEditor({ n, t, last, onChange, onMove, onRemove }: {
       {txt("objective", "Objectiu", 2)}
       {txt("rules", "Normes de provocació", 2)}
       {txt("cues", "Consignes", 2)}
-      {txt("teams", "Equips", 2)}
+      <SquadPicker pool={pool} squads={t.squads ?? []} onChange={(squads) => onChange({ squads })} />
+      {txt("teams", "Equips · notes (opcional)", 2)}
       {txt("scoring", "Puntuació", 2)}
 
       <label className="field" style={{ marginTop: 10 }}>Rols del staff</label>
@@ -578,11 +680,48 @@ function TaskEditor({ n, t, last, onChange, onMove, onRemove }: {
 // Full imprimible (A4 horitzontal), com la plantilla del club
 // ---------------------------------------------------------------------------
 
+// Pàgina A4 horitzontal menys els marges de 8 mm (en píxels CSS: 96 per polzada).
+const MM = 96 / 25.4;
+const PAGE_W = 281 * MM;
+const PAGE_H = 192 * MM; // 194 mm útils, amb una mica de marge per seguretat
+
+/** Calcula quant s'ha de reduir el full perquè hi càpiga tot en una sola pàgina. */
+function fitSheet(el: HTMLElement) {
+  const fits = (k: number) => {
+    el.style.width = `${PAGE_W / k}px`; // més ample i després reduït: el text ocupa menys línies
+    return el.offsetHeight * k <= PAGE_H;
+  };
+  let k = 1;
+  if (!fits(1)) {
+    let lo = 0.2, hi = 1;
+    for (let i = 0; i < 12; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) lo = mid;
+      else hi = mid;
+    }
+    k = lo;
+    fits(k);
+  }
+  el.style.setProperty("--ps-fit", String(k));
+  return k;
+}
+
 function PlanSheet({ plan, roster }: { plan: Plan; roster: Roster }) {
+  const sheet = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = () => sheet.current && fitSheet(sheet.current);
+    window.addEventListener("beforeprint", h);
+    return () => window.removeEventListener("beforeprint", h);
+  }, []);
   const available = roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").length + plan.guests.filter((g) => g.status === "disp").length;
+  // Només les disponibles (si una s'ha donat de baixa després de fer els equips, no surt).
+  const names = new Map([
+    ...roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").map((p) => [p.id, p.display_name.split(" ")[0]] as [string, string]),
+    ...plan.guests.filter((g) => g.status === "disp").map((g) => [g.id, g.name] as [string, string]),
+  ]);
   const cell = (k: string, v: ReactNode) => (<div className="ps-cell"><span>{k}</span><b>{v || "–"}</b></div>);
   return (
-    <div className="plan-sheet">
+    <div className="plan-sheet" ref={sheet}>
       <header className="ps-head">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/escut.png" alt="" width={46} height={46} />
@@ -641,7 +780,13 @@ function PlanSheet({ plan, roster }: { plan: Plan; roster: Roster }) {
               <div className="ps-draw">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {t.image ? <img src={t.image} alt="" /> : <DrillView d={t.diagram} />}
-                {t.teams && <p><b>Equips</b>{t.teams}</p>}
+                {((t.squads?.length ?? 0) > 0 || t.teams) && (
+                  <div className="ps-teams">
+                    <p><b>Equips</b></p>
+                    <SquadLines squads={t.squads ?? []} pool={names} />
+                    {t.teams && <p>{t.teams}</p>}
+                  </div>
+                )}
                 {t.scoring && <p><b>Puntuació</b>{t.scoring}</p>}
               </div>
             </div>
