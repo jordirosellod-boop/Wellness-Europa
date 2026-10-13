@@ -901,6 +901,39 @@ body:has(.an-font) .picker, body:has(.an-font) .picker * {
 @media print {
   body:has(.an-report) * { visibility: hidden !important; }
   body:has(.an-report) .an-report, body:has(.an-report) .an-report * { visibility: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:has(.an-report) *:not(:has(.an-report)):not(.an-report):not(.an-report *) { display: none !important; }
   .an-report { position: absolute; left: 0; top: 0; width: 100%; border: 0; padding: 0; }
   .an-report .zone-pitch { height: 38mm !important; }
 }
+
+/* Proper rival i correccions */
+.scout-print { display: none; }
+@media print { body:has(.scout-print) .scout-print { display: block; } }
+.rival-hero { background: linear-gradient(135deg, var(--navy), var(--blau)); color: #fff; display: flex; flex-direction: column; gap: 2px; }
+.rival-hero .rv-k { color: var(--or); text-transform: uppercase; letter-spacing: .6px; }
+.rival-hero .rv-name { font-size: 2.1rem; line-height: 1.05; }
+.rv-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+@media (max-width: 560px) { .rv-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rv-stats > div { background: rgba(255,255,255,.1); border-radius: 10px; padding: 6px; text-align: center; display: flex; flex-direction: column; }
+.rv-stats b { font-size: 1.4rem; color: var(--or); }
+.rv-stats span { font-size: .75rem; opacity: .8; }
+.rv-stats .form { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px; align-items: center; }
+.rv-stats .form span { width: 100%; }
+.rv-stats .form i, .rbadge { font-style: normal; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; font-size: .8rem; color: #fff; }
+.rv-stats .form i.G, .rbadge.G { background: #1e7d3a; }
+.rv-stats .form i.E, .rbadge.E { background: #8a6d00; }
+.rv-stats .form i.P, .rbadge.P { background: #c62828; }
+.rv-vs { margin: 8px 0 0; opacity: .85; }
+.rival-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 800px) { .rival-grid { grid-template-columns: 1fr; } }
+.stats-table tr.rv-row td { background: #fdecec; font-weight: 700; }
+.stats-table tr.us-row td { background: var(--blau-clar); font-weight: 700; }
+.rv-matches li { display: flex; align-items: center; gap: 8px; }
+.rv-matches .pname { flex: 1; }
+.rv-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.an-home-tabs button { font-size: 1.05rem; }
+.corr.corregit { opacity: .7; }
+.corr-clips { list-style: none; margin: 6px 0; padding: 0; }
+.corr-clips li { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--vora); }
+.corr-clips a { flex: 1; color: var(--blau); padding: 6px 0; }
+.corr-add { margin-top: 10px; padding: 10px; background: #f3f5fa; border-radius: 10px; }

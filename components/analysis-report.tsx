@@ -1,7 +1,7 @@
 "use client";
 
 import { ZonePitch, type APlayer } from "@/components/analysis-stats";
-import { halfOf, minuteOf, type AEvent, type AMatch } from "@/lib/analysis";
+import { halfOf, minuteOf, teamLabels, type AEvent, type AMatch } from "@/lib/analysis";
 import { matchInsights } from "@/lib/analysis-insights";
 import { fmtDate } from "@/lib/wellness";
 
@@ -11,6 +11,7 @@ export function MatchReport({ match, events, players }: { match: AMatch; events:
     const p = players.find((x) => x.id === id);
     return p ? `${p.dorsal != null ? p.dorsal + " · " : ""}${p.name}` : "—";
   };
+  const L = teamLabels(match);
   const actions = [...new Set(events.map((e) => e.action))];
   const count = (team: "us" | "rival", a: string, h?: 1 | 2) => events.filter((e) => e.team === team && e.action === a && (!h || halfOf(match, e.t) === h)).length;
   const okPct = (team: "us" | "rival", a: string) => {
@@ -48,10 +49,10 @@ export function MatchReport({ match, events, players }: { match: AMatch; events:
       </section>
 
       <section className="rp-block">
-        <h3>Nosaltres vs {match.rival || "rival"}</h3>
+        <h3>{L.us} vs {L.rival}</h3>
         <table className="rp-table">
           <thead>
-            <tr><th>Acció</th><th>CE Europa</th><th>1a / 2a</th><th>Encert</th><th>{match.rival || "Rival"}</th><th>1a / 2a</th><th>Encert</th></tr>
+            <tr><th>Acció</th><th>{L.us}</th><th>1a / 2a</th><th>Encert</th><th>{L.rival}</th><th>1a / 2a</th><th>Encert</th></tr>
           </thead>
           <tbody>
             {actions.map((a) => (
@@ -69,7 +70,7 @@ export function MatchReport({ match, events, players }: { match: AMatch; events:
         <section className="rp-block rp-maps">
           {mapActions.map((a) => (
             <div key={a}>
-              <h4>{a} · CE Europa</h4>
+              <h4>{a} · {L.us}</h4>
               <ZonePitch points={zones(a, "us")} height={120} />
             </div>
           ))}
@@ -107,7 +108,7 @@ export function MatchReport({ match, events, players }: { match: AMatch; events:
                 <tr key={e.id}>
                   <td>{minuteOf(match, e.t)}</td>
                   <td>{e.action}{e.result ? (e.result === "ok" ? " ✓" : " ✗") : ""}</td>
-                  <td>{e.team === "us" ? (e.player_id ? name(e.player_id) : "CE Europa") : match.rival || "Rival"}</td>
+                  <td>{e.team === "us" ? (e.player_id ? name(e.player_id) : L.us) : L.rival}</td>
                   <td>{e.notes ?? ""}</td>
                 </tr>
               ))}

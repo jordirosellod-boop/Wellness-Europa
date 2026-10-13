@@ -18,9 +18,10 @@ export type AMatch = {
   h1_start: number;
   h2_start: number | null;
   notes: string | null;
+  kind: "own" | "rival";
 };
 export const AMATCH_COLS =
-  "id, convocation_id, title, match_date, rival, is_home, goals_for, goals_against, video_source, video_ref, video_offset, video_offset_h2, h1_start, h2_start, notes";
+  "id, convocation_id, title, match_date, rival, is_home, goals_for, goals_against, video_source, video_ref, video_offset, video_offset_h2, h1_start, h2_start, notes, kind";
 
 export type AEvent = {
   id: string;
@@ -121,4 +122,25 @@ export async function fetchButtons(): Promise<AButton[]> {
 export function youtubeId(url: string): string | null {
   const m = url.trim().match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : /^[A-Za-z0-9_-]{11}$/.test(url.trim()) ? url.trim() : null;
+}
+
+/** Clau d'un rival per agrupar (sense majúscules, accents ni sufixos de club). */
+export function rivalKey(name: string): string {
+  return name
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/,?\s+(c\.e\.|u\.e\.|c\.f\.|a\.d\.|c\.d\.|u\.d\.|f\.c\.)\s*/g, " ")
+    .replace(/\s+[a-z]$/, "")
+    .replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim()
+    .slice(0, 80);
+}
+/** Nom curt d'un equip de la FCF ("PREMIA DALT, C.D. A" → "Premia Dalt"). */
+export function prettyTeam(name: string): string {
+  const s = name.replace(/,?\s+(C\.E\.|U\.E\.|C\.F\.|A\.D\.|C\.D\.|U\.D\.|F\.C\.)\s*/g, " ").replace(/\s+[A-Z]$/, "").replace(/\s+/g, " ").trim();
+  return s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+}
+
+/** Noms dels dos equips: en un vídeo del rival, «nosaltres» és el rival analitzat i l'altre és el seu contrari. */
+export function teamLabels(m: Pick<AMatch, "kind" | "rival">): { us: string; rival: string } {
+  return m.kind === "rival" ? { us: m.rival || "Rival", rival: "Contrari" } : { us: "CE Europa", rival: m.rival || "Rival" };
 }

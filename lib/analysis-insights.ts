@@ -6,24 +6,43 @@ export type Insight = { tone: "good" | "bad" | "info"; text: string };
 
 const THIRD = ["terç defensiu", "terç mig", "terç ofensiu"];
 const thirdOf = (x: number) => Math.min(2, Math.floor(x / 33.34));
+const NEGATIVE = ["Pèrdua", "Falta", "Targeta", "Fora de joc"];
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 
 /** Llegeix les accions del partit i en treu les idees principals, ordenades per importància. */
 export function matchInsights(m: AMatch, events: AEvent[], playerName: (id: string) => string): Insight[] {
+  const list = rawInsights(m, events, playerName);
+  if (m.kind !== "rival") return list;
+  // Vídeo del rival: «nosaltres» és l'equip analitzat i l'altre és el seu contrari.
+  const who = m.rival || "el rival";
+  return list.map((i) => ({
+    ...i,
+    text: i.text
+      .replace(/accions nostres/g, `accions de ${who}`)
+      .replace(/ nostres contra /g, ` de ${who} contra `)
+      .replace(/que nosaltres/g, `que ${who}`)
+      .replace(/ ens supera en /g, ` supera ${who} en `)
+      .replace(/la nostra porteria/g, "la seva porteria")
+      .replace(/ de el contrari/g, " del contrari")
+      .replace(/^./, (c) => c.toUpperCase()),
+  }));
+}
+
+function rawInsights(m: AMatch, events: AEvent[], playerName: (id: string) => string): Insight[] {
   const out: Insight[] = [];
   if (events.length < 3) return [{ tone: "info", text: "Encara hi ha poques accions marcades per treure conclusions." }];
-  const rival = m.rival || "el rival";
+  const rival = m.kind === "rival" ? "el contrari" : m.rival || "el rival";
   const by = (team: "us" | "rival", action?: string) => events.filter((e) => e.team === team && (!action || e.action === action));
   const actions = [...new Set(events.map((e) => e.action))];
 
   // 1. Comparativa per acció (on som millors i on pitjors)
   const diffs = actions
     .map((a) => ({ a, us: by("us", a).length, rv: by("rival", a).length }))
-    .filter((d) => d.us + d.rv >= 4);
+    .filter((d) => d.us + d.rv >= 4 && !NEGATIVE.includes(d.a)); // fer-ne més no és «dominar»
   const best = [...diffs].sort((x, y) => y.us - y.rv - (x.us - x.rv))[0];
   const worst = [...diffs].sort((x, y) => x.us - x.rv - (y.us - y.rv))[0];
   if (best && best.us > best.rv) out.push({ tone: "good", text: `Domini en «${best.a}»: ${best.us} nostres contra ${best.rv} de ${rival}.` });
-  if (worst && worst.rv > worst.us && worst !== best) out.push({ tone: "bad", text: `${rival} ens supera en «${worst.a}»: ${worst.rv} contra ${worst.us}.` });
+  if (worst && worst.rv > worst.us) out.push({ tone: "bad", text: `${rival} ens supera en «${worst.a}»: ${worst.rv} contra ${worst.us}.` });
 
   // 2. Encert de les accions amb resultat
   for (const a of actions) {

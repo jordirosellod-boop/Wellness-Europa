@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { MatchReport } from "@/components/analysis-report";
+import { AddToCorrection, CorrectionsPanel } from "@/components/corrections";
+import { RivalPanel } from "@/components/rival-scout";
 import { AnalysisSeason } from "@/components/analysis-season";
 import { AnalysisStats, ZonePitch, type APlayer } from "@/components/analysis-stats";
 import { DrawingEditor, DrawingOverlay, type Shape } from "@/components/telestrator";
@@ -29,6 +31,7 @@ export default function AnalysisPage() {
 
 function Analysis() {
   const [id, setId] = useState<string | null>(null);
+  const [tab, setTab] = useState<HomeTab>("rival"); // es manté en tornar d'un partit
   useEffect(() => {
     const sync = () => setId(new URLSearchParams(window.location.search).get("id"));
     sync();
@@ -40,7 +43,29 @@ function Analysis() {
     setId(next);
     window.scrollTo({ top: 0 });
   };
-  return <div className={`an-font ${escapulada.variable}`}>{id ? <Workspace key={id} id={id} onBack={() => go(null)} /> : <MatchList onOpen={go} />}</div>;
+  return <div className={`an-font ${escapulada.variable}`}>{id ? <Workspace key={id} id={id} onBack={() => go(null)} /> : <AnalysisHome onOpen={go} tab={tab} choose={setTab} />}</div>;
+}
+
+type HomeTab = "rival" | "corr" | "own";
+
+/** Inici de l'Anàlisi: proper rival, correccions i els nostres partits. */
+function AnalysisHome({ onOpen, tab, choose }: { onOpen: (id: string) => void; tab: HomeTab; choose: (t: HomeTab) => void }) {
+  return (
+    <>
+      <div className="row between">
+        <h1 style={{ margin: 0 }}>Anàlisi</h1>
+        <span className="chip">Només tu</span>
+      </div>
+      <div className="tabs an-home-tabs" style={{ margin: "10px 0" }}>
+        <button aria-pressed={tab === "rival"} onClick={() => choose("rival")}>Proper rival</button>
+        <button aria-pressed={tab === "corr"} onClick={() => choose("corr")}>Correccions</button>
+        <button aria-pressed={tab === "own"} onClick={() => choose("own")}>Els nostres partits</button>
+      </div>
+      {tab === "rival" && <RivalPanel onOpen={onOpen} />}
+      {tab === "corr" && <CorrectionsPanel />}
+      {tab === "own" && <MatchList onOpen={onOpen} />}
+    </>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +82,7 @@ function MatchList({ onOpen }: { onOpen: (id: string) => void }) {
   const [view, setView] = useState<"list" | "season">("list");
 
   useEffect(() => {
-    fetchAMatches().then(setList, (e) => setError(e instanceof Error ? e.message : String(e)));
+    fetchAMatches().then((l) => setList(l.filter((m) => m.kind !== "rival")), (e) => setError(e instanceof Error ? e.message : String(e)));
     fetchConvocations(addDays(today, -120)).then(setConvos, () => {});
   }, [today]);
 
@@ -82,10 +107,6 @@ function MatchList({ onOpen }: { onOpen: (id: string) => void }) {
 
   return (
     <>
-      <div className="row between">
-        <h1 style={{ margin: 0 }}>Anàlisi</h1>
-        <span className="chip">Només tu</span>
-      </div>
       <p className="muted" style={{ marginTop: 4 }}>
         Analitza els partits amb el vídeo de Veo o de qualsevol càmera. El vídeo no es puja enlloc: s&apos;obre des del teu dispositiu i aquí només es
         guarden les marques. Ningú més ho veu.
@@ -199,6 +220,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [, force] = useState(0);
   const [team, setTeam] = useState<"us" | "rival">("us");
   const [detail, setDetail] = useState<string | null>(null);
+  const [targetEv, setTargetEv] = useState<string | null>(null);
   const [editButtons, setEditButtons] = useState(false);
   const [ytUrl, setYtUrl] = useState("");
   const [rateV, setRateV] = useState(1);
@@ -228,6 +250,12 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
         else setButtons(((ins ?? []) as AButton[]).sort((a, b) => a.sort - b.sort));
       }
       setLive(readLive(id));
+      // Ve d'una correcció: anirem al clip quan s'obri el vídeo.
+      const evp = new URLSearchParams(window.location.search).get("ev");
+      if (evp) {
+        setTargetEv(evp);
+        setTab("list");
+      }
       if (mm.video_source === "youtube" && mm.video_ref) setSrc({ kind: "youtube", url: mm.video_ref });
     })().catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [id]);
@@ -308,7 +336,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     const ev = { ...(data as AEvent), t: Number((data as AEvent).t) };
     setEvents((x) => [...x, ev].sort((a, b2) => a.t - b2.t));
     setMsg({ ok: true, text: `${b.label} · ${minuteOf(match, t)} ✓` });
-    if (b.ask_player || b.ask_result || b.ask_zone) setDetail(ev.id);
+    if ((b.ask_player && match.kind !== "rival") || b.ask_result || b.ask_zone) setDetail(ev.id);
   }
 
   async function updEvent(eid: string, patch: Partial<AEvent>) {
@@ -391,6 +419,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   };
 
   const detailEv = events.find((e) => e.id === detail) ?? null;
+  const target = targetEv ? events.find((e) => e.id === targetEv) ?? null : null;
 
   return (
     <div className="analysis">
@@ -490,6 +519,16 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
             </span>
           </div>
           {msg && <p className={`msg ${msg.ok ? "ok" : "error"} an-msg`} role="status">{msg.text}</p>}
+          {target && (
+            <p className="msg info an-msg">
+              Clip de la correcció: {target.action} · {minuteOf(match, target.t)}.{" "}
+              {src && mode === "video" ? (
+                <button className="btn small" onClick={() => { seek(target); setTargetEv(null); }}>▶ Veure&apos;l</button>
+              ) : (
+                "Obre el vídeo per veure'l."
+              )}
+            </p>
+          )}
           <Timeline match={match} events={events} now={clock} onSeek={seek} />
         </div>
 
@@ -505,8 +544,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
             <section className="card">
               <div className="row between" style={{ marginBottom: 8 }}>
                 <div className="seg-toggle" role="group" aria-label="Equip">
-                  <button type="button" aria-pressed={team === "us"} onClick={() => setTeam("us")}>CE Europa</button>
-                  <button type="button" aria-pressed={team === "rival"} onClick={() => setTeam("rival")}>{match.rival || "Rival"}</button>
+                  <button type="button" aria-pressed={team === "us"} onClick={() => setTeam("us")}>{match.kind === "rival" ? match.rival || "Rival" : "CE Europa"}</button>
+                  <button type="button" aria-pressed={team === "rival"} onClick={() => setTeam("rival")}>{match.kind === "rival" ? "Contrari" : match.rival || "Rival"}</button>
                 </div>
                 <button className="btn small secondary" onClick={() => setEditButtons((v) => !v)}>{editButtons ? "Fet" : "Editar botons"}</button>
               </div>
@@ -668,7 +707,8 @@ function EventDetail({ ev, match, players, button, onChange, onDelete, onClose, 
   onDraw: () => void; canDraw: boolean;
 }) {
   const [notes, setNotes] = useState(ev.notes ?? "");
-  const showPlayer = ev.team === "us" && (button?.ask_player ?? true);
+  const showPlayer = ev.team === "us" && match.kind !== "rival" && (button?.ask_player ?? true);
+  const [corr, setCorr] = useState<string | null>(null);
   return (
     <div className="picker-backdrop" onClick={onClose}>
       <div className="picker an-detail" role="dialog" aria-label={`Detall: ${ev.action}`} onClick={(e) => e.stopPropagation()}>
@@ -706,7 +746,9 @@ function EventDetail({ ev, match, players, button, onChange, onDelete, onClose, 
             ✏️ {Array.isArray(ev.drawing) && ev.drawing.length ? "Editar el dibuix" : "Dibuixar sobre el vídeo"}
           </button>
           {!canDraw && <span className="muted small">Obre el vídeo per dibuixar.</span>}
+          {match.kind !== "rival" && <button className="btn small secondary" onClick={() => setCorr(corr === null ? "" : null)}>➕ Afegir a correccions</button>}
         </div>
+        {corr !== null && (corr ? <p className="msg ok">{corr}</p> : <AddToCorrection ev={ev} onDone={setCorr} />)}
         <div className="row" style={{ gap: 6, marginTop: 8 }}>
           <span className="muted small">Clip: </span>
           <label className="small">abans <input type="number" min={0} max={120} value={ev.pre_s} onChange={(e) => onChange({ pre_s: Math.min(120, Math.max(0, Number(e.target.value) || 0)) })} style={{ width: 64 }} /> s</label>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { halfOf, type AEvent, type AMatch } from "@/lib/analysis";
+import { halfOf, teamLabels, type AEvent, type AMatch } from "@/lib/analysis";
 
 export type APlayer = { id: string; name: string; dorsal: number | null };
 
@@ -56,6 +56,7 @@ export function AnalysisStats({ match, events, players }: { match: AMatch; event
     return (h - 1) * 3 + Math.min(2, Math.floor(Math.max(0, s) / 900));
   };
   const SEGS = ["0-15'", "15-30'", "30-45'", "45-60'", "60-75'", "75-90'"];
+  const L = teamLabels(match);
   const segUs = SEGS.map((_, i) => count((e) => e.team === "us" && seg(e) === i));
   const segRival = SEGS.map((_, i) => count((e) => e.team === "rival" && seg(e) === i));
   const segMax = Math.max(1, ...segUs, ...segRival);
@@ -80,7 +81,7 @@ export function AnalysisStats({ match, events, players }: { match: AMatch; event
         <h3 className="esc">Nosaltres vs rival</h3>
         <div className="table-wrap">
           <table className="stats-table">
-            <thead><tr><th>Acció</th><th>CE Europa</th><th>% encert</th><th>{match.rival || "Rival"}</th><th>% encert</th></tr></thead>
+            <thead><tr><th>Acció</th><th>{L.us}</th><th>% encert</th><th>{L.rival}</th><th>% encert</th></tr></thead>
             <tbody>
               {actions.map((a) => {
                 const u = count((e) => e.action === a && e.team === "us");
@@ -109,7 +110,7 @@ export function AnalysisStats({ match, events, players }: { match: AMatch; event
           {SEGS.map((s, i) => (
             <div key={s} className="seg">
               <div className="bars">
-                <i className="us" style={{ height: `${(segUs[i] / segMax) * 100}%` }} title={`CE Europa: ${segUs[i]}`} />
+                <i className="us" style={{ height: `${(segUs[i] / segMax) * 100}%` }} title={`${L.us}: ${segUs[i]}`} />
                 <i className="rv" style={{ height: `${(segRival[i] / segMax) * 100}%` }} title={`Rival: ${segRival[i]}`} />
               </div>
               <span>{s}</span>
@@ -117,7 +118,7 @@ export function AnalysisStats({ match, events, players }: { match: AMatch; event
             </div>
           ))}
         </div>
-        <p className="muted small" style={{ margin: 0 }}><span className="dotc" style={{ background: "#0a2ea0" }} /> CE Europa · <span className="dotc" style={{ background: "#d32f2f" }} /> Rival</p>
+        <p className="muted small" style={{ margin: 0 }}><span className="dotc" style={{ background: "#0a2ea0" }} /> {L.us} · <span className="dotc" style={{ background: "#d32f2f" }} /> {L.rival}</p>
       </section>
 
       <section className="card">
@@ -157,8 +158,8 @@ export function AnalysisStats({ match, events, players }: { match: AMatch; event
             {actions.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
           <div className="seg-toggle" role="group" aria-label="Equip">
-            <button type="button" aria-pressed={zoneTeam === "us"} onClick={() => setZoneTeam("us")}>CE Europa</button>
-            <button type="button" aria-pressed={zoneTeam === "rival"} onClick={() => setZoneTeam("rival")}>Rival</button>
+            <button type="button" aria-pressed={zoneTeam === "us"} onClick={() => setZoneTeam("us")}>{L.us}</button>
+            <button type="button" aria-pressed={zoneTeam === "rival"} onClick={() => setZoneTeam("rival")}>{L.rival}</button>
           </div>
         </div>
         <ZonePitch points={zonePts} height={220} />

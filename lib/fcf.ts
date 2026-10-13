@@ -147,3 +147,53 @@ export function matchNames(fcf: { fcf_id: string; full_name: string }[], app: { 
   for (const [fid, ids] of cand) if (ids.length === 1 && usage.get(ids[0]) === 1) out.set(fid, ids[0]);
   return out;
 }
+
+// ---------- Tot el grup (per a l'anàlisi del rival) ----------
+
+export type GroupMatch = {
+  acta_id: string; jornada: number; kickoff: string | null;
+  home_id: string; home: string; away_id: string; away: string;
+  home_goals: number | null; away_goals: number | null; closed: boolean;
+};
+
+/** Tots els partits del grup (de tots els equips). */
+export async function fetchGroupMatches(grupId: string): Promise<GroupMatch[]> {
+  const byRound = await getJson<Record<string, RawMatch[]>>(`/api/competition/partidos?grupId=${encodeURIComponent(grupId)}`);
+  const num = (v: string | null) => (v == null || v === "" ? null : Number(v));
+  return Object.values(byRound)
+    .flat()
+    .map((m) => ({
+      acta_id: m.CODACTA, jornada: Number(m.JORNADA), kickoff: m.COMIENZO1,
+      home_id: m.CODEQUIPO_CASA, home: m.NOMBRE_CASA.trim(), away_id: m.CODEQUIPO_FUERA, away: m.NOMBRE_FUERA.trim(),
+      home_goals: num(m.GOLES_CASA), away_goals: num(m.GOLES_FUERA), closed: m.CERRADA === "1",
+    }))
+    // "Descans" és la jornada de descans d'un equip, no un rival de veritat.
+    .filter((m) => !/^descans/i.test(m.home) && !/^descans/i.test(m.away))
+    .sort((a, b) => a.jornada - b.jornada);
+}
+
+export type StandingRow = { team_id: string; team: string; pj: number; g: number; e: number; p: number; gf: number; gc: number; pts: number; pos: number; form: ("G" | "E" | "P")[] };
+
+/** Classificació calculada amb els partits tancats (3 punts per victòria, 1 per empat). */
+export function standings(matches: GroupMatch[]): StandingRow[] {
+  const t = new Map<string, StandingRow>();
+  const row = (id: string, name: string) => {
+    if (!t.has(id)) t.set(id, { team_id: id, team: name, pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, pts: 0, pos: 0, form: [] });
+    return t.get(id)!;
+  };
+  for (const m of matches) {
+    row(m.home_id, m.home);
+    row(m.away_id, m.away);
+  }
+  for (const m of matches.filter((x) => x.closed && x.home_goals != null && x.away_goals != null)) {
+    const h = row(m.home_id, m.home), a = row(m.away_id, m.away);
+    const hg = m.home_goals!, ag = m.away_goals!;
+    h.pj++; a.pj++; h.gf += hg; h.gc += ag; a.gf += ag; a.gc += hg;
+    if (hg > ag) { h.g++; a.p++; h.pts += 3; h.form.push("G"); a.form.push("P"); }
+    else if (hg < ag) { a.g++; h.p++; a.pts += 3; a.form.push("G"); h.form.push("P"); }
+    else { h.e++; a.e++; h.pts++; a.pts++; h.form.push("E"); a.form.push("E"); }
+  }
+  const list = [...t.values()].sort((x, y) => y.pts - x.pts || y.gf - y.gc - (x.gf - x.gc) || y.gf - x.gf || x.team.localeCompare(y.team));
+  list.forEach((r, i) => { r.pos = i + 1; r.form = r.form.slice(-5); });
+  return list;
+}

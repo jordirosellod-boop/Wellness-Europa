@@ -389,6 +389,36 @@ create table if not exists public.analysis_matches (
   updated_at     timestamptz not null default now()
 );
 create index if not exists analysis_matches_owner_idx on public.analysis_matches (owner_id, match_date desc);
+-- Tipus d'anàlisi: un partit nostre o un vídeo d'un rival (scouting).
+alter table public.analysis_matches add column if not exists kind text not null default 'own' check (kind in ('own', 'rival'));
+
+-- INFORME DEL RIVAL (scouting): un per rival i partit. "fields" = sistema, jugadores clau, punts forts...
+create table if not exists public.rival_scouting (
+  id         uuid primary key default gen_random_uuid(),
+  owner_id   uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  rival_key  text not null check (char_length(rival_key) between 1 and 80),
+  rival_name text not null check (char_length(rival_name) between 1 and 80),
+  match_date date not null,
+  fields     jsonb not null default '{}'::jsonb check (jsonb_typeof(fields) = 'object' and octet_length(fields::text) < 100000),
+  updated_at timestamptz not null default now(),
+  constraint rival_scouting_one unique (owner_id, rival_key, match_date)
+);
+
+-- CORRECCIONS: coses a corregir de l'equip o de jugadores, amb clips del vídeo.
+create table if not exists public.corrections (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  title       text not null check (char_length(trim(title)) between 1 and 120),
+  category    text not null default 'Equip' check (category in ('Atac', 'Defensa', 'Transicions', 'ABP', 'Porteria', 'Individual', 'Equip')),
+  description text check (description is null or char_length(description) <= 2000),
+  status      text not null default 'pendent' check (status in ('pendent', 'treballant', 'corregit')),
+  player_ids  uuid[] not null default '{}',
+  event_ids   uuid[] not null default '{}',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists corrections_owner_idx on public.corrections (owner_id, status, created_at desc);
+
 -- Desfasament propi de la 2a part (si el vídeo inclou el descans o són dos vídeos).
 alter table public.analysis_matches add column if not exists video_offset_h2 numeric(8,2);
 
@@ -956,7 +986,8 @@ returns trigger language plpgsql set search_path = '' as $$
 begin
   if tg_op = 'UPDATE' then
     new.owner_id := old.owner_id;
-    if tg_table_name = 'analysis_matches' then new.created_at := old.created_at; new.updated_at := now(); end if;
+    if tg_table_name in ('analysis_matches', 'corrections') then new.created_at := old.created_at; end if;
+    if tg_table_name in ('analysis_matches', 'corrections', 'rival_scouting') then new.updated_at := now(); end if;
     if tg_table_name = 'analysis_events' then new.match_id := old.match_id; end if;
   end if;
   return new;
@@ -966,6 +997,12 @@ create trigger analysis_matches_stamp before insert or update on public.analysis
   for each row execute function public.stamp_analysis();
 drop trigger if exists analysis_events_stamp on public.analysis_events;
 create trigger analysis_events_stamp before insert or update on public.analysis_events
+  for each row execute function public.stamp_analysis();
+drop trigger if exists rival_scouting_stamp on public.rival_scouting;
+create trigger rival_scouting_stamp before insert or update on public.rival_scouting
+  for each row execute function public.stamp_analysis();
+drop trigger if exists corrections_stamp on public.corrections;
+create trigger corrections_stamp before insert or update on public.corrections
   for each row execute function public.stamp_analysis();
 drop trigger if exists analysis_buttons_stamp on public.analysis_buttons;
 create trigger analysis_buttons_stamp before insert or update on public.analysis_buttons
@@ -1090,6 +1127,8 @@ alter table public.training_plans     enable row level security;
 alter table public.analysis_matches   enable row level security;
 alter table public.analysis_events    enable row level security;
 alter table public.analysis_buttons   enable row level security;
+alter table public.rival_scouting     enable row level security;
+alter table public.corrections        enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
 -- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
@@ -1099,7 +1138,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups,
   public.injuries, public.rehab_entries, public.player_positions, public.training_plans,
-  public.analysis_matches, public.analysis_events, public.analysis_buttons from anon, authenticated;
+  public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -1120,8 +1159,8 @@ grant all on public.player_numbers, public.convocations, public.convocation_play
 grant select, insert, update, delete on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to authenticated;
 grant all on public.injuries, public.rehab_entries, public.player_positions, public.training_plans to service_role;
 grant select, insert, update, delete on public.injuries, public.player_positions, public.training_plans to authenticated;
-grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons to service_role;
-grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons to authenticated;
+grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections to service_role;
+grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections to authenticated;
 grant select, insert, update on public.rehab_entries to authenticated;
 revoke all on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) from public, anon;
 grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) to authenticated;
@@ -1298,6 +1337,15 @@ create policy analysis_events_owner on public.analysis_events for all to authent
               and exists (select 1 from public.analysis_matches m where m.id = match_id and m.owner_id = (select auth.uid())));
 drop policy if exists analysis_buttons_owner on public.analysis_buttons;
 create policy analysis_buttons_owner on public.analysis_buttons for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner()));
+
+drop policy if exists rival_scouting_owner on public.rival_scouting;
+create policy rival_scouting_owner on public.rival_scouting for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner()));
+drop policy if exists corrections_owner on public.corrections;
+create policy corrections_owner on public.corrections for all to authenticated
   using (owner_id = (select auth.uid()) and (select public.is_owner()))
   with check (owner_id = (select auth.uid()) and (select public.is_owner()));
 
