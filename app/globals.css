@@ -712,6 +712,8 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .pchip.part { background: var(--groc-clar); color: var(--groc); }
 .pchip.baixa { background: #eceff5; color: #8a93ad; text-decoration: line-through; }
 .pchip.guest { outline: 1.5px dashed currentColor; outline-offset: -2px; }
+.plan-pdf-ready { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; padding: 10px 12px; background: var(--verd-clar); color: var(--verd); border-radius: 12px; font-weight: 600; }
+.plan-pdf-ready span { flex: 1 1 160px; }
 .squad-picker { margin-top: 10px; }
 .squad-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
 .squad-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--vora); background: #fff; border-radius: 999px; padding: 5px 10px; font: inherit; font-size: .85rem; font-weight: 600; color: var(--navy); cursor: pointer; }

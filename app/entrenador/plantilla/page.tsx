@@ -9,6 +9,7 @@ import {
   type Guest, type Plan, type PlayerStatus, type Squad, type Team, SQUAD_NAMES, type Position, type Task,
 } from "@/lib/plan";
 import { ABSENCE_REASONS, reasonLabel, type AbsenceReason } from "@/lib/attendance";
+import { deliverPdf, planPdf } from "@/lib/plan-pdf";
 import { activeOn, fetchInjuries } from "@/lib/rehab";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
@@ -173,6 +174,8 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [editPos, setEditPos] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdf, setPdf] = useState<File | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -216,6 +219,24 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
     if (e || !data) return setStatus({ ok: false, text: `No s'ha pogut desar: ${e?.message ?? "torna-ho a provar"}` });
     setDirty(false);
     setStatus({ ok: true, text: "Desat ✓" });
+  }
+
+  /** PDF d'una sola pàgina fet al dispositiu (no depèn del navegador). */
+  async function makePdf() {
+    const el = document.querySelector<HTMLElement>(".plan-sheet");
+    if (!el || !plan) return;
+    setPdfBusy(true);
+    setPdf(null);
+    try {
+      const file = await planPdf(el, `Sessio ${plan.plan_date}${plan.session_no ? ` (${plan.session_no})` : ""}.pdf`.replace(/[\\/:*?"<>|]/g, "-"));
+      // Ordinador: es descarrega directament. Mòbil: un botó per compartir (cal un toc nou).
+      if (navigator.canShare?.({ files: [file] })) setPdf(file);
+      else await deliverPdf(file);
+    } catch (e) {
+      setStatus({ ok: false, text: `No s'ha pogut fer el PDF: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      setPdfBusy(false);
+    }
   }
 
   async function refreshPlayers() {
@@ -287,13 +308,23 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
         <span className={status && !status.ok ? "err" : ""}>{status ? status.text : dirty ? "Canvis sense desar" : "Tot desat"}</span>
         <span className="row" style={{ gap: 6 }}>
           <button className="btn small" disabled={saving || !dirty} onClick={save}>{saving ? "Desant…" : "Desar"}</button>
+          <button className="btn small secondary" disabled={pdfBusy} onClick={makePdf} title="PDF d'una pàgina, per imprimir o enviar">
+            {pdfBusy ? "Fent el PDF…" : "📄 PDF"}
+          </button>
           <button className="btn small secondary" onClick={() => {
             const el = document.querySelector<HTMLElement>(".plan-sheet");
             if (el) fitSheet(el); // per si el navegador no avisa abans d'imprimir
             window.print();
-          }} title="Imprimir o desar en PDF per enviar">🖨 PDF / Imprimir</button>
+          }} title="Imprimir directament des del navegador">🖨</button>
         </span>
       </div>
+      {pdf && (
+        <div className="plan-pdf-ready no-print" role="status">
+          <span>PDF a punt ({pdf.name})</span>
+          <button className="btn small" onClick={() => deliverPdf(pdf).then(() => setPdf(null))}>📤 Obrir / compartir / imprimir</button>
+          <button className="btn small secondary" onClick={() => setPdf(null)} aria-label="Tancar">✕</button>
+        </div>
+      )}
 
       {/* ---------- Edició (pantalla) ---------- */}
       <div className="no-print">
