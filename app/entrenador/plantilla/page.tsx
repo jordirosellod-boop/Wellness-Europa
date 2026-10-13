@@ -5,8 +5,8 @@ import { DrillEditor, DrillView } from "@/components/drill-editor";
 import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
 import { escapulada } from "@/lib/fonts";
 import {
-  CONTENTS, fetchPlans, newTask, PLAN_COLS, POSITION_NAMES, POSITIONS, STATUS_LABEL, TASK_TYPES,
-  type Plan, type PlayerStatus, type Position, type Task,
+  CONTENTS, fetchPlans, newTask, PLAN_COLS, uid, POSITION_NAMES, POSITIONS, STATUS_LABEL, TASK_TYPES,
+  type Guest, type Plan, type PlayerStatus, type Position, type Task,
 } from "@/lib/plan";
 import { activeOn, fetchInjuries } from "@/lib/rehab";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -181,7 +181,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
       ([p, r]) => {
         if (p.error) return setError(p.error.message);
         if (!p.data) return setError("No s'ha trobat la plantilla (o no és teva).");
-        setPlan(p.data as Plan);
+        setPlan({ ...(p.data as Plan), guests: (p.data as Plan).guests ?? [] });
         setRoster(r);
       },
       (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -264,7 +264,8 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
   if (!plan || !roster) return <p className="muted">Carregant…</p>;
 
   const statusOf = (pid: string): PlayerStatus => plan.players[pid] ?? "disp";
-  const available = roster.players.filter((p) => statusOf(p.id) === "disp");
+  const available = roster.players.filter((p) => statusOf(p.id) === "disp").length + plan.guests.filter((g) => g.status === "disp").length;
+  const updGuest = (gid: string, patch: Partial<Guest>) => upd({ guests: plan.guests.map((g) => (g.id === gid ? { ...g, ...patch } : g)) });
 
   return (
     <div className={`plan ${escapulada.variable}`}>
@@ -313,13 +314,13 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
 
         <section className="card">
           <div className="row between">
-            <h2 className="esc" style={{ margin: 0 }}>Jugadores <span className="muted small">{available.length} disponibles</span></h2>
+            <h2 className="esc" style={{ margin: 0 }}>Jugadores <span className="muted small">{available} disponibles</span></h2>
             <span className="row" style={{ gap: 6 }}>
               <button className="btn small secondary" onClick={refreshPlayers}>↻ Actualitzar</button>
               <button className="btn small secondary" onClick={() => setEditPos((v) => !v)}>{editPos ? "Fet" : "Posicions"}</button>
             </span>
           </div>
-          <p className="muted small">Toca una jugadora per canviar-ne l&apos;estat: disponible → a part → baixa. Les lesionades surten soles.</p>
+          <p className="muted small">Toca una jugadora per canviar-ne l&apos;estat: disponible → a part → baixa. Les lesionades surten soles. Les que afegeixes a mà surten amb vora de punts (les treus a «Posicions»).</p>
           {editPos ? (
             <ul className="pos-edit">
               {roster.players.map((p) => (
@@ -331,15 +332,28 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
                   </select>
                 </li>
               ))}
+              {plan.guests.map((g) => (
+                <li key={g.id}>
+                  <span>{g.name} <i className="muted small">(afegida)</i></span>
+                  <select value={g.pos} onChange={(e) => updGuest(g.id, { pos: e.target.value as Position | "" })} aria-label={`Posició de ${g.name}`}>
+                    <option value="">—</option>
+                    {POSITIONS.map((x) => <option key={x} value={x}>{x} · {POSITION_NAMES[x]}</option>)}
+                  </select>
+                  <button type="button" className="an-ic" aria-label={`Treure ${g.name}`} onClick={() => upd({ guests: plan.guests.filter((x) => x.id !== g.id) })}>🗑</button>
+                </li>
+              ))}
             </ul>
           ) : (
             <PositionBoard plan={plan} roster={roster} onToggle={(pid) => {
+              const g = plan.guests.find((x) => x.id === pid);
+              if (g) return updGuest(pid, { status: g.status === "disp" ? "part" : g.status === "part" ? "baixa" : "disp" });
               const cur = statusOf(pid);
               if (cur === "les") return;
               const next: PlayerStatus = cur === "disp" ? "part" : cur === "part" ? "baixa" : "disp";
               upd({ players: { ...plan.players, [pid]: next } });
             }} />
           )}
+          <AddGuest onAdd={(g) => upd({ guests: [...plan.guests, g] })} full={plan.guests.length >= 40} />
         </section>
 
         {plan.tasks.map((t, i) => (
@@ -376,33 +390,62 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Jugadores per posicions, amb l'estat de cadascuna i el recompte de disponibles. */
+/** Jugadores per posicions, amb l'estat de cadascuna i el recompte de disponibles (inclou les afegides a mà). */
 function PositionBoard({ plan, roster, onToggle, print = false }: { plan: Plan; roster: Roster; onToggle?: (pid: string) => void; print?: boolean }) {
+  type Row = { id: string; name: string; pos: string; st: PlayerStatus; guest: boolean };
+  const rows: Row[] = [
+    ...roster.players.map((p) => ({ id: p.id, name: p.display_name.split(" ")[0], pos: roster.positions.get(p.id) ?? "—", st: plan.players[p.id] ?? "disp", guest: false })),
+    ...plan.guests.map((g) => ({ id: g.id, name: g.name, pos: g.pos || "—", st: g.status as PlayerStatus, guest: true })),
+  ];
   const cols = [...POSITIONS, "—"] as const;
-  const by = (c: string) => roster.players.filter((p) => (roster.positions.get(p.id) ?? "—") === c);
+  const by = (c: string) => rows.filter((r) => r.pos === c);
   const shown = cols.filter((c) => c !== "—" || by("—").length > 0);
   return (
     <div className={`pos-board${print ? " print" : ""}`} style={{ gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))` }}>
       {shown.map((c) => {
         const list = by(c);
-        const avail = list.filter((p) => (plan.players[p.id] ?? "disp") === "disp").length;
+        const avail = list.filter((r) => r.st === "disp").length;
         return (
           <div key={c} className="pos-col">
             <b className="esc">{c === "—" ? "Sense pos." : c}</b>
-            {list.map((p) => {
-              const st = plan.players[p.id] ?? "disp";
+            {list.map((r) => {
+              const cls = `pchip ${r.st}${r.guest ? " guest" : ""}`;
+              const title = `${r.name} · ${STATUS_LABEL[r.st]}${r.guest ? " · afegida a mà" : ""}`;
+              const inner = <>{r.name}{r.st !== "disp" && <i>{r.st === "les" ? "L" : r.st === "part" ? "P" : "B"}</i>}</>;
               return onToggle ? (
-                <button key={p.id} type="button" className={`pchip ${st}`} onClick={() => onToggle(p.id)} title={STATUS_LABEL[st]}>
-                  {p.display_name.split(" ")[0]}{st !== "disp" && <i>{st === "les" ? "L" : st === "part" ? "P" : "B"}</i>}
-                </button>
+                <button key={r.id} type="button" className={cls} onClick={() => onToggle(r.id)} title={title}>{inner}</button>
               ) : (
-                <span key={p.id} className={`pchip ${st}`}>{p.display_name.split(" ")[0]}{st !== "disp" && <i>{st === "les" ? "L" : st === "part" ? "P" : "B"}</i>}</span>
+                <span key={r.id} className={cls} title={title}>{inner}</span>
               );
             })}
             <span className="pos-count esc">{avail}</span>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Afegir una jugadora a mà (nom i posició). Es desa amb la plantilla. */
+function AddGuest({ onAdd, full }: { onAdd: (g: Guest) => void; full: boolean }) {
+  const [name, setName] = useState("");
+  const [pos, setPos] = useState<Position | "">("");
+  const ok = name.trim().length > 0 && !full;
+  const add = () => {
+    if (!ok) return;
+    onAdd({ id: uid(), name: name.trim(), pos, status: "disp" });
+    setName("");
+    setPos("");
+  };
+  return (
+    <div className="add-guest">
+      <input type="text" maxLength={30} placeholder="Afegir jugadora (nom)" value={name}
+        onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} aria-label="Nom de la jugadora a afegir" />
+      <select value={pos} onChange={(e) => setPos(e.target.value as Position | "")} aria-label="Posició">
+        <option value="">Posició</option>
+        {POSITIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+      </select>
+      <button type="button" className="btn small" disabled={!ok} onClick={add}>+ Afegir</button>
     </div>
   );
 }
@@ -496,7 +539,7 @@ function TaskEditor({ n, t, last, onChange, onMove, onRemove }: {
 // ---------------------------------------------------------------------------
 
 function PlanSheet({ plan, roster }: { plan: Plan; roster: Roster }) {
-  const available = roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").length;
+  const available = roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").length + plan.guests.filter((g) => g.status === "disp").length;
   const cell = (k: string, v: ReactNode) => (<div className="ps-cell"><span>{k}</span><b>{v || "–"}</b></div>);
   return (
     <div className="plan-sheet">

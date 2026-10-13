@@ -19,11 +19,15 @@ export const STATUS_LABEL: Record<PlayerStatus, string> = { disp: "Disponible", 
 export type Field = "full" | "half" | "blank";
 export type Team = "blue" | "red" | "yellow" | "white" | "gk";
 export type ArrowKind = "pass" | "run" | "drive" | "shot";
+/** `s` és la mida (1 = normal). */
 export type El =
-  | { id: string; t: "player"; x: number; y: number; team: Team; label?: string }
-  | { id: string; t: "cone" | "ball" | "minigoal" | "goal"; x: number; y: number }
-  | { id: string; t: "arrow"; x: number; y: number; x2: number; y2: number; kind: ArrowKind };
+  | { id: string; t: "player"; x: number; y: number; team: Team; label?: string; s?: number }
+  | { id: string; t: "cone" | "ball" | "minigoal" | "goal"; x: number; y: number; s?: number }
+  | { id: string; t: "arrow"; x: number; y: number; x2: number; y2: number; kind: ArrowKind; s?: number };
 export type Diagram = { field: Field; els: El[] };
+
+/** Jugadora afegida a mà a la plantilla (no té compte a l'app: p. ex. una d'un altre equip). */
+export type Guest = { id: string; name: string; pos: Position | ""; status: Exclude<PlayerStatus, "les"> };
 
 export type StaffRole = { who: string; role: string; extra: string };
 
@@ -61,12 +65,13 @@ export type Plan = {
   observations: string | null;
   score_notes: string | null;
   players: Record<string, PlayerStatus>;
+  guests: Guest[];
   tasks: Task[];
   updated_at?: string;
 };
 
 export const PLAN_COLS =
-  "id, session_id, plan_date, start_time, session_no, jornada, rival, microcycle, mesocycle, duration_min, contents, observations, score_notes, players, tasks, updated_at";
+  "id, session_id, plan_date, start_time, session_no, jornada, rival, microcycle, mesocycle, duration_min, contents, observations, score_notes, players, guests, tasks, updated_at";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 

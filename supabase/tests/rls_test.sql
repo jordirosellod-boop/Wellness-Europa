@@ -497,6 +497,8 @@ insert into public.profiles (id, role, display_name) values ('00000000-0000-0000
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 insert into public.training_plans (plan_date, rival, tasks) values ((select today from vars), 'Damm', '[{"name":"RDP"}]');
 select pg_temp.check((select count(*) from public.training_plans) = 1, 'L''entrenador crea la seva plantilla');
+with u as (update public.training_plans set guests = '[{"id":"g1","name":"Marta (convidada)","pos":"MC","status":"disp"}]' returning 1) select pg_temp.check(count(*) = 1, 'Pot afegir jugadores a mà a la plantilla') from u;
+select pg_temp.expect_error($$update public.training_plans set guests = '{"a":1}'$$, 'Les jugadores afegides han de ser una llista');
 select pg_temp.expect_error($$insert into public.training_plans (plan_date, owner_id) values (current_date, '00000000-0000-0000-0000-0000000000c2')$$, 'No es pot crear una plantilla a nom d''un altre');
 insert into public.player_positions (profile_id, position) values ('00000000-0000-0000-0000-0000000000b2', 'MC');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c2', false);

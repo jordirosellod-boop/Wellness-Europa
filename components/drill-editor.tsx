@@ -51,7 +51,21 @@ function FieldBg({ field }: { field: Field }) {
   );
 }
 
+export const SIZE_MIN = 0.4;
+export const SIZE_MAX = 3;
+
 function ElView({ el, selected, arrowId }: { el: El; selected: boolean; arrowId: string }) {
+  const k = el.s ?? 1;
+  if (el.t === "arrow" || k === 1) return <ElShape el={el} selected={selected} arrowId={arrowId} />;
+  // Mida: s'escala des del centre de l'element.
+  return (
+    <g transform={`translate(${el.x} ${el.y}) scale(${k}) translate(${-el.x} ${-el.y})`}>
+      <ElShape el={el} selected={selected} arrowId={arrowId} />
+    </g>
+  );
+}
+
+function ElShape({ el, selected, arrowId }: { el: El; selected: boolean; arrowId: string }) {
   const sel = selected ? { stroke: "#dbb34d", strokeWidth: 0.7 } : {};
   switch (el.t) {
     case "player":
@@ -83,7 +97,7 @@ function ElView({ el, selected, arrowId }: { el: El; selected: boolean; arrowId:
       return (
         <line
           x1={el.x} y1={el.y} x2={el.x2} y2={el.y2}
-          stroke={selected ? "#dbb34d" : a.color} strokeWidth={0.45} strokeDasharray={a.dash}
+          stroke={selected ? "#dbb34d" : a.color} strokeWidth={0.45 * (el.s ?? 1)} strokeDasharray={a.dash?.split(" ").map((n) => Number(n) * (el.s ?? 1)).join(" ")}
           markerEnd={`url(#${arrowId}-${selected ? "sel" : el.kind})`}
         />
       );
@@ -122,6 +136,7 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
   const [sel, setSel] = useState<string | null>(null);
   const drag = useRef<{ id: string; ox: number; oy: number; moved: boolean } | null>(null);
   const [draft, setDraft] = useState<El | null>(null);
+  const [size, setSize] = useState(1); // mida dels elements nous
 
   const pt = (e: RPointerEvent) => {
     const m = svg.current!.getScreenCTM()!.inverse();
@@ -144,13 +159,14 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
       return;
     }
     if (tool.startsWith("a-")) {
-      setDraft({ id: uid(), t: "arrow", x: p.x, y: p.y, x2: p.x, y2: p.y, kind: tool.slice(2) as ArrowKind });
+      setDraft({ id: uid(), t: "arrow", x: p.x, y: p.y, x2: p.x, y2: p.y, kind: tool.slice(2) as ArrowKind, ...(size !== 1 && { s: size }) });
       svg.current!.setPointerCapture(e.pointerId);
       return;
     }
     const el: El = tool.startsWith("p-")
       ? { id: uid(), t: "player", x: p.x, y: p.y, team: tool.slice(2) as Team }
       : { id: uid(), t: tool as "cone" | "ball" | "minigoal" | "goal", x: p.x, y: p.y };
+    if (size !== 1) el.s = size;
     set([...value.els, el]);
     setSel(el.id);
   }
@@ -183,6 +199,13 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
   }
 
   const selected = value.els.find((x) => x.id === sel) ?? null;
+  const curSize = selected ? selected.s ?? 1 : size;
+  /** Canvia la mida de l'element triat (o la dels nous, si no n'hi ha cap de triat). */
+  const resize = (v: number) => {
+    const k = Math.round(Math.min(SIZE_MAX, Math.max(SIZE_MIN, v)) * 10) / 10;
+    if (!selected) return setSize(k);
+    set(value.els.map((x) => (x.id === selected.id ? { ...x, s: k === 1 ? undefined : k } : x)));
+  };
   const btn = (t: Tool, content: ReactNode, title: string) => (
     <button key={t} type="button" className="tool" aria-pressed={tool === t} title={title} aria-label={title} onClick={() => setTool(t)}>{content}</button>
   );
@@ -215,7 +238,7 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
         <FieldBg field={value.field} />
         {value.els.map((el) => (
           <g key={el.id} data-el={el.id} style={{ cursor: "grab" }}>
-            {el.t === "arrow" && <line x1={el.x} y1={el.y} x2={el.x2} y2={el.y2} stroke="transparent" strokeWidth={3} />}
+            {el.t === "arrow" && <line x1={el.x} y1={el.y} x2={el.x2} y2={el.y2} stroke="transparent" strokeWidth={3 * Math.max(1, el.s ?? 1)} />}
             <ElView el={el} selected={el.id === sel} arrowId={id} />
           </g>
         ))}
@@ -247,8 +270,31 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
           Netejar
         </button>
       </div>
+      <div className="drill-size">
+        <label htmlFor={`${id}-size`}>{selected ? "Mida de l'element" : "Mida dels nous"}</label>
+        <button type="button" className="an-ic" aria-label="Més petit" onClick={() => resize(curSize - 0.1)}>−</button>
+        <input
+          id={`${id}-size`}
+          type="range"
+          min={SIZE_MIN}
+          max={SIZE_MAX}
+          step={0.1}
+          value={curSize}
+          onChange={(e) => resize(Number(e.target.value))}
+        />
+        <button type="button" className="an-ic" aria-label="Més gran" onClick={() => resize(curSize + 0.1)}>+</button>
+        <b>{Math.round(curSize * 100)}%</b>
+        {selected && selected.s && selected.s !== 1 && (
+          <button type="button" className="btn small secondary" onClick={() => resize(1)}>Normal</button>
+        )}
+        {!selected && value.els.length > 0 && (
+          <button type="button" className="btn small secondary" onClick={() => set(value.els.map((x) => ({ ...x, s: size === 1 ? undefined : size })))}>
+            Aplicar a tots
+          </button>
+        )}
+      </div>
       <p className="muted small" style={{ margin: "4px 0 0" }}>
-        Tria una eina i toca el camp. Les fletxes es dibuixen arrossegant. Amb ✋ (o tocant un element) el pots moure.
+        Tria una eina i toca el camp. Les fletxes es dibuixen arrossegant. Amb ✋ (o tocant un element) el pots moure i canviar-ne la mida.
       </p>
     </div>
   );

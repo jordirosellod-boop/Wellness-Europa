@@ -365,6 +365,11 @@ create table if not exists public.training_plans (
   updated_at   timestamptz not null default now()
 );
 create index if not exists training_plans_owner_idx on public.training_plans (owner_id, plan_date desc);
+-- Jugadores afegides a mà en una plantilla (no són del club a l'app): [{id, name, pos, status}]
+alter table public.training_plans add column if not exists guests jsonb not null default '[]'::jsonb;
+alter table public.training_plans drop constraint if exists training_plans_guests_check;
+alter table public.training_plans add constraint training_plans_guests_check
+  check (jsonb_typeof(guests) = 'array' and jsonb_array_length(guests) <= 40 and octet_length(guests::text) < 8000);
 
 -- ANÀLISI DE PARTITS (només qui la fa). El vídeo NO es puja: es queda al dispositiu (o és un
 -- enllaç de YouTube). Aquí només es guarden les marques (temps, acció, jugadora, zona...).

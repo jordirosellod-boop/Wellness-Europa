@@ -702,6 +702,10 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .pchip.les { background: var(--vermell-clar); color: var(--vermell); cursor: default; }
 .pchip.part { background: var(--groc-clar); color: var(--groc); }
 .pchip.baixa { background: #eceff5; color: #8a93ad; text-decoration: line-through; }
+.pchip.guest { outline: 1.5px dashed currentColor; outline-offset: -2px; }
+.add-guest { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+.add-guest input { flex: 1; min-width: 0; }
+.add-guest select { width: auto; }
 .pos-edit { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
 .pos-edit li { display: flex; align-items: center; gap: 8px; }
 .pos-edit li span { flex: 1; font-weight: 600; }
@@ -711,6 +715,11 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .drill { display: block; width: 100%; height: auto; border-radius: 6px; aspect-ratio: 100 / 64; }
 .drill.editing { touch-action: none; cursor: crosshair; box-shadow: 0 0 0 2px var(--vora); }
 .drill-img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.drill-size { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: .9rem; }
+.drill-size label { font-weight: 600; color: var(--navy); }
+.drill-size input[type="range"] { flex: 1 1 120px; min-width: 100px; accent-color: var(--navy); }
+.drill-size b { min-width: 3.2em; text-align: right; }
+@media (max-width: 520px) { .drill-size label { width: 100%; } }
 .drill-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .drill-tools .tool {
   min-width: 40px; min-height: 40px; display: grid; place-items: center; border-radius: 8px; border: 1.5px solid var(--vora); background: #fff; cursor: pointer; font-size: 1rem;
