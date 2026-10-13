@@ -58,7 +58,10 @@ function CoachCalendar() {
     <>
       <div className="row between">
         <h1>Calendari</h1>
-        <Link className="btn small secondary" href="/entrenador/programacio">⟳ Programacions</Link>
+        <span className="row" style={{ gap: 6 }}>
+          <Link className="btn small" href="/entrenador/plantilla">📋 Plantilles</Link>
+          <Link className="btn small secondary" href="/entrenador/programacio">⟳ Programacions</Link>
+        </span>
       </div>
       {error && <p className="msg error">{friendlyError(error)}</p>}
       <Calendar

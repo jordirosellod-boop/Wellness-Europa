@@ -15,7 +15,7 @@ export async function loadTeamAcwr(asOf: string, players: { id: string; created_
   const sb = supabase();
   const from = addDays(asOf, -(HISTORY_DAYS - 1));
   const missingFrom = addDays(asOf, -28);
-  const [rows, sessions] = await Promise.all([
+  const [rows, sessions, rehab] = await Promise.all([
     fetchAll<{ player_id: string; session_id: string; load: number | null; sessions: { session_date: string } | { session_date: string }[] }>((f, t) =>
       sb.from("rpe").select("player_id, session_id, load, sessions!inner(session_date)")
         .gte("sessions.session_date", from).lte("sessions.session_date", asOf).order("id").range(f, t),
@@ -23,6 +23,11 @@ export async function loadTeamAcwr(asOf: string, players: { id: string; created_
     fetchAll<{ id: string; session_date: string }>((f, t) =>
       sb.from("sessions").select("id, session_date").eq("cancelled", false)
         .gte("session_date", missingFrom).lt("session_date", asOf).order("session_date").order("id").range(f, t),
+    ),
+    // Entrenaments a part de les lesionades: també sumen càrrega.
+    fetchAll<{ player_id: string; entry_date: string; load: number | null }>((f, t) =>
+      sb.from("rehab_entries").select("player_id, entry_date, load").gte("entry_date", from).lte("entry_date", asOf)
+        .order("entry_date").order("id").range(f, t),
     ),
   ]);
   const daily = new Map<string, Map<string, number>>();
@@ -37,6 +42,12 @@ export async function loadTeamAcwr(asOf: string, players: { id: string; created_
     const s = done.get(r.player_id) ?? new Set<string>();
     s.add(r.session_id);
     done.set(r.player_id, s);
+  }
+  for (const r of rehab) {
+    if (r.load == null) continue;
+    const m = daily.get(r.player_id) ?? new Map<string, number>();
+    m.set(r.entry_date, (m.get(r.entry_date) ?? 0) + r.load);
+    daily.set(r.player_id, m);
   }
   const out = new Map<string, PlayerLoad>();
   for (const p of players) {

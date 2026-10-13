@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { InjuriesAdmin } from "@/components/injuries-admin";
 import { LeagueEditor, LevelEditor } from "@/components/league-admin";
 import { CoachShell, Footer } from "@/components/ui";
 import { adminAction, fetchAll, supabase } from "@/lib/supabase";
@@ -65,6 +66,7 @@ function Team({ me }: { me: Profile }) {
   return (
     <>
       <h1>Equip</h1>
+      <InjuriesAdmin players={players} />
       <LevelEditor />
       <LeagueEditor />
       <AddPlayer onDone={load} />

@@ -296,6 +296,73 @@ create table if not exists public.convocation_lineups (
   slots          jsonb not null default '{}'::jsonb check (jsonb_typeof(slots) = 'object'),
   updated_at     timestamptz not null default now()
 );
+-- LESIONS: el staff marca qui està lesionada (des de / fins a). Dades mínimes: la nota és opcional.
+create table if not exists public.injuries (
+  id         uuid primary key default gen_random_uuid(),
+  player_id  uuid not null references public.profiles(id) on delete cascade,
+  start_date date not null,
+  end_date   date,
+  note       text check (note is null or char_length(note) <= 200),
+  created_by uuid default auth.uid() references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  constraint injuries_dates check (end_date is null or end_date >= start_date)
+);
+create index if not exists injuries_player_idx on public.injuries (player_id, start_date);
+
+-- ENTRENAMENTS A PART de les lesionades (recuperació, readaptació, fisio...): wellness abans
+-- i RPE després. Un per jugadora i dia. Només si aquell dia consta com a lesionada.
+create table if not exists public.rehab_entries (
+  id           uuid primary key default gen_random_uuid(),
+  player_id    uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  entry_date   date not null,
+  kind         text not null default 'Recuperació' check (kind in ('Recuperació', 'Readaptació', 'Fisioteràpia', 'Gimnàs', 'Altres')),
+  sleep        smallint check (sleep between 1 and 10),
+  fatigue      smallint check (fatigue between 1 and 10),
+  mood         smallint check (mood between 1 and 10),
+  score        numeric(3,1) generated always as (round((sleep + fatigue + mood)::numeric / 3, 1)) stored,
+  pain         smallint check (pain between 0 and 10),
+  rpe          smallint check (rpe between 0 and 10),
+  duration_min smallint check (duration_min between 1 and 300),
+  load         integer generated always as (rpe * duration_min) stored,
+  notes        text check (notes is null or char_length(notes) <= 500),
+  wellness_at  timestamptz,
+  rpe_at       timestamptz,
+  updated_at   timestamptz not null default now(),
+  constraint rehab_one_per_day unique (player_id, entry_date),
+  constraint rehab_wellness_complete check ((sleep is null) = (fatigue is null) and (sleep is null) = (mood is null))
+);
+
+-- POSICIÓ DE CADA JUGADORA (per a la plantilla d'entrenament): PO, LT, CT, MC, INT, EXT, PT.
+create table if not exists public.player_positions (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  position   text not null check (position in ('PO', 'LT', 'CT', 'MC', 'INT', 'EXT', 'PT')),
+  updated_at timestamptz not null default now()
+);
+
+-- PLANTILLA D'ENTRENAMENT: privada de qui la fa (ni la resta del staff la veu).
+-- "players" = estat de cada jugadora aquell dia; "tasks" = llista de tasques amb el seu dibuix.
+create table if not exists public.training_plans (
+  id           uuid primary key default gen_random_uuid(),
+  owner_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  session_id   uuid references public.sessions(id) on delete set null,
+  plan_date    date not null,
+  start_time   time,
+  session_no   text check (session_no is null or char_length(session_no) <= 20),
+  jornada      text check (jornada is null or char_length(jornada) <= 40),
+  rival        text check (rival is null or char_length(rival) <= 80),
+  microcycle   text check (microcycle is null or char_length(microcycle) <= 40),
+  mesocycle    text check (mesocycle is null or char_length(mesocycle) <= 40),
+  duration_min smallint check (duration_min between 1 and 400),
+  contents     text[] not null default '{}',
+  observations text check (observations is null or char_length(observations) <= 600),
+  score_notes  text check (score_notes is null or char_length(score_notes) <= 600),
+  players      jsonb not null default '{}'::jsonb check (jsonb_typeof(players) = 'object'),
+  tasks        jsonb not null default '[]'::jsonb check (jsonb_typeof(tasks) = 'array' and octet_length(tasks::text) < 4000000),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists training_plans_owner_idx on public.training_plans (owner_id, plan_date desc);
+
 -- Equipació de la pissarra: 1a (blanca) o 2a (blava). La portera sempre de groc.
 alter table public.convocation_lineups add column if not exists kit text not null default 'home' check (kit in ('home', 'away'));
 
@@ -773,6 +840,53 @@ language sql stable security definer set search_path = '' as $$
   order by coalesce(cp.called, false) desc, 3 nulls last, p.display_name, p.id;
 $$;
 
+-- Està lesionada aquesta jugadora aquest dia?
+create or replace function public.is_injured_on(pid uuid, d date)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.injuries i
+                 where i.player_id = pid and i.start_date <= d and (i.end_date is null or i.end_date >= d));
+$$;
+
+-- Entrenament a part: la jugadora el pot omplir avui (i l'RPE també l'endemà), només si està lesionada.
+create or replace function public.rehab_is_open(pid uuid, d date)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select pid = (select auth.uid()) and (select public.is_player())
+     and d in ((now() at time zone 'Europe/Madrid')::date, (now() at time zone 'Europe/Madrid')::date - 1)
+     and public.is_injured_on(pid, d);
+$$;
+
+-- Les hores les posa el servidor (no la jugadora).
+create or replace function public.stamp_rehab()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  new.updated_at := now();
+  if tg_op = 'UPDATE' then
+    new.player_id := old.player_id;
+    new.entry_date := old.entry_date;
+    new.wellness_at := case when new.sleep is null then null else coalesce(old.wellness_at, now()) end;
+    new.rpe_at := case when new.rpe is null then null else coalesce(old.rpe_at, now()) end;
+  else
+    new.wellness_at := case when new.sleep is not null then now() end;
+    new.rpe_at := case when new.rpe is not null then now() end;
+  end if;
+  return new;
+end $$;
+drop trigger if exists rehab_stamp on public.rehab_entries;
+create trigger rehab_stamp before insert or update on public.rehab_entries
+  for each row execute function public.stamp_rehab();
+
+-- Plantilles d'entrenament: hores del servidor i propietari fix.
+create or replace function public.stamp_training_plan()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  new.updated_at := now();
+  if tg_op = 'UPDATE' then new.owner_id := old.owner_id; new.created_at := old.created_at; end if;
+  return new;
+end $$;
+drop trigger if exists training_plans_stamp on public.training_plans;
+create trigger training_plans_stamp before insert or update on public.training_plans
+  for each row execute function public.stamp_training_plan();
+
 -- Si s'esborra una sessió, primer es treu la seva assistència (i es resta de la lliga).
 create or replace function public.session_delete_attendance()
 returns trigger language plpgsql security definer set search_path = '' as $$
@@ -873,6 +987,10 @@ alter table public.player_numbers     enable row level security;
 alter table public.convocations       enable row level security;
 alter table public.convocation_players enable row level security;
 alter table public.convocation_lineups enable row level security;
+alter table public.injuries           enable row level security;
+alter table public.rehab_entries      enable row level security;
+alter table public.player_positions   enable row level security;
+alter table public.training_plans     enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
 -- automàticament com si no). Els visitants sense sessió iniciada no poden tocar res.
@@ -880,7 +998,8 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
-  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups from anon, authenticated;
+  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups,
+  public.injuries, public.rehab_entries, public.player_positions, public.training_plans from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -899,6 +1018,11 @@ grant all on public.profiles, public.player_links, public.sessions, public.welln
 grant select, insert, update, delete on public.attendance to authenticated;
 grant all on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to service_role;
 grant select, insert, update, delete on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to authenticated;
+grant all on public.injuries, public.rehab_entries, public.player_positions, public.training_plans to service_role;
+grant select, insert, update, delete on public.injuries, public.player_positions, public.training_plans to authenticated;
+grant select, insert, update on public.rehab_entries to authenticated;
+revoke all on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) from public, anon;
+grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) to authenticated;
 revoke all on function public.convo_roster(uuid) from public, anon;
 grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
@@ -1027,6 +1151,42 @@ create policy convocation_players_coach on public.convocation_players for all to
 drop policy if exists convocation_lineups_coach on public.convocation_lineups;
 create policy convocation_lineups_coach on public.convocation_lineups for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
+
+-- LESIONS: el staff les gestiona; cada jugadora veu només les seves.
+drop policy if exists injuries_select on public.injuries;
+create policy injuries_select on public.injuries for select to authenticated
+  using (player_id = (select auth.uid()) or (select public.is_coach()));
+drop policy if exists injuries_write on public.injuries;
+create policy injuries_write on public.injuries for insert to authenticated
+  with check ((select public.is_coach()) and exists (select 1 from public.profiles where id = player_id and role = 'player'));
+drop policy if exists injuries_update on public.injuries;
+create policy injuries_update on public.injuries for update to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists injuries_delete on public.injuries;
+create policy injuries_delete on public.injuries for delete to authenticated
+  using ((select public.is_coach()));
+
+-- ENTRENAMENTS A PART: la jugadora lesionada escriu els seus (avui o ahir); el staff ho llegeix tot.
+drop policy if exists rehab_select on public.rehab_entries;
+create policy rehab_select on public.rehab_entries for select to authenticated
+  using (player_id = (select auth.uid()) or (select public.is_coach()));
+drop policy if exists rehab_insert on public.rehab_entries;
+create policy rehab_insert on public.rehab_entries for insert to authenticated
+  with check (public.rehab_is_open(player_id, entry_date));
+drop policy if exists rehab_update on public.rehab_entries;
+create policy rehab_update on public.rehab_entries for update to authenticated
+  using (public.rehab_is_open(player_id, entry_date)) with check (public.rehab_is_open(player_id, entry_date));
+
+-- POSICIONS: només el staff.
+drop policy if exists player_positions_coach on public.player_positions;
+create policy player_positions_coach on public.player_positions for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+
+-- PLANTILLES D'ENTRENAMENT: només qui l'ha feta (i ha de ser staff).
+drop policy if exists training_plans_owner on public.training_plans;
+create policy training_plans_owner on public.training_plans for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_coach()))
+  with check (owner_id = (select auth.uid()) and (select public.is_coach()));
 
 drop policy if exists team_settings_read on public.team_settings;
 create policy team_settings_read on public.team_settings for select to authenticated

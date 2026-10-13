@@ -6,6 +6,7 @@ import { RpeForm, WellnessForm } from "@/components/forms";
 import { FcfStats } from "@/components/fcf-stats";
 import { average, daysLeftInMonth, fetchLeague, fmtAvg, qualified, fetchTeamLevel, fetchWinners, LeagueTable, leagueTitle, LevelBadge, ranks, sortLeague, Winners, type LeagueRow, type LeagueWinner } from "@/components/league";
 import { PlayerAttendance } from "@/components/player-attendance";
+import { RehabCard } from "@/components/rehab-card";
 import { nextConvoFor, PlayerConvo } from "@/components/player-convo";
 import { hhmm } from "@/lib/convo";
 import { PlayerFines } from "@/components/player-fines";
@@ -409,6 +410,8 @@ function Dashboard({
           <span>{data.convo.called ? "✓ Estàs convocada · Veure la convocatòria" : "Veure la convocatòria"}</span>
         </button>
       )}
+
+      <RehabCard meId={me.id} today={today} />
 
       <section className="card today-card">
         <h2>Avui</h2>

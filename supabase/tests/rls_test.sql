@@ -460,3 +460,50 @@ select pg_temp.expect_error($$select * from public.convo_roster('88888888-0000-0
 reset role; select set_config('request.jwt.claim.sub','', false);
 update public.convocations set notified_at = now() where id = '88888888-0000-0000-0000-000000000001';
 select pg_temp.check((select notified_at is not null from public.convocations where id = '88888888-0000-0000-0000-000000000001'), 'El servidor sí que pot marcar que ha enviat l''avís');
+
+-- =============== LESIONS I ENTRENAMENTS A PART ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.injuries (player_id, start_date, note) values ('00000000-0000-0000-0000-0000000000e5', (select today from vars) - 3, 'Turmell');
+select pg_temp.expect_error($$insert into public.injuries (player_id, start_date) values ('00000000-0000-0000-0000-00000000000a', current_date)$$, 'No es pot marcar el staff com a lesionada');
+select pg_temp.expect_error($$insert into public.injuries (player_id, start_date, end_date) values ('00000000-0000-0000-0000-0000000000b2', current_date, current_date - 1)$$, 'La data d''alta no pot ser abans de la lesió');
+
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5', false);
+insert into public.rehab_entries (entry_date, kind, sleep, fatigue, mood, pain) values ((select today from vars), 'Readaptació', 7, 6, 8, 3);
+select pg_temp.check((select score = 7.0 and wellness_at is not null and rpe_at is null from public.rehab_entries), 'Lesionada: fa el wellness de l''entrenament a part');
+update public.rehab_entries set rpe = 6, duration_min = 45 where entry_date = (select today from vars);
+select pg_temp.check((select load = 270 and rpe_at is not null from public.rehab_entries), 'I l''RPE després (càrrega 6 x 45 = 270)');
+insert into public.rehab_entries (entry_date, rpe, duration_min) values ((select today from vars) - 1, 5, 30);
+select pg_temp.check(true, 'També pot fer el d''ahir (fora de termini)');
+select pg_temp.expect_error($$insert into public.rehab_entries (entry_date, rpe) values (current_date - 5, 5)$$, 'No pot fer-ne d''un dia de fa temps');
+select pg_temp.expect_error($$insert into public.rehab_entries (entry_date, rpe) values ((now() at time zone 'Europe/Madrid')::date, 5)$$, 'Un per dia');
+select pg_temp.expect_error($$insert into public.rehab_entries (player_id, entry_date, rpe) values ('00000000-0000-0000-0000-0000000000b2', (now() at time zone 'Europe/Madrid')::date, 5)$$, 'No en pot fer per una altra');
+select pg_temp.check((select count(*) from public.injuries) = 1, 'Veu la seva lesió');
+with u as (update public.injuries set end_date = current_date returning 1) select pg_temp.check(count(*) = 0, 'No es pot donar d''alta ella mateixa') from u;
+
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);
+select pg_temp.expect_error($$insert into public.rehab_entries (entry_date, rpe) values ((now() at time zone 'Europe/Madrid')::date, 5)$$, 'Una jugadora no lesionada no pot fer entrenaments a part');
+select pg_temp.check((select count(*) from public.rehab_entries) + (select count(*) from public.injuries) = 0, 'Una altra jugadora no veu ni lesions ni entrenaments a part de ningú');
+
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false);
+select pg_temp.check((select count(*) from public.rehab_entries) = 2, 'El staff veu els entrenaments a part');
+update public.injuries set end_date = (select today from vars) - 1 where player_id = '00000000-0000-0000-0000-0000000000e5';
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5', false);
+with u as (update public.rehab_entries set rpe = 9 where entry_date = (select today from vars) returning 1) select pg_temp.check(count(*) = 0, 'Donada d''alta: avui ja no pot omplir l''entrenament a part') from u;
+
+-- =============== PLANTILLES D'ENTRENAMENT (només qui les fa) ===============
+reset role;
+insert into auth.users values ('00000000-0000-0000-0000-0000000000c2','coach2@test');
+insert into public.profiles (id, role, display_name) values ('00000000-0000-0000-0000-0000000000c2', 'coach', 'Segon');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.training_plans (plan_date, rival, tasks) values ((select today from vars), 'Damm', '[{"name":"RDP"}]');
+select pg_temp.check((select count(*) from public.training_plans) = 1, 'L''entrenador crea la seva plantilla');
+select pg_temp.expect_error($$insert into public.training_plans (plan_date, owner_id) values (current_date, '00000000-0000-0000-0000-0000000000c2')$$, 'No es pot crear una plantilla a nom d''un altre');
+insert into public.player_positions (profile_id, position) values ('00000000-0000-0000-0000-0000000000b2', 'MC');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c2', false);
+select pg_temp.check((select count(*) from public.training_plans) = 0, 'Un altre membre del staff NO veu la plantilla');
+with u as (update public.training_plans set rival = 'x' returning 1) select pg_temp.check(count(*) = 0, 'Ni la pot canviar') from u;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);
+select pg_temp.check((select count(*) from public.training_plans) + (select count(*) from public.player_positions) = 0, 'Una jugadora no veu plantilles ni posicions');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.training_plans$$, 'Anònim no veu plantilles');
+select pg_temp.expect_error($$select * from public.rehab_entries$$, 'Anònim no veu entrenaments a part');
