@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ConvoSheet } from "@/components/convo-sheet";
 import { LineupBoard } from "@/components/pitch";
 import { CoachShell, Footer } from "@/components/ui";
-import { CONVO_COLS, fetchConvocations, fetchRoster, hhmm, type Convocation, type RosterRow } from "@/lib/convo";
+import { CONVO_COLS, fetchConvocations, fetchRoster, GUEST_ORIGINS, hhmm, type Convocation, type RosterRow } from "@/lib/convo";
 import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
@@ -218,6 +218,81 @@ function ConvoForm({ c, onSaved }: { c?: Convocation; onSaved: (id: string) => v
   );
 }
 
+/** Jugadores d'un altre equip (Cadet A, Juvenil D...) que pugen per a aquest partit. */
+function GuestEditor({ convoId, guests, onChanged, onMsg }: {
+  convoId: string; guests: RosterRow[]; onChanged: () => Promise<unknown> | void; onMsg: (m: { ok: boolean; text: string }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [dorsal, setDorsal] = useState("");
+  const [origin, setOrigin] = useState(GUEST_ORIGINS[0]);
+  const [busy, setBusy] = useState(false);
+  const num = (raw: string) => (raw.trim() === "" ? null : Number(raw));
+  const badNum = (v: number | null) => v != null && (!Number.isInteger(v) || v < 0 || v > 99);
+
+  async function add() {
+    const d = num(dorsal);
+    if (!name.trim()) return;
+    if (badNum(d)) return onMsg({ ok: false, text: "El dorsal ha de ser un número del 0 al 99." });
+    setBusy(true);
+    const { data, error } = await supabase()
+      .from("convocation_guests")
+      .insert({ convocation_id: convoId, name: name.trim(), dorsal: d, origin: origin.trim() || null })
+      .select("id")
+      .maybeSingle();
+    setBusy(false);
+    if (error || !data) return onMsg({ ok: false, text: `No s'ha pogut afegir: ${error?.message ?? "torna-ho a provar"}` });
+    setName("");
+    setDorsal("");
+    await onChanged();
+    onMsg({ ok: true, text: `Afegida: ${name.trim()}${origin ? ` (${origin})` : ""} ✓` });
+  }
+
+  async function update(id: string, patch: { dorsal?: number | null }) {
+    const { data, error } = await supabase().from("convocation_guests").update(patch).eq("id", id).select("id");
+    if (error || !data?.length) return onMsg({ ok: false, text: `No s'ha pogut desar: ${error?.message ?? ""}` });
+    await onChanged();
+  }
+
+  async function remove(g: RosterRow) {
+    if (!window.confirm(`Treure ${g.display_name} de la convocatòria?`)) return;
+    const { data, error } = await supabase().from("convocation_guests").delete().eq("id", g.player_id).select("id");
+    if (error || !data?.length) return onMsg({ ok: false, text: `No s'ha pogut treure: ${error?.message ?? ""}` });
+    await onChanged();
+  }
+
+  return (
+    <div className="guest-editor">
+      <h3>Pujades d&apos;altres equips {guests.length > 0 && <span className="muted small">{guests.length}</span>}</h3>
+      {guests.length > 0 && (
+        <ul className="guest-list">
+          {guests.map((g) => (
+            <li key={g.player_id}>
+              <input type="text" inputMode="numeric" maxLength={2} aria-label={`Dorsal de ${g.display_name}`} defaultValue={g.dorsal ?? ""}
+                onBlur={(e) => {
+                  const v = num(e.target.value);
+                  if (v === g.dorsal) return;
+                  if (badNum(v)) return onMsg({ ok: false, text: "El dorsal ha de ser un número del 0 al 99." });
+                  update(g.player_id, { dorsal: v });
+                }} />
+              <span className="pname">{g.display_name}{g.origin && <span className="chip">{g.origin}</span>}</span>
+              <button type="button" className="btn small secondary" onClick={() => remove(g)} aria-label={`Treure ${g.display_name}`}>✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="guest-add">
+        <input type="text" maxLength={40} placeholder="Nom (p. ex. Marta R.)" value={name} onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()} aria-label="Nom de la jugadora" />
+        <input type="text" inputMode="numeric" maxLength={2} placeholder="Nº" value={dorsal} onChange={(e) => setDorsal(e.target.value)} aria-label="Dorsal" />
+        <input type="text" list="guest-origins" maxLength={30} placeholder="Equip" value={origin} onChange={(e) => setOrigin(e.target.value)} aria-label="Equip d'on ve" />
+        <datalist id="guest-origins">{GUEST_ORIGINS.map((o) => <option key={o} value={o} />)}</datalist>
+        <button type="button" className="btn small" disabled={busy || !name.trim()} onClick={add}>+ Afegir</button>
+      </div>
+      <p className="muted small" style={{ margin: "4px 0 0" }}>Surten a la convocatòria (amb l&apos;equip d&apos;on vénen) i les pots posar a l&apos;onze. No tenen compte a l&apos;app.</p>
+    </div>
+  );
+}
+
 function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: () => void; onDeleted: () => void }) {
   const [roster, setRoster] = useState<RosterRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -303,6 +378,8 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
   if (error) return <p className="msg error">{error}</p>;
   if (!roster) return <p className="muted">Carregant…</p>;
   const calledN = roster.filter((r) => r.called).length;
+  const own = roster.filter((r) => !r.guest); // les de l'equip (les afegides van a part)
+  const guests = roster.filter((r) => r.guest);
 
   return (
     <>
@@ -346,12 +423,12 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
           <button className="btn small secondary" onClick={() => setDorsals((v) => !v)}>{dorsals ? "Fet" : "Dorsals"}</button>
         </div>
         <div className="row" style={{ gap: 8, margin: "10px 0" }}>
-          <button className="btn small" disabled={saving.size > 0} onClick={() => setCalled(roster.filter((r) => !r.called).map((r) => r.player_id), true)}>Convocar totes</button>
-          <button className="btn small secondary" disabled={saving.size > 0} onClick={() => setCalled(roster.filter((r) => r.called).map((r) => r.player_id), false)}>Desconvocar totes</button>
+          <button className="btn small" disabled={saving.size > 0} onClick={() => setCalled(own.filter((r) => !r.called).map((r) => r.player_id), true)}>Convocar totes</button>
+          <button className="btn small secondary" disabled={saving.size > 0} onClick={() => setCalled(own.filter((r) => r.called).map((r) => r.player_id), false)}>Desconvocar totes</button>
         </div>
         <p className="muted small" style={{ marginTop: 0 }}>Toca una jugadora per convocar-la o desconvocar-la.</p>
         <ul className="convo-toggle">
-          {[...roster].sort((a, b) => a.display_name.localeCompare(b.display_name, "ca")).map((r) => (
+          {[...own].sort((a, b) => a.display_name.localeCompare(b.display_name, "ca")).map((r) => (
             <li key={r.player_id}>
               {dorsals ? (
                 <label className="dorsal-edit">
@@ -382,6 +459,8 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
           ))}
         </ul>
         {dorsals && <p className="muted small">Escriu el dorsal i surt de la casella per desar-lo. Si el deixes buit, es fa servir el de la FCF.</p>}
+
+        <GuestEditor convoId={c.id} guests={guests} onChanged={load} onMsg={setMsg} />
       </section>
 
       <LineupBoard c={c} roster={roster} />

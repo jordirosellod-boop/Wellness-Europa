@@ -68,6 +68,7 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
             <li key={r.player_id} className={r.player_id === meId ? "mine" : ""}>
               <KitNumber n={r.dorsal} />
               <span className="kit-name">{r.display_name}</span>
+              {r.origin && <span className="kit-origin">{r.origin}</span>}
             </li>
           ))}
         </ul>

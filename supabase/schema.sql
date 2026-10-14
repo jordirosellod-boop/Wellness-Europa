@@ -298,6 +298,18 @@ create table if not exists public.convocation_players (
   primary key (convocation_id, player_id)
 );
 
+-- JUGADORES AFEGIDES a una convocatòria (pujades d'un altre equip: Cadet A, Juvenil D...).
+-- No tenen compte a l'app. Dades mínimes: nom, dorsal i equip d'on vénen.
+create table if not exists public.convocation_guests (
+  id             uuid primary key default gen_random_uuid(),
+  convocation_id uuid not null references public.convocations(id) on delete cascade,
+  name           text not null check (char_length(trim(name)) between 1 and 40),
+  dorsal         smallint check (dorsal between 0 and 99),
+  origin         text check (origin is null or char_length(origin) <= 30),
+  created_at     timestamptz not null default now()
+);
+create index if not exists convocation_guests_idx on public.convocation_guests (convocation_id);
+
 -- ONZE INICIAL (només staff): sistema i qui va a cada posició ({"0": id, "1": id, ...}).
 create table if not exists public.convocation_lineups (
   convocation_id uuid primary key references public.convocations(id) on delete cascade,
@@ -1137,6 +1149,7 @@ alter table public.player_numbers     enable row level security;
 alter table public.convocations       enable row level security;
 alter table public.convocation_players enable row level security;
 alter table public.convocation_lineups enable row level security;
+alter table public.convocation_guests enable row level security;
 alter table public.injuries           enable row level security;
 alter table public.rehab_entries      enable row level security;
 alter table public.player_positions   enable row level security;
@@ -1153,7 +1166,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
-  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups,
+  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
@@ -1174,6 +1187,8 @@ grant all on public.profiles, public.player_links, public.sessions, public.welln
 grant select, insert, update, delete on public.attendance to authenticated;
 grant all on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to service_role;
 grant select, insert, update, delete on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to authenticated;
+grant all on public.convocation_guests to service_role;
+grant select, insert, update, delete on public.convocation_guests to authenticated;
 grant all on public.injuries, public.rehab_entries, public.player_positions, public.training_plans to service_role;
 grant select, insert, update, delete on public.injuries, public.player_positions, public.training_plans to authenticated;
 grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections to service_role;
@@ -1308,6 +1323,20 @@ drop policy if exists convocation_players_coach on public.convocation_players;
 create policy convocation_players_coach on public.convocation_players for all to authenticated
   using ((select public.is_coach()))
   with check ((select public.is_coach()) and exists (select 1 from public.profiles where id = player_id and role = 'player'));
+-- Afegides: el staff les gestiona; les jugadores les veuen només a les convocatòries publicades.
+drop policy if exists convocation_guests_select on public.convocation_guests;
+create policy convocation_guests_select on public.convocation_guests for select to authenticated
+  using ((select public.is_coach()) or ((select public.is_player()) and exists (
+    select 1 from public.convocations c where c.id = convocation_id and c.published)));
+drop policy if exists convocation_guests_write on public.convocation_guests;
+create policy convocation_guests_write on public.convocation_guests for insert to authenticated
+  with check ((select public.is_coach()));
+drop policy if exists convocation_guests_update on public.convocation_guests;
+create policy convocation_guests_update on public.convocation_guests for update to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists convocation_guests_delete on public.convocation_guests;
+create policy convocation_guests_delete on public.convocation_guests for delete to authenticated
+  using ((select public.is_coach()));
 drop policy if exists convocation_lineups_coach on public.convocation_lineups;
 create policy convocation_lineups_coach on public.convocation_lineups for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));

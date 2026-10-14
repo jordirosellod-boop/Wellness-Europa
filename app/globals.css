@@ -552,11 +552,23 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .convo-grid li.mine { background: var(--or); outline: 3px solid #fff; }
 .convo-grid li.mine .kit-number { color: var(--navy); }
 .kit-number { display: block; font-family: var(--font-kit), var(--display); font-size: 3.4rem; line-height: 1; color: var(--navy); }
+/* Noms: la mateixa lletra que la resta del full (el dorsal es queda amb la de samarreta). */
 .kit-name {
-  font-family: var(--font-kit), var(--display); font-weight: 400; text-transform: uppercase; letter-spacing: .3px;
-  font-size: 1.4rem; line-height: 1.1; overflow-wrap: anywhere;
+  font-family: var(--display); font-weight: 400; text-transform: uppercase; letter-spacing: .5px;
+  font-size: 1rem; line-height: 1.15; overflow-wrap: anywhere;
 }
-.convo-out { margin: 0; color: rgba(255,255,255,.75); font-family: var(--font-kit), var(--cos); font-weight: 400; font-size: 1.1rem; text-transform: uppercase; letter-spacing: .4px; }
+.kit-origin { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; background: var(--navy); color: var(--or); border-radius: 999px; padding: 0 7px; margin-top: 2px; }
+.convo-out { margin: 0; color: rgba(255,255,255,.75); font-family: var(--display); font-weight: 400; font-size: .95rem; text-transform: uppercase; letter-spacing: .5px; }
+.guest-editor { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--vora); }
+.guest-editor h3 { margin: 0 0 8px; font-size: 1.1rem; }
+.guest-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.guest-list li { display: flex; align-items: center; gap: 8px; }
+.guest-list li input { width: 52px; flex: none; text-align: center; }
+.guest-list .pname { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 600; }
+.guest-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.guest-add input:nth-child(1) { flex: 2 1 140px; min-width: 0; }
+.guest-add input:nth-child(2) { flex: 0 0 56px; text-align: center; }
+.guest-add input:nth-child(3) { flex: 1 1 100px; min-width: 0; }
 @media (max-width: 380px) { .convo-info { grid-template-columns: 1fr 1fr; } .convo-match { font-size: 1.4rem; } }
 
 .convo-banner {

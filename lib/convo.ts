@@ -19,7 +19,9 @@ export type Convocation = {
   notified_at: string | null;
 };
 
-export type RosterRow = { player_id: string; display_name: string; dorsal: number | null; called: boolean };
+/** Una fila de la llista. Les afegides (d'un altre equip) porten `origin` i sempre estan convocades. */
+export type RosterRow = { player_id: string; display_name: string; dorsal: number | null; called: boolean; guest?: boolean; origin?: string | null };
+export type Guest = { id: string; name: string; dorsal: number | null; origin: string | null };
 
 export const CONVO_COLS =
   "id, match_date, kickoff, meet_time, rival, is_home, competition, venue, address, kit, notes, published, published_at, notified_at";
@@ -33,10 +35,22 @@ export async function fetchConvocations(from: string): Promise<Convocation[]> {
 }
 
 export async function fetchRoster(cid: string): Promise<RosterRow[]> {
-  const { data, error } = await supabase().rpc("convo_roster", { cid });
+  const sb = supabase();
+  const [{ data, error }, guests] = await Promise.all([
+    sb.rpc("convo_roster", { cid }),
+    fetchAll<Guest>((f, t) =>
+      sb.from("convocation_guests").select("id, name, dorsal, origin").eq("convocation_id", cid).order("created_at").order("id").range(f, t),
+    ),
+  ]);
   if (error) throw new Error(error.message);
-  return (data ?? []) as RosterRow[];
+  return [
+    ...((data ?? []) as RosterRow[]),
+    ...guests.map((g) => ({ player_id: g.id, display_name: g.name, dorsal: g.dorsal, called: true, guest: true, origin: g.origin })),
+  ];
 }
+
+/** Equips d'on solen pujar jugadores (es pot escriure qualsevol altre). */
+export const GUEST_ORIGINS = ["Cadet A", "Juvenil D"];
 
 export const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 

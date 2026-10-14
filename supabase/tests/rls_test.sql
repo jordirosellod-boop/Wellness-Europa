@@ -443,11 +443,16 @@ insert into public.convocation_players (convocation_id, player_id, called) value
 insert into public.player_numbers (profile_id, dorsal) values ('00000000-0000-0000-0000-0000000000b2', 7);
 insert into public.convocation_lineups (convocation_id, formation, slots) values ('88888888-0000-0000-0000-000000000001', '4-3-3', '{"0":"00000000-0000-0000-0000-0000000000b2"}');
 select pg_temp.expect_error($$insert into public.convocation_players (convocation_id, player_id, called) values ('88888888-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', true)$$, 'No es pot convocar el staff');
+insert into public.convocation_guests (convocation_id, name, dorsal, origin) values ('88888888-0000-0000-0000-000000000001', 'Nora (Cadet A)', 18, 'Cadet A');
+select pg_temp.check((select count(*) from public.convocation_guests) = 1, 'El staff afegeix una jugadora d''un altre equip');
+select pg_temp.expect_error($$insert into public.convocation_guests (convocation_id, name, dorsal) values ('88888888-0000-0000-0000-000000000001', 'X', 120)$$, 'El dorsal de l''afegida ha de ser 0-99');
+select pg_temp.expect_error($$insert into public.convocation_guests (convocation_id, name) values ('88888888-0000-0000-0000-000000000001', '   ')$$, 'L''afegida ha de tenir nom');
 select pg_temp.check((select string_agg(display_name || ':' || coalesce(dorsal::text, '-') || ':' || called, ', ') from public.convo_roster('88888888-0000-0000-0000-000000000001')) like 'Berta:7:true%', 'El staff veu la llista amb dorsals (convocades primer)');
 
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5', false);
 select pg_temp.check((select count(*) from public.convocations) = 0, 'Una jugadora no veu una convocatòria sense publicar');
 select pg_temp.check((select count(*) from public.convo_roster('88888888-0000-0000-0000-000000000001')) = 0, 'Ni la seva llista');
+select pg_temp.check((select count(*) from public.convocation_guests) = 0, 'Ni les afegides d''una convocatòria sense publicar');
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 update public.convocations set published = true where id = '88888888-0000-0000-0000-000000000001';
 select pg_temp.check((select published_at is not null from public.convocations where id = '88888888-0000-0000-0000-000000000001'), 'Publicar posa l''hora de publicació');
@@ -455,6 +460,9 @@ select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5'
 select pg_temp.check((select count(*) from public.convocations) = 1, 'Una jugadora veu la convocatòria publicada');
 select pg_temp.check((select count(*) filter (where called) from public.convo_roster('88888888-0000-0000-0000-000000000001')) = 1, 'I la llista de convocades');
 select pg_temp.check((select count(*) from public.convocation_lineups) = 0, 'Una jugadora NO veu l''onze');
+select pg_temp.check((select count(*) from public.convocation_guests) = 1, 'Una jugadora veu les afegides de la convocatòria publicada');
+select pg_temp.expect_error($$insert into public.convocation_guests (convocation_id, name) values ('88888888-0000-0000-0000-000000000001', 'Jo')$$, 'Una jugadora no pot afegir ningú');
+with d as (delete from public.convocation_guests returning 1) select pg_temp.check(count(*) = 0, 'Ni treure''n') from d;
 select pg_temp.check((select count(*) from public.convocation_players) = 0, 'Ni la taula interna de la llista');
 select pg_temp.check((select count(*) from public.player_numbers) = 0, 'Ni la taula de dorsals');
 with u as (update public.convocations set rival = 'x' returning 1) select pg_temp.check(count(*) = 0, 'Una jugadora no pot canviar la convocatòria') from u;
@@ -463,6 +471,7 @@ with u as (update public.convocation_lineups set formation = '5-4-1' returning 1
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.convocations$$, 'Anònim no veu convocatòries');
 select pg_temp.expect_error($$select * from public.convo_roster('88888888-0000-0000-0000-000000000001')$$, 'Anònim no veu la llista');
+select pg_temp.expect_error($$select * from public.convocation_guests$$, 'Anònim no veu les afegides');
 reset role; select set_config('request.jwt.claim.sub','', false);
 update public.convocations set notified_at = now() where id = '88888888-0000-0000-0000-000000000001';
 select pg_temp.check((select notified_at is not null from public.convocations where id = '88888888-0000-0000-0000-000000000001'), 'El servidor sí que pot marcar que ha enviat l''avís');
