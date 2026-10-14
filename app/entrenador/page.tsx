@@ -17,7 +17,9 @@ export default function CoachSessionsPage() {
   );
 }
 
-type Counts = { w: number; r: number };
+type Counts = { w: number; r: number; rs: number; rn: number }; // rs/rn: suma i nombre de notes de l'entreno
+const ZERO: Counts = { w: 0, r: 0, rs: 0, rn: 0 };
+const fmt1 = (n: number) => n.toFixed(1).replace(".", ",");
 
 /** Estat per al staff: compara les respostes rebudes amb el nombre de jugadores. */
 function coachStatus(s: Session, today: string, c: Counts, players: number): CalStatus {
@@ -52,8 +54,13 @@ function CoachCalendar() {
 
   const items: CalItem[] = (data?.sessions ?? []).map((s) => ({
     session: s,
-    status: coachStatus(s, today, data!.counts.get(s.id) ?? { w: 0, r: 0 }, data!.players),
+    status: coachStatus(s, today, data!.counts.get(s.id) ?? ZERO, data!.players),
   }));
+  // Nota mitjana dels entrenos del període que es veu (mitjana de totes les notes enviades).
+  const trainings = (data?.sessions ?? []).filter((s) => s.kind === "Entrenament" && !s.cancelled);
+  const rated = trainings.map((s) => data!.counts.get(s.id) ?? ZERO).filter((c) => c.rn > 0);
+  const ratingSum = rated.reduce((a, c) => a + c.rs, 0);
+  const ratingN = rated.reduce((a, c) => a + c.rn, 0);
 
   return (
     <>
@@ -70,6 +77,17 @@ function CoachCalendar() {
         </span>
       </div>
       {error && <p className="msg error">{friendlyError(error)}</p>}
+      {data && (
+        <div className="card rating-summary">
+          <div>
+            <span className="muted small">Nota mitjana dels entrenos · {view === "setmana" ? "aquesta setmana" : view === "mes" ? "aquest mes" : "aquest dia"}</span>
+            <b className={ratingN ? ratingClass(ratingSum / ratingN) : ""}>{ratingN ? fmt1(ratingSum / ratingN) : "–"}<small>/10</small></b>
+          </div>
+          <span className="muted small">
+            {ratingN ? `${ratingN} ${ratingN === 1 ? "nota" : "notes"} de ${rated.length} ${rated.length === 1 ? "entreno" : "entrenos"}` : "Encara no hi ha notes en aquestes dates."}
+          </span>
+        </div>
+      )}
       <Calendar
         view={view}
         anchor={anchor}
@@ -82,7 +100,7 @@ function CoachCalendar() {
           setAdding(null);
         }}
         renderItem={({ session: s, status }) => {
-          const c = data?.counts.get(s.id) ?? { w: 0, r: 0 };
+          const c = data?.counts.get(s.id) ?? ZERO;
           return (
             <Link className="item" href={`/entrenador/sessio?id=${s.id}`}>
               <div className="row between">
@@ -98,6 +116,7 @@ function CoachCalendar() {
               {s.session_date <= today && !s.cancelled && (
                 <div className="small" style={{ marginTop: 2 }}>
                   Wellness {c.w}/{data?.players ?? 0} · RPE {c.r}/{data?.players ?? 0}
+                  {c.rn > 0 && <> · Nota <b className={ratingClass(c.rs / c.rn)}>{fmt1(c.rs / c.rn)}</b></>}
                 </div>
               )}
             </Link>
@@ -124,6 +143,9 @@ function CoachCalendar() {
   );
 }
 
+/** Color de la nota: verda si és bona, groga si és normal, vermella si és baixa. */
+const ratingClass = (n: number) => (n >= 7.5 ? "rating-good" : n >= 5.5 ? "rating-mid" : "rating-low");
+
 async function loadCoachRange(from: string, to: string) {
   const sb = supabase();
   // Crea les sessions que toquin segons les programacions (no fa res si ja hi són).
@@ -143,10 +165,14 @@ async function loadCoachRange(from: string, to: string) {
   if (ids.length) {
     const [w, r] = await Promise.all([
       fetchAll<{ session_id: string }>((f, t) => sb.from("wellness").select("session_id").in("session_id", ids).order("id").range(f, t)),
-      fetchAll<{ session_id: string }>((f, t) => sb.from("rpe").select("session_id").in("session_id", ids).order("id").range(f, t)),
+      fetchAll<{ session_id: string; rating: number | null }>((f, t) => sb.from("rpe").select("session_id, rating").in("session_id", ids).order("id").range(f, t)),
     ]);
-    for (const x of w) counts.set(x.session_id, { w: (counts.get(x.session_id)?.w ?? 0) + 1, r: counts.get(x.session_id)?.r ?? 0 });
-    for (const x of r) counts.set(x.session_id, { w: counts.get(x.session_id)?.w ?? 0, r: (counts.get(x.session_id)?.r ?? 0) + 1 });
+    const get = (id: string) => counts.get(id) ?? { ...ZERO };
+    for (const x of w) counts.set(x.session_id, { ...get(x.session_id), w: get(x.session_id).w + 1 });
+    for (const x of r) {
+      const c = get(x.session_id);
+      counts.set(x.session_id, { ...c, r: c.r + 1, rs: c.rs + (x.rating ?? 0), rn: c.rn + (x.rating != null ? 1 : 0) });
+    }
   }
   return { sessions, counts, players: playersRes.count ?? 0 };
 }
