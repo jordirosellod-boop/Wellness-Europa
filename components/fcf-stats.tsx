@@ -1,5 +1,6 @@
 "use client";
 
+import { MatchLine } from "@/components/crest";
 import { useCallback, useEffect, useState } from "react";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDateTime, friendlyError, type Profile } from "@/lib/wellness";
@@ -133,7 +134,7 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
             </div>
             {next && (
               <p style={{ marginBottom: 0 }}>
-                <b>Proper partit</b> (J{next.jornada}): {shortTeam(next.home)} – {shortTeam(next.away)}
+                <b>Proper partit</b> (J{next.jornada}): <MatchLine home={shortTeam(next.home)} away={shortTeam(next.away)} />
                 {next.kickoff ? ` · ${new Intl.DateTimeFormat("ca-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" }).format(new Date(`${next.kickoff}Z`))}` : ""}
               </p>
             )}
@@ -208,7 +209,7 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
                     <div className="row between">
                       <span>
                         <span className="muted small">J{m.jornada} · </span>
-                        <b>{shortTeam(m.home)} {m.home_goals}–{m.away_goals} {shortTeam(m.away)}</b>
+                        <b><MatchLine home={shortTeam(m.home)} away={shortTeam(m.away)} score={`${m.home_goals}–${m.away_goals}`} /></b>
                       </span>
                       {r && <span className={`chip ${RES_CLS[r]}`}>{RES_LABEL[r]}</span>}
                     </div>

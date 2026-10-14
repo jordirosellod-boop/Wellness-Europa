@@ -28,7 +28,12 @@ async function getJson<T>(path: string): Promise<T> {
 type RawMatch = {
   JORNADA: string; CODACTA: string; CODEQUIPO_CASA: string; NOMBRE_CASA: string; CODEQUIPO_FUERA: string; NOMBRE_FUERA: string;
   GOLES_CASA: string | null; GOLES_FUERA: string | null; COMIENZO1: string | null; CERRADA: string;
+  ESCUDO_CASA?: string | null; ESCUDO_FUERA?: string | null;
 };
+
+/** Els escuts són fitxers públics de la FCF: «00100_0000808730_uebreda_200x200.png». */
+export const CREST_BASE = "https://files.fcf.cat/escudos/clubes/escudos/";
+export const isCrestFile = (f: string) => /^[A-Za-z0-9_.-]{3,120}\.(png|jpe?g|gif|webp)$/i.test(f);
 
 /** Partits del nostre equip al grup (de la jornada 1 a l'última). */
 export async function fetchTeamMatches(grupId: string, teamId: string): Promise<FcfMatch[]> {
@@ -154,6 +159,7 @@ export type GroupMatch = {
   acta_id: string; jornada: number; kickoff: string | null;
   home_id: string; home: string; away_id: string; away: string;
   home_goals: number | null; away_goals: number | null; closed: boolean;
+  home_crest?: string | null; away_crest?: string | null; // nom del fitxer de l'escut
 };
 
 /** Tots els partits del grup (de tots els equips). */
@@ -166,6 +172,7 @@ export async function fetchGroupMatches(grupId: string): Promise<GroupMatch[]> {
       acta_id: m.CODACTA, jornada: Number(m.JORNADA), kickoff: m.COMIENZO1,
       home_id: m.CODEQUIPO_CASA, home: m.NOMBRE_CASA.trim(), away_id: m.CODEQUIPO_FUERA, away: m.NOMBRE_FUERA.trim(),
       home_goals: num(m.GOLES_CASA), away_goals: num(m.GOLES_FUERA), closed: m.CERRADA === "1",
+      home_crest: m.ESCUDO_CASA || null, away_crest: m.ESCUDO_FUERA || null,
     }))
     // "Descans" és la jornada de descans d'un equip, no un rival de veritat.
     .filter((m) => !/^descans/i.test(m.home) && !/^descans/i.test(m.away))

@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { useEffect, useState } from "react";
 import { FORMATION_NAMES, FORMATIONS, hhmm, type Convocation, type RosterRow } from "@/lib/convo";
 import { escapulada } from "@/lib/fonts";
@@ -154,6 +155,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
         <div className="print-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/escut.png" alt="" width={44} height={44} />
+          <Crest name={c.rival} size={44} />
           <div>
             <b className="esc">{c.is_home ? `CE Europa – ${c.rival}` : `${c.rival} – CE Europa`}</b>
             <span>{fmtDate(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""} · Sistema {lineup.formation} · {lineup.kit === "home" ? "1a" : "2a"} equipació</span>

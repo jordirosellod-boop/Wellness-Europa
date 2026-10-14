@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest, MatchLine } from "@/components/crest";
 import { useEffect, useState } from "react";
 import { AMATCH_COLS, fetchAEvents, prettyTeam, rivalKey, type AEvent, type AMatch } from "@/lib/analysis";
 import { FORMATION_NAMES } from "@/lib/convo";
@@ -154,9 +155,18 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
   return (
     <div className="rival">
       <section className="card rival-hero">
-        <span className="rv-k">Proper partit · J{n.jornada}{days != null && days >= 0 ? ` · ${days === 0 ? "avui" : days === 1 ? "demà" : `d'aquí ${days} dies`}` : ""}</span>
-        <b className="rv-name">{rival}</b>
-        <span>{n.is_home ? "A casa" : "A fora"} · {kickoff}</span>
+        <div className="rv-top">
+          <div className="rv-top-text">
+            <span className="rv-k">Proper partit · J{n.jornada}{days != null && days >= 0 ? ` · ${days === 0 ? "avui" : days === 1 ? "demà" : `d'aquí ${days} dies`}` : ""}</span>
+            <b className="rv-name">{rival}</b>
+            <span>{n.is_home ? "A casa" : "A fora"} · {kickoff}</span>
+          </div>
+          <div className="rv-crests" aria-hidden="true">
+            <Crest name={n.is_home ? "CE Europa" : n.rival} size={n.is_home ? 58 : 92} />
+            <i>vs</i>
+            <Crest name={n.is_home ? n.rival : "CE Europa"} size={n.is_home ? 92 : 58} />
+          </div>
+        </div>
         {row && (
           <div className="rv-stats">
             <div><b>{row.pos}a</b><span>posició</span></div>
@@ -175,11 +185,11 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
           <h3 className="esc">Classificació</h3>
           <div className="table-wrap">
             <table className="stats-table">
-              <thead><tr><th>#</th><th>Equip</th><th>PJ</th><th>Pts</th><th>DG</th></tr></thead>
+              <thead><tr><th>#</th><th style={{ textAlign: "left" }}>Equip</th><th>PJ</th><th>Pts</th><th>DG</th></tr></thead>
               <tbody>
                 {data.table.map((r) => (
                   <tr key={r.team_id} className={r.team_id === n.rival_id ? "rv-row" : r.team_id === data.us_id ? "us-row" : ""}>
-                    <td>{r.pos}</td><td><span className="pname">{prettyTeam(r.team)}</span></td><td>{r.pj}</td><td><b>{r.pts}</b></td><td>{r.gf - r.gc > 0 ? "+" : ""}{r.gf - r.gc}</td>
+                    <td>{r.pos}</td><td style={{ textAlign: "left" }}><span className="pname team-inline"><Crest name={r.team} size={20} />{prettyTeam(r.team)}</span></td><td>{r.pj}</td><td><b>{r.pts}</b></td><td>{r.gf - r.gc > 0 ? "+" : ""}{r.gf - r.gc}</td>
                   </tr>
                 ))}
               </tbody>
@@ -196,7 +206,7 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
                 return (
                   <li key={m.acta_id}>
                     <span className="muted small">J{m.jornada}</span>
-                    <span className="pname">{prettyTeam(m.home)} {m.home_goals}–{m.away_goals} {prettyTeam(m.away)}</span>
+                    <span className="pname"><MatchLine home={prettyTeam(m.home)} away={prettyTeam(m.away)} score={`${m.home_goals}–${m.away_goals}`} size={20} /></span>
                     {r && <i className={`rbadge ${r}`}>{r}</i>}
                   </li>
                 );
@@ -210,7 +220,7 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
                 {data.vs_us.map((m) => (
                   <li key={m.acta_id}>
                     <span className="muted small">J{m.jornada}</span>
-                    <span className="pname">{prettyTeam(m.home)} {m.closed ? `${m.home_goals}–${m.away_goals}` : "vs"} {prettyTeam(m.away)}</span>
+                    <span className="pname"><MatchLine home={prettyTeam(m.home)} away={prettyTeam(m.away)} score={m.closed ? `${m.home_goals}–${m.away_goals}` : "vs"} size={20} /></span>
                     {m.closed && <i className={`rbadge ${res(m, data.us_id)}`}>{res(m, data.us_id)}</i>}
                   </li>
                 ))}
@@ -230,7 +240,7 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
           <ul className="list">
             {videos.map((v) => (
               <li key={v.id} className="row between">
-                <span><b>{v.title}</b> <span className="muted small">· {fmtDate(v.match_date)} · {vEvents.filter((e) => e.match_id === v.id).length} accions</span></span>
+                <span className="team-inline"><Crest name={v.rival} size={22} /><b>{v.title}</b> <span className="muted small">· {fmtDate(v.match_date)} · {vEvents.filter((e) => e.match_id === v.id).length} accions</span></span>
                 <button className="btn small secondary" onClick={() => onOpen(v.id)}>Obrir</button>
               </li>
             ))}
@@ -300,6 +310,7 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
         <header className="rp-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/escut.png" alt="" width={54} height={54} />
+          <Crest name={n.rival} size={54} />
           <div className="rp-title">
             <b>Informe del rival · {rival}</b>
             <span>J{n.jornada} · {n.is_home ? "A casa" : "A fora"} · {kickoff}</span>
@@ -335,7 +346,7 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
             <table className="rp-table">
               <tbody>
                 {data.rival_matches.slice(0, 6).map((m) => (
-                  <tr key={m.acta_id}><td>J{m.jornada}</td><td>{prettyTeam(m.home)} {m.home_goals}–{m.away_goals} {prettyTeam(m.away)}</td><td>{res(m, n.rival_id)}</td></tr>
+                  <tr key={m.acta_id}><td>J{m.jornada}</td><td><MatchLine home={prettyTeam(m.home)} away={prettyTeam(m.away)} score={`${m.home_goals}–${m.away_goals}`} size={14} /></td><td>{res(m, n.rival_id)}</td></tr>
                 ))}
               </tbody>
             </table>

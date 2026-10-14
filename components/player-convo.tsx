@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { useEffect, useState } from "react";
 import { ConvoSheet } from "@/components/convo-sheet";
 import { fetchConvocations, fetchRoster, type Convocation, type RosterRow } from "@/lib/convo";
@@ -48,7 +49,7 @@ export function PlayerConvo({ meId }: { meId: string }) {
         <div className="tabs convo-tabs" style={{ marginBottom: 12 }}>
           {[...list].reverse().map((x) => (
             <button key={x.id} aria-pressed={x.id === selected} onClick={() => setSelected(x.id)}>
-              {x.match_date.slice(8, 10)}/{x.match_date.slice(5, 7)} · {x.rival}
+              <span className="team-inline"><Crest name={x.rival} size={20} />{x.match_date.slice(8, 10)}/{x.match_date.slice(5, 7)} · {x.rival}</span>
             </button>
           ))}
         </div>

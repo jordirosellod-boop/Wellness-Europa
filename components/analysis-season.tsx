@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { useEffect, useState } from "react";
 import { fetchAEvents, type AEvent, type AMatch } from "@/lib/analysis";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -61,7 +62,7 @@ export function AnalysisSeason({ matches }: { matches: AMatch[] }) {
                 const ev = data.events.get(m.id) ?? [];
                 return (
                   <tr key={m.id}>
-                    <td><span className="pname">{m.match_date.slice(8, 10)}/{m.match_date.slice(5, 7)} {m.rival ?? m.title}</span></td>
+                    <td><span className="pname team-inline"><Crest name={m.rival} size={18} />{m.match_date.slice(8, 10)}/{m.match_date.slice(5, 7)} {m.rival ?? m.title}</span></td>
                     <td>{m.goals_for != null && m.goals_against != null ? `${m.goals_for}–${m.goals_against}` : "–"}</td>
                     {actions.slice(0, 7).map((a) => (
                       <td key={a}>{ev.filter((e) => e.team === "us" && e.action === a).length}<span className="muted small">/{ev.filter((e) => e.team === "rival" && e.action === a).length}</span></td>

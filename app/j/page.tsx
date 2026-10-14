@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { useEffect, useState, type ReactNode } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
@@ -406,7 +407,7 @@ function Dashboard({
       {data?.convo && (
         <button type="button" className={`convo-banner ${data.convo.called ? "yes" : "no"}`} onClick={() => go("convo")}>
           <span className="convo-banner-k">Convocatòria · {fmtShort(data.convo.c.match_date)}{data.convo.c.kickoff ? ` · ${hhmm(data.convo.c.kickoff)} h` : ""}</span>
-          <b>{data.convo.c.is_home ? `CE Europa – ${data.convo.c.rival}` : `${data.convo.c.rival} – CE Europa`}</b>
+          <b className="team-inline"><Crest name={data.convo.c.rival} size={30} />{data.convo.c.is_home ? `CE Europa – ${data.convo.c.rival}` : `${data.convo.c.rival} – CE Europa`}</b>
           <span>{data.convo.called ? "✓ Estàs convocada · Veure la convocatòria" : "Veure la convocatòria"}</span>
         </button>
       )}

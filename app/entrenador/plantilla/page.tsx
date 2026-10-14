@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from "react";
 import { DrillEditor, DrillView } from "@/components/drill-editor";
 import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
@@ -151,7 +152,7 @@ function PlanList({ onOpen }: { onOpen: (id: string) => void }) {
               <li key={p.id} className="row between">
                 <span>
                   <b>{fmtDate(p.plan_date)}</b>
-                  <span className="muted small">{p.session_no ? ` · Sessió ${p.session_no}` : ""}{p.rival ? ` · vs ${p.rival}` : ""}</span>
+                  <span className="muted small">{p.session_no ? ` · Sessió ${p.session_no}` : ""}{p.rival ? <> · vs <span className="team-inline"><Crest name={p.rival} size={16} />{p.rival}</span></> : ""}</span>
                 </span>
                 <button className="btn small" onClick={() => onOpen(p.id)}>Obrir</button>
               </li>
@@ -779,7 +780,7 @@ function PlanSheet({ plan, roster }: { plan: Plan; roster: Roster }) {
           {cell("Hora", plan.start_time?.slice(0, 5))}
           {cell("Sessió", plan.session_no)}
           {cell("Jornada", plan.jornada)}
-          {cell("Rival", plan.rival)}
+          {cell("Rival", plan.rival ? <span className="team-inline" style={{ gap: 4 }}><Crest name={plan.rival} size={14} />{plan.rival}</span> : null)}
           {cell("Microcicle", plan.microcycle)}
           {cell("Mesocicle", plan.mesocycle)}
           {cell("Temps", plan.duration_min ? `${plan.duration_min}'` : "")}

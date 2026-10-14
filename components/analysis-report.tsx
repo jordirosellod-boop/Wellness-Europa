@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { ZonePitch, type APlayer } from "@/components/analysis-stats";
 import { halfOf, minuteOf, teamLabels, type AEvent, type AMatch } from "@/lib/analysis";
 import { matchInsights } from "@/lib/analysis-insights";
@@ -34,6 +35,7 @@ export function MatchReport({ match, events, players }: { match: AMatch; events:
       <header className="rp-head">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/escut.png" alt="" width={54} height={54} />
+        {match.rival && <Crest name={match.rival} size={54} />}
         <div className="rp-title">
           <b>{match.title}</b>
           <span>{fmtDate(match.match_date)} · Informe d&apos;anàlisi · Juvenil C</span>

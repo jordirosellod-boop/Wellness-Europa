@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ConvoSheet } from "@/components/convo-sheet";
 import { LineupBoard } from "@/components/pitch";
@@ -63,7 +64,7 @@ function Convos() {
         <div className="tabs convo-tabs" style={{ margin: "12px 0" }}>
           {list.map((c) => (
             <button key={c.id} aria-pressed={c.id === selected} onClick={() => setSelected(c.id)}>
-              {c.match_date.slice(8, 10)}/{c.match_date.slice(5, 7)} · {c.rival}
+              <span className="team-inline"><Crest name={c.rival} size={20} />{c.match_date.slice(8, 10)}/{c.match_date.slice(5, 7)} · {c.rival}</span>
               {!c.published && " ·  esborrany"}
             </button>
           ))}
@@ -385,9 +386,12 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
     <>
       <section className="card">
         <div className="row between">
-          <div>
+          <div className="team-inline" style={{ gap: 10 }}>
+            <Crest name={c.rival} size={40} />
+            <div>
             <b>{c.is_home ? `CE Europa – ${c.rival}` : `${c.rival} – CE Europa`}</b>
             <div className="muted small">{fmtDate(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""}</div>
+            </div>
           </div>
           {c.published ? <span className="chip fet">Publicada</span> : <span className="chip pendent">Esborrany</span>}
         </div>

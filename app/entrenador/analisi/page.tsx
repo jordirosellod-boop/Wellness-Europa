@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { MatchReport } from "@/components/analysis-report";
 import { AddToCorrection, CorrectionsPanel } from "@/components/corrections";
@@ -156,9 +157,12 @@ function MatchList({ onOpen }: { onOpen: (id: string) => void }) {
           <ul className="list">
             {list.map((m) => (
               <li key={m.id} className="row between">
-                <span>
+                <span className="team-inline" style={{ gap: 10 }}>
+                  <Crest name={m.rival} size={30} />
+                  <span>
                   <b>{m.title}</b>
                   <span className="muted small"> · {fmtDate(m.match_date)}{m.goals_for != null && m.goals_against != null ? ` · ${m.goals_for}–${m.goals_against}` : ""}</span>
+                  </span>
                 </span>
                 <button className="btn small" onClick={() => onOpen(m.id)}>Obrir</button>
               </li>
@@ -433,7 +437,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
           <ScoreBox match={match} onSave={(gf, ga) => saveMatch({ goals_for: gf, goals_against: ga }, "Resultat desat.")} />
         </span>
       </div>
-      <h1 className="esc" style={{ margin: "8px 0 4px", fontSize: "1.6rem" }}>{match.title}</h1>
+      <h1 className="esc team-inline" style={{ margin: "8px 0 4px", fontSize: "1.6rem", gap: 10 }}><Crest name={match.rival} size={40} />{match.title}</h1>
       <p className="muted small" style={{ marginTop: 0 }}>{fmtDate(match.match_date)}</p>
 
       <div className="seg-toggle" role="group" aria-label="Mode" style={{ marginBottom: 8 }}>

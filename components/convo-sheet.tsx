@@ -1,5 +1,6 @@
 "use client";
 
+import { Crest } from "@/components/crest";
 import { hhmm, type Convocation, type RosterRow } from "@/lib/convo";
 import { kitFont } from "@/lib/fonts";
 import { fmtDate } from "@/lib/wellness";
@@ -34,9 +35,9 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
       </header>
 
       <div className="convo-match">
-        <span className={c.is_home ? "us" : ""}>{home}</span>
+        <span className={c.is_home ? "us" : ""}><Crest name={home} size={72} className="convo-crest" /><b>{home}</b></span>
         <i>vs</i>
-        <span className={c.is_home ? "" : "us"}>{away}</span>
+        <span className={c.is_home ? "" : "us"}><Crest name={away} size={72} className="convo-crest" /><b>{away}</b></span>
       </div>
       <p className="convo-date">{fmtDate(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""} · {c.is_home ? "Local" : "Visitant"}</p>
 
