@@ -22,6 +22,11 @@ function savedText(row: { submitted_at: string; updated_at: string }) {
   return sent === edited ? `Desat! Enviat a les ${sent}.` : `Desat! Enviat a les ${sent}, modificat a les ${edited}.`;
 }
 
+
+/** Com ha anat l'entreno per a ella (nota 1-10). */
+const RATING_LABEL = (n: number) =>
+  n <= 2 ? "Molt dolent" : n <= 4 ? "Dolent" : n <= 6 ? "Normal" : n <= 8 ? "Bo" : "Excel·lent";
+
 export function WellnessForm({
   sessionId,
   existing,
@@ -177,6 +182,7 @@ export function RpeForm({
   const [value, setValue] = useState<number | null>(existing?.rpe ?? null);
   const [duration, setDuration] = useState<string>(String(existing?.duration_min ?? plannedDuration ?? ""));
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   async function save(e: FormEvent) {
@@ -185,12 +191,16 @@ export function RpeForm({
       setStatus({ kind: "error", text: "Toca un número de 0 a 10." });
       return;
     }
+    if (rating == null) {
+      setStatus({ kind: "error", text: "Posa una nota a l'entreno (de l'1 al 10)." });
+      return;
+    }
     if (minutes == null) {
       setStatus({ kind: "error", text: "Indica quants minuts ha durat la sessió (d'1 a 300)." });
       return;
     }
     setStatus({ kind: "saving" });
-    const payload = { rpe: value, duration_min: minutes, notes: notes.trim() || null };
+    const payload = { rpe: value, duration_min: minutes, rating, notes: notes.trim() || null };
     try {
       const res = existing
         ? await supabase().from("rpe").update(payload).eq("id", existing.id).select().maybeSingle()
@@ -256,6 +266,27 @@ export function RpeForm({
         {value != null && minutes != null && (
           <p className="muted" style={{ marginBottom: 0 }}>
             Càrrega: {value} × {minutes} min = <b>{value * minutes}</b> UA
+          </p>
+        )}
+      </div>
+      <div>
+        <label className="field">Quina nota li poses a l&apos;entreno?</label>
+        <Scale
+          label="Nota de l'entreno"
+          min={1}
+          max={10}
+          low="Molt dolent"
+          high="Excel·lent"
+          value={rating}
+          disabled={!editable}
+          onChange={(n) => {
+            setRating(n);
+            setStatus({ kind: "idle" });
+          }}
+        />
+        {rating != null && (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Nota: <b>{rating}/10</b> · {RATING_LABEL(rating)}
           </p>
         )}
       </div>

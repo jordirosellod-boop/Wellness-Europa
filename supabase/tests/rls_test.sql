@@ -38,6 +38,9 @@ insert into public.wellness (session_id, sleep, fatigue, mood, notes, submitted_
 select pg_temp.check(score = 6.3 and submitted_at > now() - interval '1 minute', 'A desa wellness d''avui; puntuació 6.3 i hora posada pel servidor (no la seva)') from public.wellness;
 insert into public.rpe (session_id, rpe) values ('11111111-0000-0000-0000-000000000001', 0);
 select pg_temp.check(true, 'A desa RPE = 0 (vàlid)');
+with u as (update public.rpe set rating = 8 where session_id = '11111111-0000-0000-0000-000000000001' returning rating) select pg_temp.check((select rating from u) = 8, 'A posa nota 8 a l''entreno');
+select pg_temp.expect_error($$update public.rpe set rating = 11 where session_id = '11111111-0000-0000-0000-000000000001'$$, 'Nota 11 rebutjada');
+select pg_temp.expect_error($$update public.rpe set rating = 0 where session_id = '11111111-0000-0000-0000-000000000001'$$, 'Nota 0 rebutjada');
 select pg_temp.expect_error($$insert into public.wellness (session_id, sleep, fatigue, mood) values ('11111111-0000-0000-0000-000000000001', 5,5,5)$$, 'A no pot fer un segon wellness a la mateixa sessió');
 select pg_temp.expect_error($$insert into public.wellness (session_id, sleep, fatigue, mood) values ('11111111-0000-0000-0000-000000000002', 5,5,5)$$, 'A no pot omplir una sessió d''un altre dia');
 select pg_temp.expect_error($$insert into public.wellness (session_id, player_id, sleep, fatigue, mood) values ('11111111-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b2', 5,5,5)$$, 'A no pot crear un registre en nom de B');

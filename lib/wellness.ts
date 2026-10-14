@@ -51,6 +51,7 @@ export type Rpe = {
   rpe: number;
   duration_min: number | null; // durada real
   load: number | null; // RPE x minuts (la calcula la base de dades)
+  rating: number | null; // nota de l'entreno (1-10) que hi posa la jugadora
   notes: string | null;
   submitted_at: string;
   updated_at: string;

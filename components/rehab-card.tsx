@@ -68,6 +68,7 @@ function RehabForm({ date, today, entry, onSaved }: { date: string; today: strin
   const [pain, setPain] = useState<number | null>(entry?.pain ?? null);
   const [rpe, setRpe] = useState<number | null>(entry?.rpe ?? null);
   const [dur, setDur] = useState<number>(entry?.duration_min ?? 45);
+  const [rating, setRating] = useState<number | null>(entry?.rating ?? null);
   const [notes, setNotes] = useState(entry?.notes ?? "");
   const [busy, setBusy] = useState<"w" | "r" | null>(null);
   const [msgW, setMsgW] = useState<Msg>(null);
@@ -80,11 +81,12 @@ function RehabForm({ date, today, entry, onSaved }: { date: string; today: strin
     if (part === "w" && (w.sleep == null || w.fatigue == null || w.mood == null || pain == null))
       return set({ ok: false, text: "Respon totes les preguntes (toca un número a cada una)." });
     if (part === "r" && rpe == null) return set({ ok: false, text: "Tria l'esforç (de 0 a 10)." });
+    if (part === "r" && rating == null) return set({ ok: false, text: "Posa una nota a l'entreno (de l'1 al 10)." });
     setBusy(part);
     const payload =
       part === "w"
         ? { kind, sleep: w.sleep, fatigue: w.fatigue, mood: w.mood, pain, notes: notes.trim() || null }
-        : { kind, rpe, duration_min: dur, notes: notes.trim() || null };
+        : { kind, rpe, duration_min: dur, rating, notes: notes.trim() || null };
     const sb = supabase();
     const res = entry
       ? await sb.from("rehab_entries").update(payload).eq("id", entry.id).select(REHAB_COLS).maybeSingle()
@@ -142,6 +144,10 @@ function RehabForm({ date, today, entry, onSaved }: { date: string; today: strin
           <input type="text" inputMode="numeric" value={dur} onChange={(e) => setDur(Math.min(300, Math.max(1, Number(e.target.value.replace(/\D/g, "")) || 1)))} style={{ textAlign: "center" }} aria-label="Durada en minuts" />
           <button type="button" className="btn small secondary" onClick={() => setDur((d) => Math.min(300, d + 5))} aria-label="Més minuts">+</button>
         </div>
+      </div>
+      <div>
+        <label className="field">Quina nota li poses a l&apos;entreno?</label>
+        <Scale value={rating} onChange={setRating} min={1} max={10} low="Molt dolent" high="Excel·lent" label="Nota de l'entreno" />
       </div>
       <div>
         <label className="field" htmlFor="rnotes">Notes (opcional)</label>

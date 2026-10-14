@@ -494,6 +494,9 @@ alter table public.convocation_lineups add column if not exists kit text not nul
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);
 alter table public.rpe add column if not exists load integer generated always as (rpe * duration_min) stored;
+-- Nota de l'entreno que posa la jugadora (1-10): com ha anat la sessió per a ella.
+alter table public.rpe add column if not exists rating smallint check (rating between 1 and 10);
+alter table public.rehab_entries add column if not exists rating smallint check (rating between 1 and 10);
 
 -- ---------------------------------------------------------------------
 -- 2. HORES AUTOMÀTIQUES: la jugadora no les pot posar ni canviar

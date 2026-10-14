@@ -20,12 +20,13 @@ export type RehabEntry = {
   rpe: number | null;
   duration_min: number | null;
   load: number | null;
+  rating: number | null; // nota de l'entreno (1-10)
   notes: string | null;
   wellness_at: string | null;
   rpe_at: string | null;
 };
 
-export const REHAB_COLS = "id, player_id, entry_date, kind, sleep, fatigue, mood, score, pain, rpe, duration_min, load, notes, wellness_at, rpe_at";
+export const REHAB_COLS = "id, player_id, entry_date, kind, sleep, fatigue, mood, score, pain, rpe, duration_min, load, rating, notes, wellness_at, rpe_at";
 
 /** Està de baixa aquell dia? */
 export function activeOn(i: Pick<Injury, "start_date" | "end_date">, d: string): boolean {

@@ -129,6 +129,8 @@ function Detail() {
   const wAvg = average(ws);
   const rAvg = average(rs);
   const loads = rows.flatMap((x) => (x.r?.load != null ? [x.r.load] : []));
+  const ratings = rows.flatMap((x) => (x.r?.rating != null ? [x.r.rating] : []));
+  const ratingAvg = average(ratings);
   const loadAvg = average(loads);
   const withAlerts = rows.filter((x) => x.w && (alertsOf(x.w).length > 0 || x.w.has_pain)).length;
   const pendingW = rows.filter((x) => !x.w).map((x) => x.player.display_name);
@@ -170,6 +172,11 @@ function Detail() {
             Càrrega mitjana
             <b>{loadAvg == null ? "–" : Math.round(loadAvg)}</b>
             <span className="small">UA (RPE × min)</span>
+          </div>
+          <div className="stat">
+            Nota de l&apos;entreno
+            <b>{ratingAvg == null ? "–" : ratingAvg.toFixed(1).replace(".", ",")}</b>
+            <span className="small">{ratings.length ? `${ratings.length} ${ratings.length === 1 ? "nota" : "notes"} · de 1 a 10` : "de 1 a 10"}</span>
           </div>
           <div className="stat">
             Amb alerta o molèstia
@@ -238,6 +245,7 @@ function Detail() {
                 <>
                   <b>RPE {r.rpe}</b> <span className="muted">({RPE_LABELS[r.rpe]})</span>
                   {r.duration_min != null && <span> · {r.duration_min} min · càrrega <b>{r.load}</b></span>}
+                  {r.rating != null && <span> · nota entreno <b>{r.rating}/10</b></span>}
                   <span className="muted"> · {fmtTime(r.submitted_at)}</span>
                   {r.notes && <div className="muted">Nota: {r.notes}</div>}
                 </>
