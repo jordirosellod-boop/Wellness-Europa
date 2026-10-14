@@ -1,5 +1,6 @@
 "use client";
 
+import { crestFor, useCrests } from "@/components/crest";
 import { useMemo, useRef, useState } from "react";
 import type { Shape } from "@/components/telestrator";
 import { minuteOf, teamLabels, toVideo, type AButton, type AEvent, type AMatch } from "@/lib/analysis";
@@ -26,6 +27,11 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
   const [ready, setReady] = useState<File | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  // Escuts: el nostre i el del rival (en un vídeo del rival, «nosaltres» és el rival analitzat).
+  const teams = useCrests();
+  const crests = match.kind === "rival"
+    ? { us: crestFor(teams, match.rival), rival: null }
+    : { us: "/escut.png", rival: crestFor(teams, match.rival) };
 
   // Apartats ordenats com els botons d'etiquetar; dins de cada apartat, per temps.
   const sections = useMemo(() => {
@@ -58,6 +64,7 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
             color: c,
             drawing: (e.drawing as Shape[] | null) ?? null,
             drawAt: v,
+            team: e.team,
           };
         }),
       };
@@ -81,6 +88,7 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
         overlay,
         drawings,
         font,
+        crests,
         signal: ctrl.signal,
         onProgress: (p) => setJob((j) => (j && j.ctrl === ctrl ? { ...j, progress: p } : j)),
       });

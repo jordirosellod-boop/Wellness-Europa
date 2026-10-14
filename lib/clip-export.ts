@@ -12,6 +12,7 @@ export type Clip = {
   color: string;
   drawing?: Shape[] | null;
   drawAt?: number; // segon del vídeo on es congela per mostrar el dibuix
+  team?: "us" | "rival"; // per posar l'escut de l'equip a l'etiqueta
 };
 export type Section = { title: string; sub: string; color: string; clips: Clip[] };
 
@@ -21,6 +22,7 @@ export type ExportOptions = {
   overlay: boolean; // nom de l'acció a sobre del vídeo
   drawings: boolean; // pausa amb el dibuix
   font: string; // família de la lletra (Escapulada)
+  crests?: { us: string | null; rival: string | null }; // adreces dels escuts (de l'app)
   onProgress?: (fraction: number) => void;
   signal?: AbortSignal;
 };
@@ -112,17 +114,21 @@ export async function exportClips(file: File, sections: Section[], o: ExportOpti
     };
 
     await document.fonts.load(`700 60px ${o.font}`).catch(() => undefined);
-    const crest = await loadImage("/escut.png");
+    const [crestUs, crestRival] = await Promise.all([
+      o.crests?.us ? loadImage(o.crests.us) : Promise.resolve(null),
+      o.crests?.rival ? loadImage(o.crests.rival) : Promise.resolve(null),
+    ]);
+    const crests = { us: crestUs, rival: crestRival };
 
     if (o.intro) {
-      drawCard(ctx, W, H, o.font, crest, o.intro.title, o.intro.sub, "#dbb34d");
+      drawCard(ctx, W, H, o.font, crests, o.intro.title, o.intro.sub, "#dbb34d", true);
       await hold(CARD_S);
     }
 
     for (const sec of sections) {
       check();
       if (o.cards) {
-        drawCard(ctx, W, H, o.font, crest, sec.title, sec.sub, sec.color);
+        drawCard(ctx, W, H, o.font, crests, sec.title, sec.sub, sec.color, false);
         await hold(CARD_S);
       }
       for (const clip of sec.clips) {
@@ -139,7 +145,7 @@ export async function exportClips(file: File, sections: Section[], o: ExportOpti
           ctx.fillStyle = "#000";
           ctx.fillRect(0, 0, W, H);
           ctx.drawImage(f.canvas, 0, 0, W, H);
-          if (o.overlay) drawLabel(ctx, W, H, o.font, clip);
+          if (o.overlay) drawLabel(ctx, W, H, o.font, clip, clip.team ? crests[clip.team] : null);
           if (freezeAt != null && !frozen && t >= freezeAt) {
             // Pausa amb el dibuix (com a l'app), i després continua.
             drawShapes(ctx, W, H, clip.drawing!);
@@ -232,7 +238,22 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, max: number, size:
 }
 
 /** Pantalla de títol (inici d'apartat). */
-function drawCard(ctx: CanvasRenderingContext2D, W: number, H: number, font: string, crest: HTMLImageElement | null, title: string, sub: string, color: string) {
+type Crests = { us: HTMLImageElement | null; rival: HTMLImageElement | null };
+
+/** Dibuixa un escut dins d'un quadrat (sense deformar-lo). */
+function drawCrest(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, size: number) {
+  const k = Math.min(size / img.naturalWidth, size / img.naturalHeight);
+  const w = img.naturalWidth * k, h = img.naturalHeight * k;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,.4)";
+  ctx.shadowBlur = size * 0.12;
+  ctx.shadowOffsetY = size * 0.04;
+  ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+  ctx.restore();
+}
+
+/** Pantalla de títol: inicial (escuts grans, un contra l'altre) o d'apartat (escuts més petits). */
+function drawCard(ctx: CanvasRenderingContext2D, W: number, H: number, font: string, crests: Crests, title: string, sub: string, color: string, intro: boolean) {
   const g = ctx.createLinearGradient(0, 0, W, H);
   g.addColorStop(0, "#0b1846");
   g.addColorStop(1, "#0a2ea0");
@@ -240,9 +261,20 @@ function drawCard(ctx: CanvasRenderingContext2D, W: number, H: number, font: str
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = color;
   ctx.fillRect(0, H * 0.62, W, H * 0.012);
-  if (crest) {
-    const s = H * 0.2;
-    ctx.drawImage(crest, (W - s) / 2, H * 0.12, s, s);
+  const size = H * (intro ? 0.26 : 0.18);
+  const cy = H * (intro ? 0.24 : 0.2);
+  const both = crests.us && crests.rival;
+  if (both) {
+    const gap = size * (intro ? 0.95 : 0.85);
+    drawCrest(ctx, crests.us!, W / 2 - gap, cy, size);
+    drawCrest(ctx, crests.rival!, W / 2 + gap, cy, size);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#dbb34d";
+    ctx.font = `400 ${Math.round(size * 0.32)}px ${font}`;
+    ctx.fillText("VS", W / 2, cy);
+  } else if (crests.us || crests.rival) {
+    drawCrest(ctx, (crests.us ?? crests.rival)!, W / 2, cy, size);
   }
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -255,7 +287,7 @@ function drawCard(ctx: CanvasRenderingContext2D, W: number, H: number, font: str
 }
 
 /** Etiqueta a sobre del vídeo: acció i minut (i jugadora). */
-function drawLabel(ctx: CanvasRenderingContext2D, W: number, H: number, font: string, c: Clip) {
+function drawLabel(ctx: CanvasRenderingContext2D, W: number, H: number, font: string, c: Clip, crest: HTMLImageElement | null) {
   const pad = Math.round(H * 0.022);
   const size = Math.round(H * 0.05);
   ctx.textAlign = "left";
@@ -266,20 +298,29 @@ function drawLabel(ctx: CanvasRenderingContext2D, W: number, H: number, font: st
   ctx.font = `400 ${Math.round(size * 0.7)}px ${font}`;
   const sub = (c.sub ?? "").toUpperCase();
   const wSub = sub ? ctx.measureText(sub).width : 0;
-  const boxW = Math.max(wMain, wSub) + pad * 2 + size * 0.4;
   const boxH = size * 1.3 + (sub ? size * 0.9 : 0);
+  const cw = crest ? boxH * 0.78 + pad * 0.6 : 0; // lloc per a l'escut de l'equip
+  const boxW = Math.max(wMain, wSub) + pad * 2 + size * 0.4 + cw;
   const x = pad, y = pad;
   ctx.fillStyle = "rgba(11,24,70,.82)";
   ctx.fillRect(x, y, boxW, boxH);
   ctx.fillStyle = c.color;
   ctx.fillRect(x, y, size * 0.22, boxH);
+  if (crest) {
+    const cs = boxH * 0.78;
+    const k = Math.min(cs / crest.naturalWidth, cs / crest.naturalHeight);
+    const w = crest.naturalWidth * k, h = crest.naturalHeight * k;
+    const cx = x + size * 0.22 + pad * 0.6 + cs / 2;
+    ctx.drawImage(crest, cx - w / 2, y + boxH / 2 - h / 2, w, h);
+  }
+  const tx = x + pad + size * 0.2 + cw;
   ctx.fillStyle = "#fff";
   ctx.font = `400 ${size}px ${font}`;
-  ctx.fillText(main, x + pad + size * 0.2, y + size * 0.68);
+  ctx.fillText(main, tx, y + size * 0.68);
   if (sub) {
     ctx.fillStyle = "#dbb34d";
     ctx.font = `400 ${Math.round(size * 0.7)}px ${font}`;
-    ctx.fillText(sub, x + pad + size * 0.2, y + size * 1.25 + size * 0.3);
+    ctx.fillText(sub, tx, y + size * 1.25 + size * 0.3);
   }
 }
 
