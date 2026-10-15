@@ -56,10 +56,11 @@ export const SIZE_MAX = 3;
 
 function ElView({ el, selected, arrowId }: { el: El; selected: boolean; arrowId: string }) {
   const k = el.s ?? 1;
-  if (el.t === "arrow" || k === 1) return <ElShape el={el} selected={selected} arrowId={arrowId} />;
-  // Mida: s'escala des del centre de l'element.
+  const r = "r" in el ? el.r ?? 0 : 0;
+  if (el.t === "arrow" || (k === 1 && !r)) return <ElShape el={el} selected={selected} arrowId={arrowId} />;
+  // Mida i orientació: des del centre de l'element.
   return (
-    <g transform={`translate(${el.x} ${el.y}) scale(${k}) translate(${-el.x} ${-el.y})`}>
+    <g transform={`translate(${el.x} ${el.y}) rotate(${r}) scale(${k}) translate(${-el.x} ${-el.y})`}>
       <ElShape el={el} selected={selected} arrowId={arrowId} />
     </g>
   );
@@ -137,6 +138,9 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
   const drag = useRef<{ id: string; ox: number; oy: number; moved: boolean } | null>(null);
   const [draft, setDraft] = useState<El | null>(null);
   const [size, setSize] = useState(1); // mida dels elements nous
+  const [grid, setGrid] = useState(false); // quadrícula (i enganxar-s'hi)
+  const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const spin = useRef<{ id: string } | null>(null); // girant amb la nansa
 
   const pt = (e: RPointerEvent) => {
     const m = svg.current!.getScreenCTM()!.inverse();
@@ -145,7 +149,46 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
   };
   const set = (els: El[]) => onChange({ ...value, els });
 
+  /**
+   * Referències: si l'element queda a prop de la mateixa alçada (o columna) que un altre, o del centre del camp,
+   * s'hi enganxa i es mostra una guia. Amb la quadrícula activada, s'enganxa a la quadrícula.
+   */
+  function snap(x: number, y: number, skip: string | null) {
+    const T = 1.3;
+    const xs: number[] = [W / 2];
+    const ys: number[] = [H / 2];
+    for (const el of value.els) {
+      if (el.id === skip) continue;
+      xs.push(el.x);
+      ys.push(el.y);
+      if (el.t === "arrow") {
+        xs.push(el.x2);
+        ys.push(el.y2);
+      }
+    }
+    const near = (v: number, list: number[]) =>
+      list.reduce<number | null>((best, c) => (Math.abs(c - v) < T && (best == null || Math.abs(c - v) < Math.abs(best - v)) ? c : best), null);
+    let gx = near(x, xs), gy = near(y, ys);
+    let nx = gx ?? x, ny = gy ?? y;
+    if (grid) {
+      if (gx == null) nx = Math.round(x / 2.5) * 2.5;
+      if (gy == null) ny = Math.round(y / 2.5) * 2.5;
+    }
+    nx = Math.round(Math.min(W, Math.max(0, nx)) * 10) / 10;
+    ny = Math.round(Math.min(H, Math.max(0, ny)) * 10) / 10;
+    if (gx != null) gx = nx;
+    if (gy != null) gy = ny;
+    return { x: nx, y: ny, gx, gy };
+  }
+
   function down(e: RPointerEvent<SVGSVGElement>) {
+    // Nansa de girar
+    const handle = (e.target as Element).closest("[data-rot]")?.getAttribute("data-rot");
+    if (handle) {
+      spin.current = { id: handle };
+      svg.current!.setPointerCapture(e.pointerId);
+      return;
+    }
     const p = pt(e);
     // Amb una fletxa triada, sempre es dibuixa (encara que es comenci sobre una jugadora).
     const hitId = tool.startsWith("a-") ? null : (e.target as Element).closest("[data-el]")?.getAttribute("data-el");
@@ -163,9 +206,10 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
       svg.current!.setPointerCapture(e.pointerId);
       return;
     }
+    const at = snap(p.x, p.y, null);
     const el: El = tool.startsWith("p-")
-      ? { id: uid(), t: "player", x: p.x, y: p.y, team: tool.slice(2) as Team }
-      : { id: uid(), t: tool as "cone" | "ball" | "minigoal" | "goal", x: p.x, y: p.y };
+      ? { id: uid(), t: "player", x: at.x, y: at.y, team: tool.slice(2) as Team }
+      : { id: uid(), t: tool as "cone" | "ball" | "minigoal" | "goal", x: at.x, y: at.y };
     if (size !== 1) el.s = size;
     set([...value.els, el]);
     setSel(el.id);
@@ -173,15 +217,29 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
 
   function move(e: RPointerEvent<SVGSVGElement>) {
     const p = pt(e);
-    if (draft && draft.t === "arrow") return setDraft({ ...draft, x2: p.x, y2: p.y });
+    if (spin.current) {
+      const el = value.els.find((x) => x.id === spin.current!.id);
+      if (!el || el.t === "arrow" || el.t === "player") return;
+      // angle des del centre; s'enganxa cada 15°
+      const deg = (Math.atan2(p.y - el.y, p.x - el.x) * 180) / Math.PI + 90;
+      const rr = (((Math.round(deg / 15) * 15) % 360) + 360) % 360;
+      return set(value.els.map((x) => (x.id === el.id && x.t !== "arrow" && x.t !== "player" ? { ...x, r: rr || undefined } : x)));
+    }
+    if (draft && draft.t === "arrow") {
+      const s2 = snap(p.x, p.y, null);
+      setGuides({ x: s2.gx, y: s2.gy });
+      return setDraft({ ...draft, x2: s2.x, y2: s2.y });
+    }
     const d = drag.current;
     if (!d) return;
     d.moved = true;
+    const s2 = snap(p.x - d.ox, p.y - d.oy, d.id);
+    setGuides({ x: s2.gx, y: s2.gy });
     set(
       value.els.map((el) => {
         if (el.id !== d.id) return el;
-        const nx = p.x - d.ox;
-        const ny = p.y - d.oy;
+        const nx = s2.x;
+        const ny = s2.y;
         return el.t === "arrow" ? { ...el, x: nx, y: ny, x2: el.x2 + (nx - el.x), y2: el.y2 + (ny - el.y) } : { ...el, x: nx, y: ny };
       }),
     );
@@ -196,11 +254,30 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
       setDraft(null);
     }
     drag.current = null;
+    spin.current = null;
+    setGuides({ x: null, y: null });
   }
 
   const selected = value.els.find((x) => x.id === sel) ?? null;
   const curSize = selected ? selected.s ?? 1 : size;
   /** Canvia la mida de l'element triat (o la dels nous, si no n'hi ha cap de triat). */
+  /** Gira l'element triat (les fletxes giren al voltant del seu punt mig). */
+  function rotate(deg: number, absolute = false) {
+    if (!selected) return;
+    if (selected.t === "arrow") {
+      const cx = (selected.x + selected.x2) / 2, cy = (selected.y + selected.y2) / 2;
+      const a = (deg * Math.PI) / 180;
+      const rot = (x: number, y: number) => [cx + (x - cx) * Math.cos(a) - (y - cy) * Math.sin(a), cy + (x - cx) * Math.sin(a) + (y - cy) * Math.cos(a)];
+      const [x1, y1] = rot(selected.x, selected.y);
+      const [x2, y2] = rot(selected.x2, selected.y2);
+      const k = (v: number) => Math.round(v * 10) / 10;
+      return set(value.els.map((x) => (x.id === selected.id && x.t === "arrow" ? { ...x, x: k(x1), y: k(y1), x2: k(x2), y2: k(y2) } : x)));
+    }
+    if (selected.t === "player") return;
+    const cur = selected.r ?? 0;
+    const next = (((absolute ? deg : cur + deg) % 360) + 360) % 360;
+    set(value.els.map((x) => (x.id === selected.id && x.t !== "arrow" && x.t !== "player" ? { ...x, r: next || undefined } : x)));
+  }
   const resize = (v: number) => {
     const k = Math.round(Math.min(SIZE_MAX, Math.max(SIZE_MIN, v)) * 10) / 10;
     if (!selected) return setSize(k);
@@ -236,6 +313,12 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
       >
         <Markers id={id} />
         <FieldBg field={value.field} />
+        {grid && (
+          <g stroke="rgba(255,255,255,.18)" strokeWidth={0.12}>
+            {Array.from({ length: Math.floor(W / 5) - 1 }, (_, i) => <line key={`gx${i}`} x1={(i + 1) * 5} y1={0} x2={(i + 1) * 5} y2={H} />)}
+            {Array.from({ length: Math.floor(H / 5) }, (_, i) => <line key={`gy${i}`} x1={0} y1={(i + 1) * 5} x2={W} y2={(i + 1) * 5} />)}
+          </g>
+        )}
         {value.els.map((el) => (
           <g key={el.id} data-el={el.id} style={{ cursor: "grab" }}>
             {el.t === "arrow" && <line x1={el.x} y1={el.y} x2={el.x2} y2={el.y2} stroke="transparent" strokeWidth={3 * Math.max(1, el.s ?? 1)} />}
@@ -243,6 +326,22 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
           </g>
         ))}
         {draft && <ElView el={draft} selected={false} arrowId={id} />}
+        {/* Guies d'alineació mentre s'arrossega */}
+        {guides.x != null && <line x1={guides.x} y1={0} x2={guides.x} y2={H} stroke="#ffd400" strokeWidth={0.25} strokeDasharray="1 0.8" pointerEvents="none" />}
+        {guides.y != null && <line x1={0} y1={guides.y} x2={W} y2={guides.y} stroke="#ffd400" strokeWidth={0.25} strokeDasharray="1 0.8" pointerEvents="none" />}
+        {/* Nansa per girar l'element triat */}
+        {selected && selected.t !== "arrow" && selected.t !== "player" && selected.t !== "ball" && (() => {
+          const d = 3.4 * (selected.s ?? 1) + 1.2;
+          const a = (((selected.r ?? 0) - 90) * Math.PI) / 180;
+          const hx = selected.x + Math.cos(a) * d, hy = selected.y + Math.sin(a) * d;
+          return (
+            <g data-rot={selected.id} style={{ cursor: "grab" }}>
+              <line x1={selected.x} y1={selected.y} x2={hx} y2={hy} stroke="#ffd400" strokeWidth={0.2} pointerEvents="none" />
+              <circle cx={hx} cy={hy} r={1.6} fill="transparent" />
+              <circle cx={hx} cy={hy} r={0.75} fill="#ffd400" stroke="#0b1846" strokeWidth={0.2} />
+            </g>
+          );
+        })()}
       </svg>
       <div className="row" style={{ gap: 6, marginTop: 6 }}>
         <select aria-label="Tipus de camp" value={value.field} onChange={(e) => onChange({ ...value, field: e.target.value as Field })} style={{ width: "auto" }}>
@@ -292,6 +391,24 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
             Aplicar a tots
           </button>
         )}
+      </div>
+      <div className="drill-size">
+        <label>Orientació</label>
+        {selected && selected.t !== "player" && selected.t !== "ball" ? (
+          <>
+            <button type="button" className="btn small secondary" onClick={() => rotate(-15)} aria-label="Girar a l'esquerra">↺ 15°</button>
+            <button type="button" className="btn small secondary" onClick={() => rotate(15)} aria-label="Girar a la dreta">↻ 15°</button>
+            <button type="button" className="btn small secondary" onClick={() => rotate(90)}>↻ 90°</button>
+            {selected.t !== "arrow" && <b>{selected.r ?? 0}°</b>}
+            {selected.t !== "arrow" && !!selected.r && <button type="button" className="btn small secondary" onClick={() => rotate(0, true)}>Recte</button>}
+          </>
+        ) : (
+          <span className="muted small">Toca una porteria, un con o una fletxa per girar-la (o arrossega el punt groc).</span>
+        )}
+      </div>
+      <div className="drill-size">
+        <label><input type="checkbox" checked={grid} onChange={(e) => setGrid(e.target.checked)} /> Quadrícula</label>
+        <span className="muted small">Les guies grogues surten soles quan un element queda alineat amb un altre o amb el centre.</span>
       </div>
       <p className="muted small" style={{ margin: "4px 0 0" }}>
         Tria una eina i toca el camp. Les fletxes es dibuixen arrossegant. Amb ✋ (o tocant un element) el pots moure i canviar-ne la mida.
