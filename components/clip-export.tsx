@@ -15,7 +15,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).
 
 /** Descarregar els talls del vídeo: un per un, per apartats (accions) o tots junts. */
 export function ClipExport({ match, events, buttons, file, playerName }: {
-  match: AMatch; events: AEvent[]; buttons: AButton[]; file: File | null; playerName: (id: string | null) => string;
+  match: AMatch; events: AEvent[]; buttons: AButton[]; file: File | string | null; playerName: (id: string | null) => string;
 }) {
   const L = teamLabels(match);
   const [team, setTeam] = useState<TeamFilter>("us");
@@ -99,6 +99,9 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
       setMsg({ ok: true, text: `Fet: ${f.name} (${Math.round(f.size / 1e6)} MB).` });
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") setMsg({ ok: true, text: "Cancel·lat." });
+      else if (typeof file === "string" && !(e instanceof ExportError))
+        // Veo no sempre deixa llegir el vídeo des d'una altra web: llavors cal el fitxer.
+        setMsg({ ok: false, text: "Veo no deixa retallar aquest vídeo des de l'enllaç. Descarrega el partit de Veo (MP4) i obre'l com a fitxer per fer els talls." });
       else setMsg({ ok: false, text: e instanceof ExportError ? e.message : `No s'ha pogut fer el vídeo: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
       setJob(null);

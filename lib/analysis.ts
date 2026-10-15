@@ -11,7 +11,7 @@ export type AMatch = {
   is_home: boolean;
   goals_for: number | null;
   goals_against: number | null;
-  video_source: "file" | "youtube" | null;
+  video_source: "file" | "youtube" | "veo" | null;
   video_ref: string | null;
   video_offset: number;
   video_offset_h2: number | null;

@@ -419,6 +419,9 @@ create table if not exists public.analysis_matches (
 create index if not exists analysis_matches_owner_idx on public.analysis_matches (owner_id, match_date desc);
 -- Tipus d'anàlisi: un partit nostre o un vídeo d'un rival (scouting).
 alter table public.analysis_matches add column if not exists kind text not null default 'own' check (kind in ('own', 'rival'));
+-- Vídeo: fitxer del dispositiu, YouTube o enllaç de Veo (en aquest cas video_ref és l'enllaç).
+alter table public.analysis_matches drop constraint if exists analysis_matches_video_source_check;
+alter table public.analysis_matches add constraint analysis_matches_video_source_check check (video_source in ('file', 'youtube', 'veo'));
 
 -- INFORME DEL RIVAL (scouting): un per rival i partit. "fields" = sistema, jugadores clau, punts forts...
 create table if not exists public.rival_scouting (

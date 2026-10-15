@@ -44,12 +44,13 @@ export function totalSeconds(sections: Section[], o: Pick<ExportOptions, "cards"
   return t;
 }
 
-export async function exportClips(file: File, sections: Section[], o: ExportOptions): Promise<Blob> {
+/** `file`: el fitxer del dispositiu o l'adreça del vídeo (Veo). */
+export async function exportClips(file: File | string, sections: Section[], o: ExportOptions): Promise<Blob> {
   const mb = await import("mediabunny");
   if (typeof VideoEncoder === "undefined") {
     throw new ExportError("Aquest navegador no pot fer vídeos. Fes servir Safari (iPad/iPhone actualitzat) o Chrome.");
   }
-  const input = new mb.Input({ source: new mb.BlobSource(file), formats: mb.ALL_FORMATS });
+  const input = new mb.Input({ source: typeof file === "string" ? new mb.UrlSource(file) : new mb.BlobSource(file), formats: mb.ALL_FORMATS });
   try {
     const vTrack = await input.getPrimaryVideoTrack();
     if (!vTrack || !(await vTrack.canDecode())) throw new ExportError("No es pot llegir el vídeo d'aquest fitxer en aquest dispositiu.");

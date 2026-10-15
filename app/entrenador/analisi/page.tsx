@@ -213,6 +213,15 @@ function writeLive(id: string, l: Live) {
 }
 const liveNow = (l: Live) => l.acc + (l.running ? (Date.now() - l.startedAt) / 1000 : 0);
 
+/** Enllaç de Veo → adreça del vídeo (la busca el servidor de l'app). */
+async function resolveVeo(link: string): Promise<{ video_url: string; title: string | null; link: string }> {
+  const { data } = await supabase().auth.getSession();
+  const res = await fetch(`/api/veo?url=${encodeURIComponent(link)}`, { headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` }, cache: "no-store" });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+  return j;
+}
+
 function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [match, setMatch] = useState<AMatch | null>(null);
   const [events, setEvents] = useState<AEvent[]>([]);
@@ -222,7 +231,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [tab, setTab] = useState<"tag" | "list" | "clips" | "stats" | "report">("tag");
   const [mode, setMode] = useState<"video" | "live">("video");
-  const [src, setSrc] = useState<{ kind: "file" | "youtube"; url: string } | null>(null);
+  const [src, setSrc] = useState<{ kind: "file" | "youtube"; url: string; veo?: boolean } | null>(null);
+  const [veoBusy, setVeoBusy] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null); // per fer els talls
   const [vt, setVt] = useState(0);
   const [live, setLive] = useState<Live>({ running: false, startedAt: 0, acc: 0 });
@@ -266,6 +276,13 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
         setTab("list");
       }
       if (mm.video_source === "youtube" && mm.video_ref) setSrc({ kind: "youtube", url: mm.video_ref });
+      // Veo: l'adreça del vídeo pot caducar, així que es torna a demanar cada cop a partir de l'enllaç.
+      if (mm.video_source === "veo" && mm.video_ref) {
+        resolveVeo(mm.video_ref).then(
+          (v) => setSrc({ kind: "file", url: v.video_url, veo: true }),
+          (e) => setMsg({ ok: false, text: `No s'ha pogut obrir el vídeo de Veo: ${e instanceof Error ? e.message : e}` }),
+        );
+      }
     })().catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [id]);
 
@@ -373,6 +390,28 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (match?.video_ref !== f.name || match?.video_source !== "file") saveMatch({ video_source: "file", video_ref: f.name });
   }
 
+  /** Enllaç de YouTube o de Veo. */
+  async function openLink() {
+    const link = ytUrl.trim();
+    if (/veo\.(co|com)\//i.test(link)) {
+      setVeoBusy(true);
+      setMsg(null);
+      try {
+        const v = await resolveVeo(link);
+        setSrc({ kind: "file", url: v.video_url, veo: true });
+        setVideoFile(null);
+        setMode("video");
+        if (match?.video_ref !== v.link || match?.video_source !== "veo") saveMatch({ video_source: "veo", video_ref: v.link.slice(0, 300) });
+      } catch (e) {
+        setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+      } finally {
+        setVeoBusy(false);
+      }
+      return;
+    }
+    openYoutube();
+  }
+
   function openYoutube() {
     const yid = youtubeId(ytUrl);
     if (!yid) return setMsg({ ok: false, text: "Aquest enllaç de YouTube no és vàlid." });
@@ -462,10 +501,13 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                     <p className="muted small" style={{ margin: 0 }}>L&apos;últim cop vas fer servir «{match.video_ref}». Torna&apos;l a obrir (el vídeo no es guarda a l&apos;app).</p>
                   )}
                   <div className="row" style={{ flexWrap: "nowrap", gap: 6 }}>
-                    <input type="text" placeholder="…o enganxa un enllaç de YouTube" value={ytUrl} onChange={(e) => setYtUrl(e.target.value)} />
-                    <button className="btn small" onClick={openYoutube}>Obrir</button>
+                    <input type="text" placeholder="…o enganxa l'enllaç de Veo o de YouTube" value={ytUrl} onChange={(e) => setYtUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && openLink()} />
+                    <button className="btn small" disabled={veoBusy || !ytUrl.trim()} onClick={openLink}>{veoBusy ? "Obrint…" : "Obrir"}</button>
                   </div>
-                  <p className="muted small" style={{ margin: 0 }}>De Veo: descarrega el partit (MP4) des de l&apos;app o la web de Veo i obre&apos;l aquí.</p>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    Veo: a l&apos;app o la web de Veo, Compartir → copiar l&apos;enllaç (el partit ha de ser «Públic») i enganxa&apos;l aquí. Es recordarà per a la propera vegada.
+                  </p>
                 </div>
               ) : (
                 <>
@@ -493,10 +535,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                     <select aria-label="Velocitat" value={rateV} onChange={(e) => { const r = Number(e.target.value); setRateV(r); player.current?.rate(r); }}>
                       {[0.25, 0.5, 1, 1.5, 2].map((r) => <option key={r} value={r}>{r}x</option>)}
                     </select>
-                    <label className="an-small-link">
-                      Canviar
-                      <input type="file" accept="video/*" onChange={openFile} hidden />
-                    </label>
+                    <button type="button" className="an-small-link" onClick={() => setSrc(null)}>Canviar</button>
                   </div>
                   {playing && (
                     <div className="an-playing">
@@ -594,7 +633,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
           )}
 
           {tab === "clips" && (
-            <ClipExport match={match} events={events} buttons={buttons} file={videoFile} playerName={(pid) => (pid ? name(pid) : "")} />
+            <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")} />
           )}
 
           {tab === "stats" && (
