@@ -432,6 +432,19 @@ create table if not exists public.rival_scouting (
   constraint rival_scouting_one unique (owner_id, rival_key, match_date)
 );
 
+-- PISSARRA TÀCTICA (només el responsable): escenes amb fitxes, dibuixos i animació (fotogrames).
+create table if not exists public.tactic_boards (
+  id         uuid primary key default gen_random_uuid(),
+  owner_id   uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  title      text not null check (char_length(trim(title)) between 1 and 120),
+  rival_key  text check (rival_key is null or char_length(rival_key) <= 80),
+  match_date date,
+  data       jsonb not null default '{}'::jsonb check (jsonb_typeof(data) = 'object' and octet_length(data::text) < 1500000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists tactic_boards_owner_idx on public.tactic_boards (owner_id, updated_at desc);
+
 -- CORRECCIONS: coses a corregir de l'equip o de jugadores, amb clips del vídeo.
 create table if not exists public.corrections (
   id          uuid primary key default gen_random_uuid(),
@@ -1018,8 +1031,8 @@ returns trigger language plpgsql set search_path = '' as $$
 begin
   if tg_op = 'UPDATE' then
     new.owner_id := old.owner_id;
-    if tg_table_name in ('analysis_matches', 'corrections') then new.created_at := old.created_at; end if;
-    if tg_table_name in ('analysis_matches', 'corrections', 'rival_scouting') then new.updated_at := now(); end if;
+    if tg_table_name in ('analysis_matches', 'corrections', 'tactic_boards') then new.created_at := old.created_at; end if;
+    if tg_table_name in ('analysis_matches', 'corrections', 'rival_scouting', 'tactic_boards') then new.updated_at := now(); end if;
     if tg_table_name = 'analysis_events' then new.match_id := old.match_id; end if;
   end if;
   return new;
@@ -1032,6 +1045,9 @@ create trigger analysis_events_stamp before insert or update on public.analysis_
   for each row execute function public.stamp_analysis();
 drop trigger if exists rival_scouting_stamp on public.rival_scouting;
 create trigger rival_scouting_stamp before insert or update on public.rival_scouting
+  for each row execute function public.stamp_analysis();
+drop trigger if exists tactic_boards_stamp on public.tactic_boards;
+create trigger tactic_boards_stamp before insert or update on public.tactic_boards
   for each row execute function public.stamp_analysis();
 drop trigger if exists corrections_stamp on public.corrections;
 create trigger corrections_stamp before insert or update on public.corrections
@@ -1161,6 +1177,7 @@ alter table public.analysis_matches   enable row level security;
 alter table public.analysis_events    enable row level security;
 alter table public.analysis_buttons   enable row level security;
 alter table public.rival_scouting     enable row level security;
+alter table public.tactic_boards      enable row level security;
 alter table public.corrections        enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
@@ -1171,7 +1188,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.training_plans,
-  public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections from anon, authenticated;
+  public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -1194,8 +1211,8 @@ grant all on public.convocation_guests to service_role;
 grant select, insert, update, delete on public.convocation_guests to authenticated;
 grant all on public.injuries, public.rehab_entries, public.player_positions, public.training_plans to service_role;
 grant select, insert, update, delete on public.injuries, public.player_positions, public.training_plans to authenticated;
-grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections to service_role;
-grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections to authenticated;
+grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to service_role;
+grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
 grant select, insert, update on public.rehab_entries to authenticated;
 revoke all on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) from public, anon;
 grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) to authenticated;
@@ -1391,6 +1408,10 @@ create policy analysis_buttons_owner on public.analysis_buttons for all to authe
 
 drop policy if exists rival_scouting_owner on public.rival_scouting;
 create policy rival_scouting_owner on public.rival_scouting for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner()));
+drop policy if exists tactic_boards_owner on public.tactic_boards;
+create policy tactic_boards_owner on public.tactic_boards for all to authenticated
   using (owner_id = (select auth.uid()) and (select public.is_owner()))
   with check (owner_id = (select auth.uid()) and (select public.is_owner()));
 drop policy if exists corrections_owner on public.corrections;

@@ -7,6 +7,7 @@ import { AddToCorrection, CorrectionsPanel } from "@/components/corrections";
 import { RivalPanel } from "@/components/rival-scout";
 import { AnalysisSeason } from "@/components/analysis-season";
 import { ClipExport } from "@/components/clip-export";
+import { TacticsHome } from "@/components/tactics-home";
 import { AnalysisStats, ZonePitch, type APlayer } from "@/components/analysis-stats";
 import { DrawingEditor, DrawingOverlay, type Shape } from "@/components/telestrator";
 import { matchInsights } from "@/lib/analysis-insights";
@@ -48,7 +49,7 @@ function Analysis() {
   return <div className={`an-font ${escapulada.variable}`}>{id ? <Workspace key={id} id={id} onBack={() => go(null)} /> : <AnalysisHome onOpen={go} tab={tab} choose={setTab} />}</div>;
 }
 
-type HomeTab = "rival" | "corr" | "own";
+type HomeTab = "rival" | "board" | "corr" | "own";
 
 /** Inici de l'Anàlisi: proper rival, correccions i els nostres partits. */
 function AnalysisHome({ onOpen, tab, choose }: { onOpen: (id: string) => void; tab: HomeTab; choose: (t: HomeTab) => void }) {
@@ -60,10 +61,12 @@ function AnalysisHome({ onOpen, tab, choose }: { onOpen: (id: string) => void; t
       </div>
       <div className="tabs an-home-tabs" style={{ margin: "10px 0" }}>
         <button aria-pressed={tab === "rival"} onClick={() => choose("rival")}>Proper rival</button>
+        <button aria-pressed={tab === "board"} onClick={() => choose("board")}>Pissarra</button>
         <button aria-pressed={tab === "corr"} onClick={() => choose("corr")}>Correccions</button>
         <button aria-pressed={tab === "own"} onClick={() => choose("own")}>Els nostres partits</button>
       </div>
       {tab === "rival" && <RivalPanel onOpen={onOpen} />}
+      {tab === "board" && <TacticsHome />}
       {tab === "corr" && <CorrectionsPanel />}
       {tab === "own" && <MatchList onOpen={onOpen} />}
     </>
