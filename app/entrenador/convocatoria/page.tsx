@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ConvoSheet } from "@/components/convo-sheet";
 import { LineupBoard } from "@/components/pitch";
 import { CoachShell, Footer } from "@/components/ui";
-import { CONVO_COLS, fetchConvocations, fetchRoster, GUEST_ORIGINS, hhmm, type Convocation, type RosterRow } from "@/lib/convo";
+import { CONVO_COLS, fetchConvocations, fetchRoster, GUEST_ORIGINS, hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
@@ -199,15 +199,23 @@ function ConvoForm({ c, onSaved }: { c?: Convocation; onSaved: (id: string) => v
         <label className="field" htmlFor="caddr">Adreça (opcional)</label>
         <input id="caddr" type="text" maxLength={200} value={f.address} onChange={(e) => set("address", e.target.value)} />
       </div>
-      <div className="row" style={{ flexWrap: "nowrap" }}>
-        <div style={{ flex: 1 }}>
-          <label className="field" htmlFor="ckit">Equipació</label>
-          <input id="ckit" type="text" maxLength={80} placeholder="Ex.: Blava (1a)" value={f.kit} onChange={(e) => set("kit", e.target.value)} />
+      <div>
+        <label className="field">Equipació</label>
+        <div className="kit-choose" role="group" aria-label="Equipació">
+          {KITS.map((k) => (
+            <button key={k.key} type="button" aria-pressed={kitOf(f.kit) === k.key} onClick={() => set("kit", k.value)}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={k.img} alt="" width={90} height={100} />
+              <span>{k.label}</span>
+            </button>
+          ))}
         </div>
-        <div style={{ flex: 1 }}>
-          <label className="field" htmlFor="ccomp">Competició</label>
-          <input id="ccomp" type="text" maxLength={80} value={f.competition} onChange={(e) => set("competition", e.target.value)} />
-        </div>
+        <input id="ckit" type="text" maxLength={80} placeholder="Detall opcional (ex.: 2a equipació amb mitges blanques)" value={f.kit}
+          onChange={(e) => set("kit", e.target.value)} aria-label="Equipació (text)" style={{ marginTop: 6 }} />
+      </div>
+      <div>
+        <label className="field" htmlFor="ccomp">Competició</label>
+        <input id="ccomp" type="text" maxLength={80} value={f.competition} onChange={(e) => set("competition", e.target.value)} />
       </div>
       <div>
         <label className="field" htmlFor="cnotes">Notes (opcional)</label>

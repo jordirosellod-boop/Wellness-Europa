@@ -2,7 +2,7 @@
 
 import { Crest } from "@/components/crest";
 import { useEffect, useState } from "react";
-import { FORMATION_NAMES, FORMATIONS, hhmm, type Convocation, type RosterRow } from "@/lib/convo";
+import { FORMATION_NAMES, FORMATIONS, hhmm, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { escapulada } from "@/lib/fonts";
 import { supabase } from "@/lib/supabase";
 import { fmtDate } from "@/lib/wellness";
@@ -47,6 +47,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [picking, setPicking] = useState<number | null>(null);
+  const defaultKit = kitOf(c.kit) ?? "home"; // si encara no hi ha onze, l'equipació de la convocatòria
   useEffect(() => {
     let alive = true;
     supabase()
@@ -57,12 +58,12 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
       .then(({ data, error: e }) => {
         if (!alive) return;
         if (e) return setError(e.message);
-        setLineup((data as Lineup | null) ?? { formation: "4-4-2", slots: {}, kit: "home" });
+        setLineup((data as Lineup | null) ?? { formation: "4-4-2", slots: {}, kit: defaultKit });
       });
     return () => {
       alive = false;
     };
-  }, [c.id]);
+  }, [c.id, defaultKit]);
 
   const called = roster.filter((r) => r.called);
   const byId = new Map(roster.map((r) => [r.player_id, r]));

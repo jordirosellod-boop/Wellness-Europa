@@ -1097,3 +1097,24 @@ body:has(.an-font) .picker, body:has(.an-font) .picker * {
 .plan-text .plan-sec { margin-bottom: 12px; }
 .plan-text .plan-sec input { font-family: var(--font-escapulada), var(--display); text-transform: uppercase; color: var(--blau); }
 .plan-text textarea { margin-top: 4px; }
+
+/* Equipació (convocatòria) */
+.kit-choose { display: flex; gap: 8px; flex-wrap: wrap; }
+.kit-choose button {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 12px; border-radius: 12px;
+  border: 2px solid var(--vora); background: #fff; cursor: pointer; font: inherit; font-weight: 700; color: var(--navy);
+}
+.kit-choose button img { width: 78px; height: auto; }
+.kit-choose button[aria-pressed="true"] { border-color: var(--navy); box-shadow: 0 0 0 2px var(--or) inset; background: #f3f5fa; }
+.convo-kit {
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 14px; padding: 10px 12px 12px; margin: 0 0 16px;
+  text-align: center;
+}
+.convo-kit-k { font-family: var(--display); text-transform: uppercase; letter-spacing: .6px; color: var(--or); font-size: .8rem; }
+.convo-kit-shirts { display: flex; align-items: flex-end; justify-content: center; gap: 18px; margin-top: 6px; }
+.convo-kit-shirts figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.convo-kit-shirts img { width: 132px; height: auto; filter: drop-shadow(0 8px 16px rgba(0,0,0,.4)); }
+.convo-kit-shirts .gk img { width: 86px; }
+.convo-kit-shirts figcaption { font-family: var(--display); text-transform: uppercase; letter-spacing: .5px; font-size: .95rem; }
+.convo-kit-shirts .gk figcaption { font-size: .8rem; opacity: .85; }
+.convo-kit-note { margin: 6px 0 0; font-weight: 600; font-size: .9rem; opacity: .9; }

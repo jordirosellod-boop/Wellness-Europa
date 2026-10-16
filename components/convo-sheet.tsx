@@ -1,7 +1,7 @@
 "use client";
 
 import { Crest } from "@/components/crest";
-import { hhmm, type Convocation, type RosterRow } from "@/lib/convo";
+import { hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { kitFont } from "@/lib/fonts";
 import { fmtDate } from "@/lib/wellness";
 
@@ -22,6 +22,8 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
   const home = c.is_home ? "CE Europa" : c.rival;
   const away = c.is_home ? c.rival : "CE Europa";
   const place = [c.venue, c.address].filter(Boolean).join(", ");
+  const kitKey = kitOf(c.kit);
+  const kit = kitKey ? KITS.find((k) => k.key === kitKey)! : null;
 
   return (
     <article className={`convo ${kitFont.variable}`}>
@@ -50,7 +52,7 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
       <dl className="convo-info">
         {c.meet_time && (<div><dt>Quedada</dt><dd>{hhmm(c.meet_time)} h</dd></div>)}
         {c.kickoff && (<div><dt>Partit</dt><dd>{hhmm(c.kickoff)} h</dd></div>)}
-        {c.kit && (<div><dt>Equipació</dt><dd>{c.kit}</dd></div>)}
+        {c.kit && !kit && (<div><dt>Equipació</dt><dd>{c.kit}</dd></div>)}
         {place && (
           <div className="wide">
             <dt>Camp</dt>
@@ -59,6 +61,25 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
         )}
         {c.notes && (<div className="wide"><dt>Notes</dt><dd style={{ whiteSpace: "pre-line" }}>{c.notes}</dd></div>)}
       </dl>
+
+      {kit && (
+        <div className="convo-kit">
+          <span className="convo-kit-k">Equipació</span>
+          <div className="convo-kit-shirts">
+            <figure>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={kit.img} alt={kit.label} width={150} height={168} />
+              <figcaption>{kit.label}</figcaption>
+            </figure>
+            <figure className="gk">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/kits/gk.webp" alt="Portera" width={104} height={116} />
+              <figcaption>Portera</figcaption>
+            </figure>
+          </div>
+          {c.kit && !KITS.some((k) => k.value === c.kit) && <p className="convo-kit-note">{c.kit}</p>}
+        </div>
+      )}
 
       <h3 className="convo-sub">Convocades <span>{called.length}</span></h3>
       {called.length === 0 ? (
