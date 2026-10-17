@@ -71,6 +71,7 @@ function CoachCalendar() {
             <>
               <Link className="btn small" href="/entrenador/plantilla">📋 Plantilles</Link>
               <Link className="btn small" href="/entrenador/analisi">🎬 Anàlisi</Link>
+              <Link className="btn small" href="/entrenador/bigdata">📊 Big Data</Link>
             </>
           )}
           <Link className="btn small secondary" href="/entrenador/programacio">⟳ Programacions</Link>

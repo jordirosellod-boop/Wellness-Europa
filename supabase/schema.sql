@@ -448,6 +448,31 @@ create table if not exists public.tactic_boards (
 );
 create index if not exists tactic_boards_owner_idx on public.tactic_boards (owner_id, updated_at desc);
 
+-- BIG DATA DE LA LLIGA: actes de la FCF ja llegides (dades públiques), perquè no calgui baixar-les cada cop.
+-- Només hi escriu i en llegeix el servidor (sense polítiques: cap usuari hi té accés directe).
+create table if not exists public.fcf_league_actas (
+  acta_id    text primary key check (acta_id ~ '^[0-9]{1,12}$'),
+  grup_id    text not null check (grup_id ~ '^[0-9]{1,12}$'),
+  jornada    smallint,
+  data       jsonb not null check (jsonb_typeof(data) = 'object' and octet_length(data::text) < 200000),
+  fetched_at timestamptz not null default now()
+);
+create index if not exists fcf_league_actas_grup_idx on public.fcf_league_actas (grup_id);
+
+-- Jugadores en seguiment (possibles fitxatges). Només el responsable. Dades mínimes: nom, equip i una nota.
+create table if not exists public.scouting_targets (
+  id         uuid primary key default gen_random_uuid(),
+  owner_id   uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  fcf_id     text not null check (fcf_id ~ '^[0-9]{1,12}$'),
+  name       text not null check (char_length(trim(name)) between 1 and 80),
+  team       text check (team is null or char_length(team) <= 80),
+  status     text not null default 'seguiment' check (status in ('seguiment', 'contactar', 'descartada')),
+  note       text check (note is null or char_length(note) <= 500),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint scouting_targets_one unique (owner_id, fcf_id)
+);
+
 -- CORRECCIONS: coses a corregir de l'equip o de jugadores, amb clips del vídeo.
 create table if not exists public.corrections (
   id          uuid primary key default gen_random_uuid(),
@@ -1034,8 +1059,8 @@ returns trigger language plpgsql set search_path = '' as $$
 begin
   if tg_op = 'UPDATE' then
     new.owner_id := old.owner_id;
-    if tg_table_name in ('analysis_matches', 'corrections', 'tactic_boards') then new.created_at := old.created_at; end if;
-    if tg_table_name in ('analysis_matches', 'corrections', 'rival_scouting', 'tactic_boards') then new.updated_at := now(); end if;
+    if tg_table_name in ('analysis_matches', 'corrections', 'tactic_boards', 'scouting_targets') then new.created_at := old.created_at; end if;
+    if tg_table_name in ('analysis_matches', 'corrections', 'rival_scouting', 'tactic_boards', 'scouting_targets') then new.updated_at := now(); end if;
     if tg_table_name = 'analysis_events' then new.match_id := old.match_id; end if;
   end if;
   return new;
@@ -1048,6 +1073,9 @@ create trigger analysis_events_stamp before insert or update on public.analysis_
   for each row execute function public.stamp_analysis();
 drop trigger if exists rival_scouting_stamp on public.rival_scouting;
 create trigger rival_scouting_stamp before insert or update on public.rival_scouting
+  for each row execute function public.stamp_analysis();
+drop trigger if exists scouting_targets_stamp on public.scouting_targets;
+create trigger scouting_targets_stamp before insert or update on public.scouting_targets
   for each row execute function public.stamp_analysis();
 drop trigger if exists tactic_boards_stamp on public.tactic_boards;
 create trigger tactic_boards_stamp before insert or update on public.tactic_boards
@@ -1181,6 +1209,8 @@ alter table public.analysis_events    enable row level security;
 alter table public.analysis_buttons   enable row level security;
 alter table public.rival_scouting     enable row level security;
 alter table public.tactic_boards      enable row level security;
+alter table public.fcf_league_actas   enable row level security;
+alter table public.scouting_targets   enable row level security;
 alter table public.corrections        enable row level security;
 
 -- Permisos mínims, explícits (funciona tant si Supabase exposa les taules
@@ -1191,7 +1221,8 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.training_plans,
-  public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards from anon, authenticated;
+  public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
+  public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
 grant select, insert, update         on public.wellness, public.rpe          to authenticated;
@@ -1216,6 +1247,8 @@ grant all on public.injuries, public.rehab_entries, public.player_positions, pub
 grant select, insert, update, delete on public.injuries, public.player_positions, public.training_plans to authenticated;
 grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to service_role;
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
+grant all on public.fcf_league_actas, public.scouting_targets to service_role;
+grant select, insert, update, delete on public.scouting_targets to authenticated;
 grant select, insert, update on public.rehab_entries to authenticated;
 revoke all on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) from public, anon;
 grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) to authenticated;
@@ -1411,6 +1444,10 @@ create policy analysis_buttons_owner on public.analysis_buttons for all to authe
 
 drop policy if exists rival_scouting_owner on public.rival_scouting;
 create policy rival_scouting_owner on public.rival_scouting for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner()));
+drop policy if exists scouting_targets_owner on public.scouting_targets;
+create policy scouting_targets_owner on public.scouting_targets for all to authenticated
   using (owner_id = (select auth.uid()) and (select public.is_owner()))
   with check (owner_id = (select auth.uid()) and (select public.is_owner()));
 drop policy if exists tactic_boards_owner on public.tactic_boards;

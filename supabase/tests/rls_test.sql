@@ -563,12 +563,17 @@ insert into public.rival_scouting (rival_key, rival_name, match_date, fields) va
 insert into public.corrections (title, category, player_ids) values ('Distàncies entre línies', 'Defensa', '{00000000-0000-0000-0000-0000000000b2}');
 select pg_temp.check((select count(*) from public.rival_scouting) = 1 and (select count(*) from public.corrections) = 1, 'El responsable fa l''informe del rival i correccions');
 insert into public.tactic_boards (title, data) values ('Pressió alta', '{"frames":[]}');
+insert into public.scouting_targets (fcf_id, name, team, note) values ('44659047', 'Lena B.', 'Girona', 'Molt ràpida');
+select pg_temp.check((select count(*) from public.scouting_targets) = 1, 'El responsable fa seguiment d''una jugadora');
+select pg_temp.expect_error($$insert into public.scouting_targets (fcf_id, name, status) values ('1', 'x', 'fitxada')$$, 'Estat de seguiment no vàlid rebutjat');
+select pg_temp.expect_error($$select * from public.fcf_league_actas$$, 'Ningú (ni el responsable) llegeix les actes directament');
 select pg_temp.check((select count(*) from public.tactic_boards) = 1, 'El responsable desa una pissarra tàctica');
 select pg_temp.expect_error($$insert into public.tactic_boards (title, data) values ('x', '[]')$$, 'La pissarra ha de ser un objecte');
 select pg_temp.expect_error($$insert into public.corrections (title, status) values ('x', 'fet')$$, 'Estat de correcció no vàlid rebutjat');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c2', false);
 select pg_temp.check((select count(*) from public.rival_scouting) + (select count(*) from public.corrections) = 0, 'La resta del staff no veu ni el rival ni les correccions');
 select pg_temp.check((select count(*) from public.tactic_boards) = 0, 'La resta del staff no veu les pissarres');
+select pg_temp.check((select count(*) from public.scouting_targets) = 0, 'La resta del staff no veu els seguiments');
 select pg_temp.expect_error($$insert into public.tactic_boards (title) values ('x')$$, 'Ni en pot crear (pissarra)');
 select pg_temp.expect_error($$insert into public.corrections (title) values ('x')$$, 'Ni en pot crear');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);

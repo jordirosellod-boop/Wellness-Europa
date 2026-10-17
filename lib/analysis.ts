@@ -137,7 +137,10 @@ export function rivalKey(name: string): string {
 /** Nom curt d'un equip de la FCF ("PREMIA DALT, C.D. A" → "Premia Dalt"). */
 export function prettyTeam(name: string): string {
   const s = name.replace(/,?\s+(C\.E\.|U\.E\.|C\.F\.|A\.D\.|C\.D\.|U\.D\.|F\.C\.)\s*/g, " ").replace(/\s+[A-Z]$/, "").replace(/\s+/g, " ").trim();
-  return s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+  return s
+    .toLowerCase()
+    .replace(/(^|[\s'-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase())
+    .replace(/(\p{L}{2,})'(\p{Lu})/gu, (_, a: string, b: string) => `${a}'${b.toLowerCase()}`); // «Women's», però «L'Estartit»
 }
 
 /** Noms dels dos equips: en un vídeo del rival, «nosaltres» és el rival analitzat i l'altre és el seu contrari. */
