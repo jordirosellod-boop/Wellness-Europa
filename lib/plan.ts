@@ -22,9 +22,9 @@ export type Team = "blue" | "red" | "yellow" | "white" | "gk";
 export type ArrowKind = "pass" | "run" | "drive" | "shot";
 /** `s` és la mida (1 = normal). */
 export type El =
-  | { id: string; t: "player"; x: number; y: number; team: Team; label?: string; s?: number }
+  | { id: string; t: "player"; x: number; y: number; team: Team; label?: string; s?: number; r?: number } // r: cap on mira (0 = amunt); sense r, només la rodona
   | { id: string; t: "cone" | "ball" | "minigoal" | "goal"; x: number; y: number; s?: number; r?: number } // r: orientació en graus
-  | { id: string; t: "arrow"; x: number; y: number; x2: number; y2: number; kind: ArrowKind; s?: number };
+  | { id: string; t: "arrow"; x: number; y: number; x2: number; y2: number; kind: ArrowKind; s?: number; c?: string }; // c: color triat (#rrggbb)
 export type Diagram = { field: Field; els: El[] };
 
 /** Jugadora afegida a mà a la plantilla (no té compte a l'app: p. ex. una d'un altre equip). */
