@@ -185,11 +185,29 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
       supabase().from("training_plans").select(PLAN_COLS).eq("id", id).maybeSingle(),
       fetchRoster(),
     ]).then(
-      ([p, r]) => {
+      async ([p, r]) => {
         if (p.error) return setError(p.error.message);
         if (!p.data) return setError("No s'ha trobat la plantilla (o no és teva).");
-        setPlan({ ...(p.data as Plan), guests: (p.data as Plan).guests ?? [], reasons: (p.data as Plan).reasons ?? {} });
+        const loaded: Plan = { ...(p.data as Plan), guests: (p.data as Plan).guests ?? [], reasons: (p.data as Plan).reasons ?? {} };
+        // Les lesions es miren al moment: qui ha rebut l'alta queda disponible i qui s'ha lesionat surt com a lesionada.
+        const auto = await autoStatuses(loaded.plan_date, r.players);
+        const players = { ...loaded.players };
+        const freed: string[] = [];
+        for (const [pid, st] of Object.entries(auto)) {
+          if (st === "les") players[pid] = "les";
+          else if (players[pid] === "les") {
+            players[pid] = "disp";
+            freed.push(pid);
+          }
+        }
+        const changed = Object.keys(players).some((k) => players[k] !== loaded.players[k]);
+        setPlan({ ...loaded, players });
         setRoster(r);
+        if (changed) {
+          setDirty(true);
+          const names = freed.map((pid) => r.players.find((x) => x.id === pid)?.display_name).filter(Boolean);
+          setStatus({ ok: true, text: `${names.length ? `${names.join(", ")} ja ${names.length > 1 ? "tenen" : "té"} l'alta i ${names.length > 1 ? "són" : "és"} disponible${names.length > 1 ? "s" : ""}. ` : "Lesionades actualitzades. "}Recorda desar.` });
+        }
       },
       (e) => setError(e instanceof Error ? e.message : String(e)),
     );

@@ -51,10 +51,16 @@ export function InjuriesAdmin({ players }: { players: Profile[] }) {
     load();
   }
 
+  /** L'alta compta des d'avui mateix: l'últim dia de lesió és ahir (i ja es pot posar a l'entreno d'avui). */
   async function discharge(i: Injury) {
-    const { data, error: er } = await supabase().from("injuries").update({ end_date: today < i.start_date ? i.start_date : today }).eq("id", i.id).select("id");
+    const yesterday = addDays(today, -1);
+    // Si la lesió començava avui (o més endavant), no ha arribat a fer perdre cap dia: es treu.
+    const { data, error: er } =
+      i.start_date > yesterday
+        ? await supabase().from("injuries").delete().eq("id", i.id).select("id")
+        : await supabase().from("injuries").update({ end_date: yesterday }).eq("id", i.id).select("id");
     if (er || !data?.length) return setMsg({ ok: false, text: `No s'ha pogut donar d'alta: ${er?.message ?? "torna-ho a provar"}` });
-    setMsg({ ok: true, text: `${name(i.player_id)} donada d'alta (avui és l'últim dia de lesió).` });
+    setMsg({ ok: true, text: `${name(i.player_id)} donada d'alta. Ja està disponible des d'avui i la pots posar a l'entreno.` });
     load();
   }
 
