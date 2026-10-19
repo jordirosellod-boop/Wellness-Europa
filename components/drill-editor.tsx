@@ -6,7 +6,6 @@ import { uid, type ArrowKind, type Diagram, type El, type Field, type Team } fro
 const W = 100;
 const H = 64;
 const TEAM_FILL: Record<Team, string> = { blue: "#1452c8", red: "#d32f2f", yellow: "#f2c200", white: "#ffffff", gk: "#111111" };
-const TEAM_TEXT: Record<Team, string> = { blue: "#fff", red: "#fff", yellow: "#0b1846", white: "#0b1846", gk: "#f2c200" };
 const ARROW: Record<ArrowKind, { color: string; dash?: string; label: string }> = {
   pass: { color: "#ffffff", label: "Passada" },
   drive: { color: "#ffffff", dash: "1.6 1.2", label: "Conducció" },
@@ -61,35 +60,39 @@ function FieldBg({ field }: { field: Field }) {
 export const SIZE_MIN = 0.4;
 export const SIZE_MAX = 3;
 
-function ElView({ el, selected, arrowId }: { el: El; selected: boolean; arrowId: string }) {
+function ElView({ el, selected, arrowId, field }: { el: El; selected: boolean; arrowId: string; field: Field }) {
   const k = el.s ?? 1;
-  // A les jugadores només es gira la punta (la lletra queda dreta).
+  // A les jugadores només es gira el dibuixet (la lletra queda dreta).
   const r = "r" in el && el.t !== "player" ? el.r ?? 0 : 0;
-  if (el.t === "arrow" || (k === 1 && !r)) return <ElShape el={el} selected={selected} arrowId={arrowId} />;
+  if (el.t === "arrow" || (k === 1 && !r)) return <ElShape el={el} selected={selected} arrowId={arrowId} field={field} />;
   // Mida i orientació: des del centre de l'element.
   return (
     <g transform={`translate(${el.x} ${el.y}) rotate(${r}) scale(${k}) translate(${-el.x} ${-el.y})`}>
-      <ElShape el={el} selected={selected} arrowId={arrowId} />
+      <ElShape el={el} selected={selected} arrowId={arrowId} field={field} />
     </g>
   );
 }
 
-function ElShape({ el, selected, arrowId }: { el: El; selected: boolean; arrowId: string }) {
+const HAIR = "#3b2a20";
+
+function ElShape({ el, selected, arrowId, field }: { el: El; selected: boolean; arrowId: string; field: Field }) {
   const sel = selected ? { stroke: "#dbb34d", strokeWidth: 0.7 } : {};
   switch (el.t) {
     case "player":
       return (
         <g>
-          {el.r != null && (
-            <path
-              transform={`rotate(${el.r} ${el.x} ${el.y})`}
-              d={`M${el.x - 1.6} ${el.y - 1.75} L${el.x} ${el.y - 4.4} L${el.x + 1.6} ${el.y - 1.75} Z`}
-              fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.35} strokeLinejoin="round" {...sel}
-            />
-          )}
-          <circle cx={el.x} cy={el.y} r={2.4} fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.35} {...sel} />
+          {/* Jugadora vista des de dalt: botes al davant, espatlles amb la samarreta, cap i cua al darrere. */}
+          <g transform={`rotate(${el.r ?? defaultHeading(field)} ${el.x} ${el.y})`}>
+            <ellipse cx={el.x - 0.85} cy={el.y - 1.95} rx={0.5} ry={0.75} fill="#0b1846" />
+            <ellipse cx={el.x + 0.85} cy={el.y - 1.95} rx={0.5} ry={0.75} fill="#0b1846" />
+            <ellipse cx={el.x - 2.4} cy={el.y - 0.35} rx={0.6} ry={1.05} fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.25} />
+            <ellipse cx={el.x + 2.4} cy={el.y - 0.35} rx={0.6} ry={1.05} fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.25} />
+            <ellipse cx={el.x} cy={el.y + 0.2} rx={2.35} ry={1.45} fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.35} {...sel} />
+            <ellipse cx={el.x} cy={el.y + 1.75} rx={0.5} ry={0.8} fill={HAIR} />
+            <circle cx={el.x} cy={el.y + 0.1} r={1.2} fill={HAIR} stroke={el.team === "gk" ? "#f2c200" : "#0b1846"} strokeWidth={0.22} />
+          </g>
           {el.label && (
-            <text x={el.x} y={el.y + 0.95} textAnchor="middle" fontSize={2.6} fill={TEAM_TEXT[el.team]} style={{ fontFamily: "var(--font-escapulada), var(--display)" }}>
+            <text x={el.x} y={el.y + 0.72} textAnchor="middle" fontSize={1.8} fill="#ffffff" style={{ fontFamily: "var(--font-escapulada), var(--display)" }}>
               {el.label}
             </text>
           )}
@@ -128,7 +131,7 @@ export function DrillView({ d }: { d: Diagram }) {
     <svg className="drill" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Dibuix de l'exercici">
       <Markers id={id} els={d.els} />
       <FieldBg field={d.field} />
-      {d.els.map((el) => <ElView key={el.id} el={el} selected={false} arrowId={id} />)}
+      {d.els.map((el) => <ElView key={el.id} el={el} selected={false} arrowId={id} field={d.field} />)}
     </svg>
   );
 }
@@ -349,16 +352,16 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
         {value.els.map((el) => (
           <g key={el.id} data-el={el.id} style={{ cursor: "grab" }}>
             {el.t === "arrow" && <line x1={el.x} y1={el.y} x2={el.x2} y2={el.y2} stroke="transparent" strokeWidth={3 * Math.max(1, el.s ?? 1)} />}
-            <ElView el={el} selected={el.id === sel} arrowId={id} />
+            <ElView el={el} selected={el.id === sel} arrowId={id} field={value.field} />
           </g>
         ))}
-        {draft && <ElView el={draft} selected={false} arrowId={id} />}
+        {draft && <ElView el={draft} selected={false} arrowId={id} field={value.field} />}
         {/* Guies d'alineació mentre s'arrossega */}
         {guides.x != null && <line x1={guides.x} y1={0} x2={guides.x} y2={H} stroke="#ffd400" strokeWidth={0.25} strokeDasharray="1 0.8" pointerEvents="none" />}
         {guides.y != null && <line x1={0} y1={guides.y} x2={W} y2={guides.y} stroke="#ffd400" strokeWidth={0.25} strokeDasharray="1 0.8" pointerEvents="none" />}
         {/* Nansa per girar l'element triat */}
         {selected && selected.t !== "arrow" && selected.t !== "ball" && (() => {
-          const d = (selected.t === "player" ? 5.4 : 3.4) * (selected.s ?? 1) + 1.2;
+          const d = (selected.t === "player" ? 4.2 : 3.4) * (selected.s ?? 1) + 1.2;
           const a = (((selected.r ?? (selected.t === "player" ? defaultHeading(value.field) : 0)) - 90) * Math.PI) / 180;
           const hx = selected.x + Math.cos(a) * d, hy = selected.y + Math.sin(a) * d;
           return (
@@ -439,17 +442,12 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
             <button type="button" className="btn small secondary" onClick={() => rotate(-15)} aria-label="Girar a l'esquerra">↺ 15°</button>
             <button type="button" className="btn small secondary" onClick={() => rotate(15)} aria-label="Girar a la dreta">↻ 15°</button>
             <button type="button" className="btn small secondary" onClick={() => rotate(90)}>↻ 90°</button>
-            {selected.t === "player" && (selected.r == null
-              ? <span className="muted small">Sense orientació</span>
-              : <>
-                  <b>{selected.r}°</b>
-                  <button type="button" className="btn small secondary" onClick={() => set(value.els.map((x) => (x.id === selected.id && x.t === "player" ? { ...x, r: undefined } : x)))}>Treure la punta</button>
-                </>)}
+            {selected.t === "player" && <b>{selected.r ?? defaultHeading(value.field)}°</b>}
             {selected.t !== "arrow" && selected.t !== "player" && <b>{selected.r ?? 0}°</b>}
             {selected.t !== "arrow" && selected.t !== "player" && !!selected.r && <button type="button" className="btn small secondary" onClick={() => rotate(0, true)}>Recte</button>}
           </>
         ) : (
-          <span className="muted small">Toca una jugadora, una porteria, un con o una fletxa per girar-la (o arrossega el punt groc). La punta de la jugadora indica cap on mira.</span>
+          <span className="muted small">Toca una jugadora, una porteria, un con o una fletxa per girar-la (o arrossega el punt groc). El dibuixet de la jugadora mira cap on la gires.</span>
         )}
       </div>
       <div className="drill-size">
