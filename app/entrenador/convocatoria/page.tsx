@@ -108,9 +108,34 @@ function ConvoForm({ c, onSaved }: { c?: Convocation; onSaved: (id: string) => v
     ).then((l) => setFcf(l.slice(0, 6)), () => {});
   }, [c]);
 
+  const [venueBusy, setVenueBusy] = useState(false);
+  /** Camp i adreça segons la FCF (pel partit triat o pel dia del formulari). */
+  async function venueFromFcf(by: { acta?: string; date?: string }, quiet = false) {
+    setVenueBusy(true);
+    try {
+      const { data } = await supabase().auth.getSession();
+      const qs = by.acta ? `acta=${encodeURIComponent(by.acta)}` : `date=${encodeURIComponent(by.date ?? "")}`;
+      const res = await fetch(`/api/fcf/venue?${qs}`, { headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` }, cache: "no-store" });
+      const j = (await res.json()) as { venue?: { venue: string | null; address: string | null } | null; error?: string };
+      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+      if (!j.venue?.venue) {
+        if (!quiet) setMsg("La FCF no té cap partit nostre aquest dia (o encara no hi ha el camp).");
+        return;
+      }
+      const v = j.venue;
+      setF((x) => ({ ...x, venue: v.venue ?? x.venue, address: v.address ?? x.address }));
+      setMsg(null);
+    } catch (e) {
+      if (!quiet) setMsg(`No s'ha pogut buscar el camp: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setVenueBusy(false);
+    }
+  }
+
   function fromFcf(id: string) {
     const m = fcf.find((x) => x.acta_id === id);
     if (!m) return;
+    void venueFromFcf({ acta: m.acta_id });
     const kick = m.kickoff ?? "";
     setF((x) => ({
       ...x,
@@ -192,7 +217,12 @@ function ConvoForm({ c, onSaved }: { c?: Convocation; onSaved: (id: string) => v
         </div>
       </div>
       <div>
-        <label className="field" htmlFor="cvenue">Camp</label>
+        <div className="row between">
+          <label className="field" htmlFor="cvenue">Camp</label>
+          <button type="button" className="btn small secondary" disabled={venueBusy || !f.match_date} onClick={() => venueFromFcf({ date: f.match_date })}>
+            {venueBusy ? "Buscant…" : "📍 Camp i adreça de la FCF"}
+          </button>
+        </div>
         <input id="cvenue" type="text" maxLength={120} placeholder="Ex.: Nou Sardenya" value={f.venue} onChange={(e) => set("venue", e.target.value)} />
       </div>
       <div>
