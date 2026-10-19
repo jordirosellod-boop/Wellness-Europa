@@ -520,13 +520,21 @@ with u as (update public.training_plans set guests = '[{"id":"g1","name":"Marta 
 select pg_temp.expect_error($$update public.training_plans set guests = '{"a":1}'$$, 'Les jugadores afegides han de ser una llista');
 select pg_temp.expect_error($$insert into public.training_plans (plan_date, owner_id) values (current_date, '00000000-0000-0000-0000-0000000000c2')$$, 'No es pot crear una plantilla a nom d''un altre');
 insert into public.player_positions (profile_id, position) values ('00000000-0000-0000-0000-0000000000b2', 'MC');
+insert into public.player_nicknames (profile_id, nickname) values ('00000000-0000-0000-0000-0000000000b2', 'Peque');
+select pg_temp.check((select nickname from public.player_nicknames) = 'Peque', 'L''entrenador posa un sobrenom');
+select pg_temp.expect_error($$update public.player_nicknames set nickname = ''$$, 'El sobrenom no pot ser buit');
+select pg_temp.expect_error($$update public.player_nicknames set nickname = 'Un sobrenom massa llarg de debò'$$, 'El sobrenom té un màxim de 20 caràcters');
+select pg_temp.expect_error($$update public.player_nicknames set nickname = '<b>x</b>'$$, 'El sobrenom no admet etiquetes');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c2', false);
 select pg_temp.check((select count(*) from public.training_plans) = 0, 'Un altre membre del staff NO veu la plantilla');
 with u as (update public.training_plans set rival = 'x' returning 1) select pg_temp.check(count(*) = 0, 'Ni la pot canviar') from u;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);
 select pg_temp.check((select count(*) from public.training_plans) + (select count(*) from public.player_positions) = 0, 'Una jugadora no veu plantilles ni posicions');
+select pg_temp.check((select count(*) from public.player_nicknames) = 0, 'Una jugadora no veu els sobrenoms');
+select pg_temp.expect_error($$insert into public.player_nicknames (profile_id, nickname) values ('00000000-0000-0000-0000-0000000000b2', 'Jo')$$, 'Una jugadora no es pot posar sobrenom');
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.training_plans$$, 'Anònim no veu plantilles');
+select pg_temp.expect_error($$select * from public.player_nicknames$$, 'Anònim no veu sobrenoms');
 select pg_temp.expect_error($$select * from public.rehab_entries$$, 'Anònim no veu entrenaments a part');
 
 -- =============== ANÀLISI DE PARTITS (només qui la fa) ===============

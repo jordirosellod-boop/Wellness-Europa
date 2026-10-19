@@ -757,6 +757,8 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
 .pos-edit li { display: flex; align-items: center; gap: 8px; }
 .pos-edit li span { flex: 1; font-weight: 600; }
 .pos-edit select { width: 130px; }
+.pos-edit .nick-input { width: 110px; padding: 6px 8px; }
+@media (max-width: 520px) { .pos-edit li { flex-wrap: wrap; } .pos-edit li span { flex-basis: 100%; } }
 @media (max-width: 520px) { .pos-board:not(.print) { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
 
 .drill { display: block; width: 100%; height: auto; border-radius: 6px; aspect-ratio: 100 / 64; }

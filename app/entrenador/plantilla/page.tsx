@@ -50,15 +50,19 @@ function Plans() {
 // Llista i creació
 // ---------------------------------------------------------------------------
 
-type Roster = { players: Profile[]; positions: Map<string, Position> };
+type Roster = { players: Profile[]; positions: Map<string, Position>; nicks: Map<string, string> };
+
+/** Com surt a l'entreno: el sobrenom, si en té; si no, el primer nom. */
+const shortName = (r: Roster, p: Profile) => r.nicks.get(p.id) ?? p.display_name.split(" ")[0];
 
 async function fetchRoster(): Promise<Roster> {
   const sb = supabase();
-  const [players, pos] = await Promise.all([
+  const [players, pos, nicks] = await Promise.all([
     fetchAll<Profile>((f, t) => sb.from("profiles").select("id, role, display_name").eq("role", "player").order("display_name").order("id").range(f, t)),
     fetchAll<{ profile_id: string; position: Position }>((f, t) => sb.from("player_positions").select("profile_id, position").order("profile_id").range(f, t)),
+    fetchAll<{ profile_id: string; nickname: string }>((f, t) => sb.from("player_nicknames").select("profile_id, nickname").order("profile_id").range(f, t)),
   ]);
-  return { players, positions: new Map(pos.map((p) => [p.profile_id, p.position])) };
+  return { players, positions: new Map(pos.map((p) => [p.profile_id, p.position])), nicks: new Map(nicks.map((n) => [n.profile_id, n.nickname])) };
 }
 
 /** Disponibles automàticament: totes menys les lesionades aquell dia. */
@@ -205,7 +209,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
         setRoster(r);
         if (changed) {
           setDirty(true);
-          const names = freed.map((pid) => r.players.find((x) => x.id === pid)?.display_name).filter(Boolean);
+          const names = freed.map((pid) => r.players.find((x) => x.id === pid)).filter((x) => !!x).map((x) => shortName(r, x));
           setStatus({ ok: true, text: `${names.length ? `${names.join(", ")} ja ${names.length > 1 ? "tenen" : "té"} l'alta i ${names.length > 1 ? "són" : "és"} disponible${names.length > 1 ? "s" : ""}. ` : "Lesionades actualitzades. "}Recorda desar.` });
         }
       },
@@ -285,6 +289,25 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
     });
   }
 
+  /** Desa el sobrenom (buit = el treu). Només el canvia a la pantalla quan el servidor ho confirma. */
+  async function setNickname(pid: string, raw: string) {
+    const nick = raw.replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 20);
+    if ((roster?.nicks.get(pid) ?? "") === nick) return;
+    const sb = supabase();
+    const { error: e } = nick
+      ? await sb.from("player_nicknames").upsert({ profile_id: pid, nickname: nick, updated_at: new Date().toISOString() }).select("profile_id").single()
+      : await sb.from("player_nicknames").delete().eq("profile_id", pid);
+    if (e) return setStatus({ ok: false, text: `No s'ha pogut desar el sobrenom: ${e.message}` });
+    setRoster((r) => {
+      if (!r) return r;
+      const m = new Map(r.nicks);
+      if (nick) m.set(pid, nick);
+      else m.delete(pid);
+      return { ...r, nicks: m };
+    });
+    setStatus({ ok: true, text: nick ? `Sobrenom desat: ${nick}` : "Sobrenom tret" });
+  }
+
   async function duplicate() {
     if (!plan) return;
     if (dirty && !window.confirm("Hi ha canvis sense desar. Duplicar igualment (sense aquests canvis)?")) return;
@@ -310,7 +333,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
   const available = roster.players.filter((p) => statusOf(p.id) === "disp").length + plan.guests.filter((g) => g.status === "disp").length;
   // Jugadores que es poden posar als equips: les disponibles (de l'app i afegides a mà).
   const pool: PoolPlayer[] = [
-    ...roster.players.filter((p) => statusOf(p.id) === "disp").map((p) => ({ id: p.id, name: p.display_name.split(" ")[0], pos: (roster.positions.get(p.id) ?? "") as Position | "" })),
+    ...roster.players.filter((p) => statusOf(p.id) === "disp").map((p) => ({ id: p.id, name: shortName(roster, p), pos: (roster.positions.get(p.id) ?? "") as Position | "" })),
     ...plan.guests.filter((g) => g.status === "disp").map((g) => ({ id: g.id, name: g.name, pos: g.pos })),
   ];
   const updGuest = (gid: string, patch: Partial<Guest>) => upd({ guests: plan.guests.map((g) => (g.id === gid ? { ...g, ...patch } : g)) });
@@ -380,15 +403,26 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
             <h2 className="esc" style={{ margin: 0 }}>Jugadores <span className="muted small">{available} disponibles</span></h2>
             <span className="row" style={{ gap: 6 }}>
               <button className="btn small secondary" onClick={refreshPlayers}>↻ Actualitzar</button>
-              <button className="btn small secondary" onClick={() => setEditPos((v) => !v)}>{editPos ? "Fet" : "Posicions"}</button>
+              <button className="btn small secondary" onClick={() => setEditPos((v) => !v)}>{editPos ? "Fet" : "Posicions i sobrenoms"}</button>
             </span>
           </div>
-          <p className="muted small">Toca una jugadora per canviar-ne l&apos;estat: disponible → a part → baixa. Les lesionades surten soles. Les que afegeixes a mà surten amb vora de punts (les treus a «Posicions»).</p>
+          <p className="muted small">Toca una jugadora per canviar-ne l&apos;estat: disponible → a part → baixa. Les lesionades surten soles. Les que afegeixes a mà surten amb vora de punts (les treus a «Posicions i sobrenoms», on també pots posar el sobrenom que sortirà a l&apos;entreno).</p>
           {editPos ? (
             <ul className="pos-edit">
               {roster.players.map((p) => (
                 <li key={p.id}>
                   <span>{p.display_name}</span>
+                  <input
+                    key={roster.nicks.get(p.id) ?? ""}
+                    type="text"
+                    className="nick-input"
+                    maxLength={20}
+                    placeholder="Sobrenom"
+                    defaultValue={roster.nicks.get(p.id) ?? ""}
+                    aria-label={`Sobrenom de ${p.display_name}`}
+                    onBlur={(e) => setNickname(p.id, e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                  />
                   <select value={roster.positions.get(p.id) ?? ""} onChange={(e) => setPosition(p.id, e.target.value as Position | "")} aria-label={`Posició de ${p.display_name}`}>
                     <option value="">—</option>
                     {POSITIONS.map((x) => <option key={x} value={x}>{x} · {POSITION_NAMES[x]}</option>)}
@@ -464,7 +498,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function PositionBoard({ plan, roster, onToggle, print = false }: { plan: Plan; roster: Roster; onToggle?: (pid: string) => void; print?: boolean }) {
   type Row = { id: string; name: string; pos: string; st: PlayerStatus; guest: boolean };
   const rows: Row[] = [
-    ...roster.players.map((p) => ({ id: p.id, name: p.display_name.split(" ")[0], pos: roster.positions.get(p.id) ?? "—", st: plan.players[p.id] ?? "disp", guest: false })),
+    ...roster.players.map((p) => ({ id: p.id, name: shortName(roster, p), pos: roster.positions.get(p.id) ?? "—", st: plan.players[p.id] ?? "disp", guest: false })),
     ...plan.guests.map((g) => ({ id: g.id, name: g.name, pos: g.pos || "—", st: g.status as PlayerStatus, guest: true })),
   ];
   const cols = [...POSITIONS, "—"] as const;
@@ -499,7 +533,7 @@ function PositionBoard({ plan, roster, onToggle, print = false }: { plan: Plan; 
 /** Llista de les baixes amb el motiu de cadascuna. */
 function baixes(plan: Plan, roster: Roster) {
   return [
-    ...roster.players.filter((p) => plan.players[p.id] === "baixa").map((p) => ({ id: p.id, name: p.display_name })),
+    ...roster.players.filter((p) => plan.players[p.id] === "baixa").map((p) => ({ id: p.id, name: roster.nicks.get(p.id) ?? p.display_name })),
     ...plan.guests.filter((g) => g.status === "baixa").map((g) => ({ id: g.id, name: g.name })),
   ];
 }
@@ -778,7 +812,7 @@ function PlanSheet({ plan, roster }: { plan: Plan; roster: Roster }) {
   const available = roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").length + plan.guests.filter((g) => g.status === "disp").length;
   // Només les disponibles (si una s'ha donat de baixa després de fer els equips, no surt).
   const names = new Map([
-    ...roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").map((p) => [p.id, p.display_name.split(" ")[0]] as [string, string]),
+    ...roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").map((p) => [p.id, shortName(roster, p)] as [string, string]),
     ...plan.guests.filter((g) => g.status === "disp").map((g) => [g.id, g.name] as [string, string]),
   ]);
   const cell = (k: string, v: ReactNode) => (<div className="ps-cell"><span>{k}</span><b>{v || "–"}</b></div>);
