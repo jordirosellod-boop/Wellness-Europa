@@ -6,6 +6,7 @@ import { uid, type ArrowKind, type Diagram, type El, type Field, type Team } fro
 const W = 100;
 const H = 64;
 const TEAM_FILL: Record<Team, string> = { blue: "#1452c8", red: "#d32f2f", yellow: "#f2c200", white: "#ffffff", gk: "#111111" };
+const TEAM_TEXT: Record<Team, string> = { blue: "#fff", red: "#fff", yellow: "#0b1846", white: "#0b1846", gk: "#f2c200" };
 const ARROW: Record<ArrowKind, { color: string; dash?: string; label: string }> = {
   pass: { color: "#ffffff", label: "Passada" },
   drive: { color: "#ffffff", dash: "1.6 1.2", label: "Conducció" },
@@ -73,26 +74,21 @@ function ElView({ el, selected, arrowId, field }: { el: El; selected: boolean; a
   );
 }
 
-const HAIR = "#3b2a20";
-
 function ElShape({ el, selected, arrowId, field }: { el: El; selected: boolean; arrowId: string; field: Field }) {
   const sel = selected ? { stroke: "#dbb34d", strokeWidth: 0.7 } : {};
   switch (el.t) {
     case "player":
       return (
         <g>
-          {/* Jugadora vista des de dalt: botes al davant, espatlles amb la samarreta, cap i cua al darrere. */}
-          <g transform={`rotate(${el.r ?? defaultHeading(field)} ${el.x} ${el.y})`}>
-            <ellipse cx={el.x - 0.85} cy={el.y - 1.95} rx={0.5} ry={0.75} fill="#0b1846" />
-            <ellipse cx={el.x + 0.85} cy={el.y - 1.95} rx={0.5} ry={0.75} fill="#0b1846" />
-            <ellipse cx={el.x - 2.4} cy={el.y - 0.35} rx={0.6} ry={1.05} fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.25} />
-            <ellipse cx={el.x + 2.4} cy={el.y - 0.35} rx={0.6} ry={1.05} fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.25} />
-            <ellipse cx={el.x} cy={el.y + 0.2} rx={2.35} ry={1.45} fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.35} {...sel} />
-            <ellipse cx={el.x} cy={el.y + 1.75} rx={0.5} ry={0.8} fill={HAIR} />
-            <circle cx={el.x} cy={el.y + 0.1} r={1.2} fill={HAIR} stroke={el.team === "gk" ? "#f2c200" : "#0b1846"} strokeWidth={0.22} />
-          </g>
+          {/* Rodona i un parèntesi al costat cap on mira. */}
+          <path
+            transform={`rotate(${el.r ?? defaultHeading(field)} ${el.x} ${el.y})`}
+            d={`M${el.x - 2.45} ${el.y - 2.3} A3.35 3.35 0 0 1 ${el.x + 2.45} ${el.y - 2.3}`}
+            fill="none" stroke={selected ? "#dbb34d" : "#0b1846"} strokeWidth={0.6} strokeLinecap="round"
+          />
+          <circle cx={el.x} cy={el.y} r={2.4} fill={TEAM_FILL[el.team]} stroke="#0b1846" strokeWidth={0.35} {...sel} />
           {el.label && (
-            <text x={el.x} y={el.y + 0.72} textAnchor="middle" fontSize={1.8} fill="#ffffff" style={{ fontFamily: "var(--font-escapulada), var(--display)" }}>
+            <text x={el.x} y={el.y + 0.95} textAnchor="middle" fontSize={2.6} fill={TEAM_TEXT[el.team]} style={{ fontFamily: "var(--font-escapulada), var(--display)" }}>
               {el.label}
             </text>
           )}
@@ -361,7 +357,7 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
         {guides.y != null && <line x1={0} y1={guides.y} x2={W} y2={guides.y} stroke="#ffd400" strokeWidth={0.25} strokeDasharray="1 0.8" pointerEvents="none" />}
         {/* Nansa per girar l'element triat */}
         {selected && selected.t !== "arrow" && selected.t !== "ball" && (() => {
-          const d = (selected.t === "player" ? 4.2 : 3.4) * (selected.s ?? 1) + 1.2;
+          const d = (selected.t === "player" ? 4.4 : 3.4) * (selected.s ?? 1) + 1.2;
           const a = (((selected.r ?? (selected.t === "player" ? defaultHeading(value.field) : 0)) - 90) * Math.PI) / 180;
           const hx = selected.x + Math.cos(a) * d, hy = selected.y + Math.sin(a) * d;
           return (
@@ -447,7 +443,7 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
             {selected.t !== "arrow" && selected.t !== "player" && !!selected.r && <button type="button" className="btn small secondary" onClick={() => rotate(0, true)}>Recte</button>}
           </>
         ) : (
-          <span className="muted small">Toca una jugadora, una porteria, un con o una fletxa per girar-la (o arrossega el punt groc). El dibuixet de la jugadora mira cap on la gires.</span>
+          <span className="muted small">Toca una jugadora, una porteria, un con o una fletxa per girar-la (o arrossega el punt groc). El parèntesi de la jugadora indica cap on mira.</span>
         )}
       </div>
       <div className="drill-size">
