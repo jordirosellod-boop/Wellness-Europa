@@ -29,7 +29,55 @@ type RawMatch = {
   JORNADA: string; CODACTA: string; CODEQUIPO_CASA: string; NOMBRE_CASA: string; CODEQUIPO_FUERA: string; NOMBRE_FUERA: string;
   GOLES_CASA: string | null; GOLES_FUERA: string | null; COMIENZO1: string | null; CERRADA: string;
   ESCUDO_CASA?: string | null; ESCUDO_FUERA?: string | null;
+  CAMPO?: string | null; CODIGO_CAMPO?: string | null;
 };
+
+/** «CAMP DE FUTBOL MPAL. DE BREDA» → «Camp de Futbol Mpal. de Breda». */
+function prettyPlace(s: string): string {
+  const small = new Set(["de", "del", "la", "les", "el", "els", "i", "a", "d'", "l'"]);
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[´’`]/g, "'")
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((w, i) => (i > 0 && small.has(w) ? w : w.replace(/(^|-)(d'|l')?(\p{L})/gu, (_m, pre: string, ap: string | undefined, c: string) => pre + (ap ?? "") + c.toUpperCase())))
+    .join(" ");
+}
+
+/** «Roca Del Vallès (La)» → «La Roca del Vallès». */
+function prettyTown(s: string): string {
+  const m = s.trim().match(/^(.*?)\s*\((el|la|les|els|l')\)$/i);
+  return prettyPlace(m ? `${m[2]}${m[2].endsWith("'") ? "" : " "}${m[1]}` : s);
+}
+
+export type MatchVenue = { acta_id: string; venue: string | null; address: string | null; lat: number | null; lng: number | null };
+
+/** Camp i adreça d'un partit del nostre equip (pel número d'acta o pel dia), segons la FCF. */
+export async function fetchMatchVenue(grupId: string, teamId: string, by: { acta?: string; date?: string }): Promise<MatchVenue | null> {
+  const byRound = await getJson<Record<string, RawMatch[]>>(`/api/competition/partidos?grupId=${encodeURIComponent(grupId)}`);
+  const ours = Object.values(byRound).flat().filter((m) => m.CODEQUIPO_CASA === teamId || m.CODEQUIPO_FUERA === teamId);
+  const m = by.acta ? ours.find((x) => x.CODACTA === by.acta) : ours.find((x) => x.COMIENZO1?.slice(0, 10) === by.date);
+  if (!m) return null;
+  const out: MatchVenue = { acta_id: m.CODACTA, venue: m.CAMPO ? prettyPlace(m.CAMPO) : null, address: null, lat: null, lng: null };
+  const code = m.CODIGO_CAMPO ?? "";
+  if (!/^\d{1,10}$/.test(code)) return out;
+  try {
+    const camp = (await getJson<{ data?: { nombre?: string; direccion?: string; localidad?: string; codigo_postal?: string; latitud?: string; longitud?: string }[] }>(`/api/camps/${code}`)).data?.[0];
+    if (camp) {
+      if (camp.nombre) out.venue = prettyPlace(camp.nombre);
+      const street = (camp.direccion ?? "").trim().replace(/^\p{L}/u, (c) => c.toUpperCase());
+      const town = [camp.codigo_postal?.trim(), camp.localidad ? prettyTown(camp.localidad) : ""].filter(Boolean).join(" ");
+      out.address = [street, town].filter(Boolean).join(", ").slice(0, 200) || null;
+      const lat = Number(camp.latitud), lng = Number(camp.longitud);
+      if (Number.isFinite(lat) && Number.isFinite(lng) && (lat || lng)) Object.assign(out, { lat, lng });
+    }
+  } catch {
+    // Si la fitxa del camp no respon, com a mínim queda el nom del camp.
+  }
+  if (out.venue) out.venue = out.venue.slice(0, 120);
+  return out;
+}
 
 /** Els escuts són fitxers públics de la FCF: «00100_0000808730_uebreda_200x200.png». */
 export const CREST_BASE = "https://files.fcf.cat/escudos/clubes/escudos/";
