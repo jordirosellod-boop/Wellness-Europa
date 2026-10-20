@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ConvoSheet } from "@/components/convo-sheet";
 import { LineupBoard } from "@/components/pitch";
 import { CoachShell, Footer } from "@/components/ui";
-import { CONVO_COLS, fetchConvocations, fetchRoster, GUEST_ORIGINS, hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
+import { CONVO_COLS, fetchConvocations, fetchRoster, FRIENDLY, GUEST_ORIGINS, hhmm, isFriendly, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
@@ -25,13 +25,16 @@ function Convos() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [section, setSection] = useState<"lliga" | "amistosos">("lliga");
 
   const load = useCallback(
     (select?: string) =>
       fetchConvocations(addDays(today, -60)).then(
         (l) => {
           setList(l);
-          setSelected((cur) => select ?? (l.some((c) => c.id === cur) ? cur : (l.find((c) => c.match_date >= today) ?? l[l.length - 1])?.id ?? null));
+          const picked = select ? l.find((c) => c.id === select) : null;
+          if (picked) setSection(isFriendly(picked) ? "amistosos" : "lliga");
+          setSelected((cur) => select ?? (l.some((c) => c.id === cur) ? cur : (l.find((c) => c.match_date >= today && !isFriendly(c)) ?? l.filter((c) => !isFriendly(c)).pop())?.id ?? null));
         },
         (e) => setError(e instanceof Error ? e.message : String(e)),
       ),
@@ -41,7 +44,15 @@ function Convos() {
     load();
   }, [load]);
 
-  const current = list?.find((c) => c.id === selected) ?? null;
+  const shown = list?.filter((c) => isFriendly(c) === (section === "amistosos")) ?? null;
+  const current = shown?.find((c) => c.id === selected) ?? null;
+  const friendlies = list?.filter(isFriendly).length ?? 0;
+  /** En canviar d'apartat, es tria el proper partit (o l'últim) d'aquell apartat. */
+  function pickSection(s: "lliga" | "amistosos") {
+    setSection(s);
+    const l = (list ?? []).filter((c) => isFriendly(c) === (s === "amistosos"));
+    setSelected((l.find((c) => c.match_date >= today) ?? l[l.length - 1])?.id ?? null);
+  }
 
   return (
     <>
@@ -50,8 +61,13 @@ function Convos() {
         <button className="btn small" onClick={() => setCreating((v) => !v)}>{creating ? "Tancar" : "+ Nova"}</button>
       </div>
       {error && <p className="msg error">{error}</p>}
+      <div className="tabs" role="group" aria-label="Lliga o amistosos" style={{ marginTop: 12 }}>
+        <button aria-pressed={section === "lliga"} onClick={() => pickSection("lliga")}>🏆 Lliga</button>
+        <button aria-pressed={section === "amistosos"} onClick={() => pickSection("amistosos")}>🤝 Amistosos{friendlies ? ` (${friendlies})` : ""}</button>
+      </div>
       {creating && (
         <ConvoForm
+          friendly={section === "amistosos"}
           onSaved={(id) => {
             setCreating(false);
             load(id);
@@ -59,10 +75,12 @@ function Convos() {
         />
       )}
       {!list && !error && <p className="muted">Carregant…</p>}
-      {list?.length === 0 && !creating && <p className="card">Encara no hi ha cap convocatòria. Toca «+ Nova».</p>}
-      {list && list.length > 0 && (
+      {shown?.length === 0 && !creating && (
+        <p className="card">{section === "amistosos" ? "Encara no hi ha cap amistós. Toca «+ Nova» per afegir-ne un." : "Encara no hi ha cap convocatòria. Toca «+ Nova»."}</p>
+      )}
+      {shown && shown.length > 0 && (
         <div className="tabs convo-tabs" style={{ margin: "12px 0" }}>
-          {list.map((c) => (
+          {shown.map((c) => (
             <button key={c.id} aria-pressed={c.id === selected} onClick={() => setSelected(c.id)}>
               <span className="team-inline"><Crest name={c.rival} size={20} />{c.match_date.slice(8, 10)}/{c.match_date.slice(5, 7)} · {c.rival}</span>
               {!c.published && " ·  esborrany"}
@@ -82,14 +100,14 @@ function shortTeam(name: string) {
 }
 
 /** Formulari de la informació del partit (nova o editar). */
-function ConvoForm({ c, onSaved }: { c?: Convocation; onSaved: (id: string) => void }) {
+function ConvoForm({ c, friendly = false, onSaved }: { c?: Convocation; friendly?: boolean; onSaved: (id: string) => void }) {
   const [f, setF] = useState({
     rival: c?.rival ?? "",
     is_home: c?.is_home ?? true,
     match_date: c?.match_date ?? todayMadrid(),
     kickoff: hhmm(c?.kickoff ?? null),
     meet_time: hhmm(c?.meet_time ?? null),
-    competition: c?.competition ?? "Lliga",
+    competition: c ? c.competition ?? "" : friendly ? FRIENDLY : "Lliga",
     venue: c?.venue ?? "",
     address: c?.address ?? "",
     kit: c?.kit ?? "",
@@ -99,6 +117,7 @@ function ConvoForm({ c, onSaved }: { c?: Convocation; onSaved: (id: string) => v
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const set = (k: keyof typeof f, v: string | boolean) => setF((x) => ({ ...x, [k]: v }));
+  const isAmistos = isFriendly(f);
 
   useEffect(() => {
     if (c) return;
@@ -175,8 +194,16 @@ function ConvoForm({ c, onSaved }: { c?: Convocation; onSaved: (id: string) => v
 
   return (
     <form className="card stack" onSubmit={submit}>
-      <h2 style={{ margin: 0 }}>{c ? "Informació del partit" : "Nova convocatòria"}</h2>
-      {!c && fcf.length > 0 && (
+      <h2 style={{ margin: 0 }}>{c ? "Informació del partit" : isAmistos ? "Nou amistós" : "Nova convocatòria"}</h2>
+      <div>
+        <label className="field">Tipus de partit</label>
+        <div className="weekdays" role="group" aria-label="Tipus de partit">
+          <button type="button" aria-pressed={!isAmistos} onClick={() => isAmistos && set("competition", "Lliga")}>Lliga</button>
+          <button type="button" aria-pressed={isAmistos} onClick={() => !isAmistos && set("competition", FRIENDLY)}>Amistós</button>
+        </div>
+        {isAmistos && <p className="muted small" style={{ margin: "4px 0 0" }}>Es guardarà a «Amistosos», a part de la lliga.</p>}
+      </div>
+      {!c && !isAmistos && fcf.length > 0 && (
         <div>
           <label className="field" htmlFor="cfcf">Omplir amb un partit de la FCF</label>
           <select id="cfcf" defaultValue="" onChange={(e) => fromFcf(e.target.value)}>
@@ -219,9 +246,9 @@ function ConvoForm({ c, onSaved }: { c?: Convocation; onSaved: (id: string) => v
       <div>
         <div className="row between">
           <label className="field" htmlFor="cvenue">Camp</label>
-          <button type="button" className="btn small secondary" disabled={venueBusy || !f.match_date} onClick={() => venueFromFcf({ date: f.match_date })}>
+          {!isAmistos && <button type="button" className="btn small secondary" disabled={venueBusy || !f.match_date} onClick={() => venueFromFcf({ date: f.match_date })}>
             {venueBusy ? "Buscant…" : "📍 Camp i adreça de la FCF"}
-          </button>
+          </button>}
         </div>
         <input id="cvenue" type="text" maxLength={120} placeholder="Ex.: Nou Sardenya" value={f.venue} onChange={(e) => set("venue", e.target.value)} />
       </div>

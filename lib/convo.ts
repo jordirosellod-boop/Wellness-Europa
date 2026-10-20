@@ -23,6 +23,10 @@ export type Convocation = {
 export type RosterRow = { player_id: string; display_name: string; dorsal: number | null; called: boolean; guest?: boolean; origin?: string | null };
 export type Guest = { id: string; name: string; dorsal: number | null; origin: string | null };
 
+/** Els amistosos es guarden amb la competició «Amistós» (i surten a part de la lliga). */
+export const FRIENDLY = "Amistós";
+export const isFriendly = (c: { competition: string | null }) => /^amist/i.test(c.competition?.trim() ?? "");
+
 export const CONVO_COLS =
   "id, match_date, kickoff, meet_time, rival, is_home, competition, venue, address, kit, notes, published, published_at, notified_at";
 
