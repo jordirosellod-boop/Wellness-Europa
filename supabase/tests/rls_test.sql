@@ -586,3 +586,21 @@ select pg_temp.expect_error($$insert into public.tactic_boards (title) values ('
 select pg_temp.expect_error($$insert into public.corrections (title) values ('x')$$, 'Ni en pot crear');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);
 select pg_temp.check((select count(*) from public.corrections) = 0, 'Una jugadora no veu les correccions (encara que hi surti)');
+
+-- =============== PLANNING DE LA SETMANA ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.weekly_plans (week_start, days, footer) values
+  (date_trunc('week', (select today from vars))::date, '[{"rest":false,"items":[{"t":"19:25","icon":"👕","text":"Canviades"}]},{"rest":true,"items":[]},{},{},{},{},{}]', 'Porteu roba per dutxar-vos');
+insert into public.weekly_plans (week_start, days, published) values (date_trunc('week', (select today from vars))::date + 7, '[{},{},{},{},{},{},{}]', true);
+select pg_temp.check((select count(*) from public.weekly_plans) = 2, 'El staff prepara el planning de la setmana');
+select pg_temp.check((select published_at is not null from public.weekly_plans where published), 'L''hora de publicació la posa el servidor');
+select pg_temp.expect_error($$insert into public.weekly_plans (week_start, days) values (date_trunc('week', current_date)::date + 1, '[{},{},{},{},{},{},{}]')$$, 'El planning ha de començar en dilluns');
+select pg_temp.expect_error($$insert into public.weekly_plans (week_start, days) values (date_trunc('week', current_date)::date + 14, '[{},{}]')$$, 'El planning ha de tenir 7 dies');
+select pg_temp.expect_error($$update public.weekly_plans set footer = repeat('x', 301)$$, 'Peu del planning massa llarg rebutjat');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);
+select pg_temp.check((select count(*) from public.weekly_plans) = 1, 'La jugadora només veu el planning publicat');
+with u as (update public.weekly_plans set footer = 'x' returning 1) select pg_temp.check(count(*) = 0, 'La jugadora no pot canviar el planning') from u;
+select pg_temp.expect_error($$insert into public.weekly_plans (week_start, days) values (date_trunc('week', current_date)::date + 21, '[{},{},{},{},{},{},{}]')$$, 'La jugadora no pot crear plannings');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.weekly_plans$$, 'Anònim no veu el planning');
+reset role;

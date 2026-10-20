@@ -8,6 +8,8 @@ import { FcfStats } from "@/components/fcf-stats";
 import { average, daysLeftInMonth, fetchLeague, fmtAvg, qualified, fetchTeamLevel, fetchWinners, LeagueTable, leagueTitle, LevelBadge, ranks, sortLeague, Winners, type LeagueRow, type LeagueWinner } from "@/components/league";
 import { PlayerAttendance } from "@/components/player-attendance";
 import { RehabCard } from "@/components/rehab-card";
+import { PlayerPlanning } from "@/components/weekly-view";
+import { fetchWeeklyPlan, itemTime, type WeeklyPlan } from "@/lib/weekly";
 import { nextConvoFor, PlayerConvo } from "@/components/player-convo";
 import { hhmm } from "@/lib/convo";
 import { PlayerFines } from "@/components/player-fines";
@@ -15,7 +17,7 @@ import { fetchAttendance, fetchSessionsBetween, monthBounds, summarize } from "@
 import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
 import { fmtEuros } from "@/lib/fines";
 import { Brand, Footer } from "@/components/ui";
-import { fmtShort, viewRange, type CalView } from "@/lib/dates";
+import { fmtShort, isoDow, startOfWeek, viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import {
   bandOf,
@@ -132,8 +134,8 @@ function PasteLink() {
   );
 }
 
-type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo";
-const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo"];
+type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning";
+const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo", "planning"];
 
 function sectionFromUrl(): Section {
   const s = new URLSearchParams(window.location.search).get("s") as Section | null;
@@ -248,6 +250,7 @@ function PlayerHome({ me }: { me: Profile }) {
       {sessions !== null && section === "lliga" && <PlayerLeague meId={me.id} />}
       {sessions !== null && section === "assistencia" && <PlayerAttendance meId={me.id} />}
       {sessions !== null && section === "convo" && <PlayerConvo meId={me.id} />}
+      {sessions !== null && section === "planning" && <PlayerPlanning />}
 
       {sessions !== null && section === "avisos" && (
         <>
@@ -296,6 +299,7 @@ type DashData = {
   reminders: ReminderStatus;
   attendance: { present: number; marked: number; pct: number | null } | null;
   convo: Awaited<ReturnType<typeof nextConvoFor>>;
+  plan: WeeklyPlan | null;
 };
 
 async function loadMonthAttendance(playerId: string, today: string) {
@@ -306,7 +310,7 @@ async function loadMonthAttendance(playerId: string, today: string) {
 async function loadDashboard(playerId: string, today: string, sessions: Session[]): Promise<DashData> {
   const sb = supabase();
   const ids = sessions.map((s) => s.id);
-  const [w, r, fines, next, reminders, level, league, attendance, convo] = await Promise.all([
+  const [w, r, fines, next, reminders, level, league, attendance, convo, plan] = await Promise.all([
     ids.length ? sb.from("wellness").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     ids.length ? sb.from("rpe").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     fetchAll<{ amount_cents: number; paid: boolean }>((f, t) =>
@@ -319,6 +323,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     fetchLeague().catch((): LeagueRow[] => []),
     loadMonthAttendance(playerId, today).catch(() => null),
     nextConvoFor(playerId, today).catch(() => null),
+    fetchWeeklyPlan(startOfWeek(today)).catch(() => null),
   ]);
   for (const res of [w, r, next]) if (res.error) throw new Error(res.error.message);
   const mine = new Map<string, { w: boolean; r: boolean }>();
@@ -338,6 +343,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     reminders,
     attendance,
     convo,
+    plan,
   };
 }
 
@@ -411,6 +417,22 @@ function Dashboard({
           <span>{data.convo.called ? "✓ Estàs convocada · Veure la convocatòria" : "Veure la convocatòria"}</span>
         </button>
       )}
+
+      {data?.plan && (() => {
+        const d = data.plan.days[isoDow(today) - 1];
+        const rest = !d || d.rest || d.items.length === 0;
+        return (
+          <button type="button" className="wk-banner" onClick={() => go("planning")}>
+            <span className="wk-banner-k">🗓️ Planning de la setmana · Avui</span>
+            {rest ? <b>Descans 😴</b> : (
+              <span className="wk-banner-items">
+                {d.items.slice(0, 4).map((it, j) => <span key={j}>{itemTime(it) && <b>{itemTime(it)}</b>} {it.icon} {it.text}</span>)}
+              </span>
+            )}
+            <span className="wk-banner-more">Veure tota la setmana ›</span>
+          </button>
+        );
+      })()}
 
       <RehabCard meId={me.id} today={today} />
 

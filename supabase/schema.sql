@@ -455,6 +455,18 @@ create table if not exists public.tactic_boards (
 );
 create index if not exists tactic_boards_owner_idx on public.tactic_boards (owner_id, updated_at desc);
 
+-- PLANNING DE LA SETMANA: el staff el prepara; les jugadores només veuen els publicats.
+-- "days" = 7 dies (de dilluns a diumenge): {rest: bool, items: [{t, e, icon, text}]}.
+create table if not exists public.weekly_plans (
+  week_start   date primary key check (extract(isodow from week_start) = 1),
+  days         jsonb not null default '[]'::jsonb check (jsonb_typeof(days) = 'array' and jsonb_array_length(days) = 7 and octet_length(days::text) < 30000),
+  footer       text check (footer is null or char_length(footer) <= 300),
+  published    boolean not null default false,
+  published_at timestamptz,
+  updated_by   uuid default auth.uid() references public.profiles(id) on delete set null,
+  updated_at   timestamptz not null default now()
+);
+
 -- BIG DATA DE LA LLIGA: actes de la FCF ja llegides (dades públiques), perquè no calgui baixar-les cada cop.
 -- Només hi escriu i en llegeix el servidor (sense polítiques: cap usuari hi té accés directe).
 create table if not exists public.fcf_league_actas (
@@ -1084,6 +1096,22 @@ create trigger rival_scouting_stamp before insert or update on public.rival_scou
 drop trigger if exists scouting_targets_stamp on public.scouting_targets;
 create trigger scouting_targets_stamp before insert or update on public.scouting_targets
   for each row execute function public.stamp_analysis();
+-- Planning: hores de publicació i d'actualització les posa el servidor.
+create or replace function public.stamp_weekly_plan()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  new.updated_at := now();
+  new.updated_by := (select auth.uid());
+  if new.published and (tg_op = 'INSERT' or not old.published) then new.published_at := now();
+  elsif not new.published then new.published_at := null;
+  else new.published_at := old.published_at;
+  end if;
+  return new;
+end $$;
+drop trigger if exists weekly_plans_stamp on public.weekly_plans;
+create trigger weekly_plans_stamp before insert or update on public.weekly_plans
+  for each row execute function public.stamp_weekly_plan();
+
 drop trigger if exists tactic_boards_stamp on public.tactic_boards;
 create trigger tactic_boards_stamp before insert or update on public.tactic_boards
   for each row execute function public.stamp_analysis();
@@ -1217,6 +1245,7 @@ alter table public.analysis_events    enable row level security;
 alter table public.analysis_buttons   enable row level security;
 alter table public.rival_scouting     enable row level security;
 alter table public.tactic_boards      enable row level security;
+alter table public.weekly_plans       enable row level security;
 alter table public.fcf_league_actas   enable row level security;
 alter table public.scouting_targets   enable row level security;
 alter table public.corrections        enable row level security;
@@ -1230,6 +1259,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
+  public.weekly_plans,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
@@ -1255,6 +1285,8 @@ grant all on public.injuries, public.rehab_entries, public.player_positions, pub
 grant select, insert, update, delete on public.injuries, public.player_positions, public.player_nicknames, public.training_plans to authenticated;
 grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to service_role;
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
+grant all on public.weekly_plans to service_role;
+grant select, insert, update, delete on public.weekly_plans to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;
 grant select, insert, update, delete on public.scouting_targets to authenticated;
 grant select, insert, update on public.rehab_entries to authenticated;
@@ -1461,6 +1493,20 @@ drop policy if exists scouting_targets_owner on public.scouting_targets;
 create policy scouting_targets_owner on public.scouting_targets for all to authenticated
   using (owner_id = (select auth.uid()) and (select public.is_owner()))
   with check (owner_id = (select auth.uid()) and (select public.is_owner()));
+-- PLANNING: el staff ho fa tot; les jugadores només llegeixen els publicats.
+drop policy if exists weekly_plans_select on public.weekly_plans;
+create policy weekly_plans_select on public.weekly_plans for select to authenticated
+  using ((select public.is_coach()) or (published and (select public.is_player())));
+drop policy if exists weekly_plans_coach on public.weekly_plans;
+create policy weekly_plans_coach on public.weekly_plans for insert to authenticated
+  with check ((select public.is_coach()));
+drop policy if exists weekly_plans_update on public.weekly_plans;
+create policy weekly_plans_update on public.weekly_plans for update to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists weekly_plans_delete on public.weekly_plans;
+create policy weekly_plans_delete on public.weekly_plans for delete to authenticated
+  using ((select public.is_coach()));
+
 drop policy if exists tactic_boards_owner on public.tactic_boards;
 create policy tactic_boards_owner on public.tactic_boards for all to authenticated
   using (owner_id = (select auth.uid()) and (select public.is_owner()))
