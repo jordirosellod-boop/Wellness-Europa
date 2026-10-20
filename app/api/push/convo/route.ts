@@ -1,5 +1,4 @@
-import webpush from "web-push";
-import { adminClient, vapidKeys } from "@/lib/server-admin";
+import { adminClient, pushToPlayers } from "@/lib/server-admin";
 
 // El staff ho crida en publicar una convocatòria: envia un avís a totes les jugadores
 // que tenen les notificacions activades. Només el staff (amb la seva sessió).
@@ -19,35 +18,17 @@ export async function POST(req: Request) {
   if (!c) return Response.json({ error: "Convocatòria no trobada." }, { status: 404 });
   if (!c.published) return Response.json({ error: "Primer cal publicar la convocatòria." }, { status: 400 });
 
-  const { data: players, error: pErr } = await db.from("profiles").select("id").eq("role", "player");
-  if (pErr) return Response.json({ error: pErr.message }, { status: 500 });
-  const ids = (players ?? []).map((p) => p.id as string);
-  const { data: subs, error: sErr } = ids.length
-    ? await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("player_id", ids).order("id")
-    : { data: [], error: null };
-  if (sErr) return Response.json({ error: sErr.message }, { status: 500 });
-
   const day = new Intl.DateTimeFormat("ca-ES", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${c.match_date}T12:00:00Z`));
-  const { publicKey, privateKey } = await vapidKeys(db);
-  webpush.setVapidDetails("https://wellness-europa.vercel.app", publicKey, privateKey);
-  const payload = JSON.stringify({
-    title: "Convocatòria penjada",
-    body: `Partit contra ${c.rival} · ${day}${c.kickoff ? ` a les ${String(c.kickoff).slice(0, 5)}` : ""}. Entra a veure-la!`,
-    url: "/j?s=convo",
-  });
-
-  let sent = 0;
-  const gone: string[] = [];
-  for (const s of subs ?? []) {
-    try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600 });
-      sent++;
-    } catch (e) {
-      const status = (e as { statusCode?: number }).statusCode;
-      if (status === 404 || status === 410) gone.push(s.id);
-    }
+  let r: { sent: number; players: number };
+  try {
+    r = await pushToPlayers(db, {
+      title: "Convocatòria penjada",
+      body: `Partit contra ${c.rival} · ${day}${c.kickoff ? ` a les ${String(c.kickoff).slice(0, 5)}` : ""}. Entra a veure-la!`,
+      url: "/j?s=convo",
+    });
+  } catch (e) {
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
-  if (gone.length) await db.from("push_subscriptions").delete().in("id", gone);
   await db.from("convocations").update({ notified_at: new Date().toISOString() }).eq("id", c.id);
-  return Response.json({ sent, players: ids.length });
+  return Response.json(r);
 }

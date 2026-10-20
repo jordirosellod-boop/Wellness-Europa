@@ -1,18 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { addDays, startOfWeek } from "@/lib/dates";
+import { addDays, startOfWeek, weekRange } from "@/lib/dates";
 import { dayTitle, fetchWeeklyPlan, itemTime, type PlanDay, type WeeklyPlan } from "@/lib/weekly";
 import { todayMadrid } from "@/lib/wellness";
-
-/** «Del 19 al 25 d'octubre» */
-export function weekRange(weekStart: string): string {
-  const end = addDays(weekStart, 6);
-  const month = (d: string) => new Intl.DateTimeFormat("ca-ES", { timeZone: "UTC", month: "long" }).format(new Date(`${d}T12:00:00Z`));
-  const de = (m: string) => (/^[aeiouà-ú]/i.test(m) ? `d'${m}` : `de ${m}`);
-  const a = Number(weekStart.slice(8, 10)), b = Number(end.slice(8, 10));
-  return weekStart.slice(5, 7) === end.slice(5, 7) ? `Del ${a} al ${b} ${de(month(end))}` : `Del ${a} ${de(month(weekStart))} al ${b} ${de(month(end))}`;
-}
 
 /** Els 7 dies del planning (el d'avui destacat). */
 export function WeekDays({ weekStart, days, footer }: { weekStart: string; days: PlanDay[]; footer: string | null }) {

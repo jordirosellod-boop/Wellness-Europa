@@ -10,6 +10,36 @@ export function adminClient(): SupabaseClient {
 }
 
 /**
+ * Envia un avís a totes les jugadores que tenen les notificacions activades.
+ * Esborra les subscripcions que ja no existeixen. Torna quants mòbils l'han rebut.
+ */
+export async function pushToPlayers(db: SupabaseClient, msg: { title: string; body: string; url: string }): Promise<{ sent: number; players: number }> {
+  const { data: players, error: pErr } = await db.from("profiles").select("id").eq("role", "player");
+  if (pErr) throw new Error(pErr.message);
+  const ids = (players ?? []).map((p) => p.id as string);
+  const { data: subs, error: sErr } = ids.length
+    ? await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("player_id", ids).order("id")
+    : { data: [], error: null };
+  if (sErr) throw new Error(sErr.message);
+  const { publicKey, privateKey } = await vapidKeys(db);
+  webpush.setVapidDetails("https://wellness-europa.vercel.app", publicKey, privateKey);
+  const payload = JSON.stringify(msg);
+  let sent = 0;
+  const gone: string[] = [];
+  for (const s of subs ?? []) {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600 });
+      sent++;
+    } catch (e) {
+      const status = (e as { statusCode?: number }).statusCode;
+      if (status === 404 || status === 410) gone.push(s.id);
+    }
+  }
+  if (gone.length) await db.from("push_subscriptions").delete().in("id", gone);
+  return { sent, players: ids.length };
+}
+
+/**
  * Claus de les notificacions (VAPID). Es generen soles la primera vegada i es guarden a la
  * taula privada app_secrets, així no cal configurar res a Vercel.
  */

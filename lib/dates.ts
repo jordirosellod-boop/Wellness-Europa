@@ -74,3 +74,12 @@ export function fmtMonth(d: string): string {
 export function fmtShort(d: string): string {
   return new Intl.DateTimeFormat("ca-ES", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(toUtc(d));
 }
+
+/** «Del 19 al 25 d'octubre» */
+export function weekRange(weekStart: string): string {
+  const end = addDays(weekStart, 6);
+  const month = (d: string) => new Intl.DateTimeFormat("ca-ES", { timeZone: "UTC", month: "long" }).format(new Date(`${d}T12:00:00Z`));
+  const de = (m: string) => (/^[aeiouà-ú]/i.test(m) ? `d'${m}` : `de ${m}`);
+  const a = Number(weekStart.slice(8, 10)), b = Number(end.slice(8, 10));
+  return weekStart.slice(5, 7) === end.slice(5, 7) ? `Del ${a} al ${b} ${de(month(end))}` : `Del ${a} ${de(month(weekStart))} al ${b} ${de(month(end))}`;
+}

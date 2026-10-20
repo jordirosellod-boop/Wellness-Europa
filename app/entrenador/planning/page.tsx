@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { CoachShell, Footer } from "@/components/ui";
-import { WeekDays, weekRange } from "@/components/weekly-view";
-import { addDays, startOfWeek } from "@/lib/dates";
+import { WeekDays } from "@/components/weekly-view";
+import { addDays, startOfWeek, weekRange } from "@/lib/dates";
 import { supabase } from "@/lib/supabase";
 import {
   ACTIVITIES, DEFAULT_FOOTER, ICONS, MAX_ITEMS, MAX_TEXT, dayTitle, draftFromCalendar, emptyWeek, fetchWeeklyPlan, sortItems, toWhatsApp,
@@ -133,7 +133,28 @@ function Planning() {
     setDraft({ ...draft, days, published: data.published as boolean, published_at: data.published_at as string | null });
     setSaved({ week_start: week, days, footer: row.footer, published: data.published as boolean, published_at: data.published_at as string | null, updated_at: data.updated_at as string });
     setDirty(false);
-    setStatus({ ok: true, text: published ? (draft.published ? "Desat ✓ (les jugadores ja veuen els canvis)" : "Publicat ✓ Les jugadores ja el veuen a l'app.") : draft.published ? "Desat ✓ Ja no és visible per a les jugadores." : "Desat ✓ (encara no publicat)" });
+    if (published && !draft.published) return notify(false, "Publicat ✓ Les jugadores ja el veuen a l'app.");
+    setStatus({ ok: true, text: published ? "Desat ✓ Les jugadores ja veuen els canvis. Si vols que els mirin, toca «🔔 Avisar dels canvis»." : draft.published ? "Desat ✓ Ja no és visible per a les jugadores." : "Desat ✓ (encara no publicat)" });
+  }
+
+  /** Avís al mòbil de les jugadores (les que tenen les notificacions activades). */
+  async function notify(changed: boolean, prefix = "") {
+    setBusy(true);
+    try {
+      const { data: s } = await supabase().auth.getSession();
+      const res = await fetch("/api/push/planning", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+        body: JSON.stringify({ week_start: week, changed }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? `Error ${res.status}`);
+      setStatus({ ok: true, text: `${prefix ? `${prefix} ` : ""}Avís enviat a ${json.sent} ${json.sent === 1 ? "mòbil" : "mòbils"}. (Només el reben les jugadores que tenen els avisos activats.)` });
+    } catch (e) {
+      setStatus({ ok: false, text: `${prefix ? `${prefix} Però l'avís` : "L'avís"} no s'ha pogut enviar: ${e instanceof Error ? e.message : e}` });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function copyText() {
@@ -243,12 +264,13 @@ function Planning() {
             {draft.published ? (
               <>
                 <button type="button" className="btn secondary" disabled={busy} onClick={() => save(false)}>Despublicar</button>
+                {!dirty && <button type="button" className="btn secondary" disabled={busy} onClick={() => window.confirm("Enviar un avís a les jugadores dient que hi ha canvis al planning?") && notify(true)}>🔔 Avisar dels canvis</button>}
                 <button type="button" className="btn" disabled={busy || !dirty} onClick={() => save(true)}>Desar</button>
               </>
             ) : (
               <>
                 <button type="button" className="btn secondary" disabled={busy || !dirty} onClick={() => save(false)}>Desar esborrany</button>
-                <button type="button" className="btn" disabled={busy} onClick={() => save(true)}>Publicar</button>
+                <button type="button" className="btn" disabled={busy} onClick={() => save(true)}>Publicar i avisar</button>
               </>
             )}
           </div>
