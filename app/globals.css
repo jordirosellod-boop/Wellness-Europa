@@ -1239,3 +1239,22 @@ body:has(.bd) main { max-width: 1240px; }
   .wk-item { grid-template-columns: 1fr 1fr 64px 36px; }
   .wk-item input[type="text"] { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* Entreno penjat (jugadores) */
+.plan-sheet.on-screen { position: static; left: 0; visibility: visible; pointer-events: auto; transform-origin: top left; box-shadow: 0 1px 6px rgba(11, 24, 70, .15); }
+.ps-viewer { width: 100%; overflow: hidden; border-radius: 6px; background: #fff; }
+.wk-banner.train { background: linear-gradient(135deg, #b07d1e, #dbb34d); color: #0b1846; }
+/* Petos */
+.bibs-card h2 { margin: 0 0 4px; }
+.bibs-card.mine { border: 2px solid #dbb34d; background: #fff8e6; }
+.bibs-now { margin: 0; font-size: 1.05rem; }
+.bibs-next { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; font-size: .92rem; }
+.bibs-next li span { display: inline-block; min-width: 5.5em; color: var(--muted, #5a6485); }
+.bibs-next li.me { font-weight: 700; }
+.bibs-week { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bibs-week li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bibs-week li > span { min-width: 6em; font-weight: 600; }
+.bibs-week select { width: auto; max-width: 100%; }
+.bibs-start summary { cursor: pointer; font-weight: 600; margin-top: 10px; }
+.wk-bibs { margin: 0 0 6px; font-size: .9rem; color: #7a5a12; }
+@media print { .plan-sheet.on-screen { transform: none !important; box-shadow: none; } }

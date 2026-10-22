@@ -9,6 +9,8 @@ import { average, daysLeftInMonth, fetchLeague, fmtAvg, qualified, fetchTeamLeve
 import { PlayerAttendance } from "@/components/player-attendance";
 import { RehabCard } from "@/components/rehab-card";
 import { PlayerPlanning } from "@/components/weekly-view";
+import { BibsCard } from "@/components/bibs";
+import { PlayerTraining } from "@/components/player-training";
 import { fetchWeeklyPlan, itemTime, type WeeklyPlan } from "@/lib/weekly";
 import { nextConvoFor, PlayerConvo } from "@/components/player-convo";
 import { hhmm } from "@/lib/convo";
@@ -134,8 +136,8 @@ function PasteLink() {
   );
 }
 
-type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning";
-const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo", "planning"];
+type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning" | "entreno";
+const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo", "planning", "entreno"];
 
 function sectionFromUrl(): Section {
   const s = new URLSearchParams(window.location.search).get("s") as Section | null;
@@ -251,6 +253,7 @@ function PlayerHome({ me }: { me: Profile }) {
       {sessions !== null && section === "assistencia" && <PlayerAttendance meId={me.id} />}
       {sessions !== null && section === "convo" && <PlayerConvo meId={me.id} />}
       {sessions !== null && section === "planning" && <PlayerPlanning />}
+      {sessions !== null && section === "entreno" && <PlayerTraining />}
 
       {sessions !== null && section === "avisos" && (
         <>
@@ -300,6 +303,7 @@ type DashData = {
   attendance: { present: number; marked: number; pct: number | null } | null;
   convo: Awaited<ReturnType<typeof nextConvoFor>>;
   plan: WeeklyPlan | null;
+  trainingToday: boolean;
 };
 
 async function loadMonthAttendance(playerId: string, today: string) {
@@ -310,7 +314,7 @@ async function loadMonthAttendance(playerId: string, today: string) {
 async function loadDashboard(playerId: string, today: string, sessions: Session[]): Promise<DashData> {
   const sb = supabase();
   const ids = sessions.map((s) => s.id);
-  const [w, r, fines, next, reminders, level, league, attendance, convo, plan] = await Promise.all([
+  const [w, r, fines, next, reminders, level, league, attendance, convo, plan, pub] = await Promise.all([
     ids.length ? sb.from("wellness").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     ids.length ? sb.from("rpe").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     fetchAll<{ amount_cents: number; paid: boolean }>((f, t) =>
@@ -324,6 +328,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     loadMonthAttendance(playerId, today).catch(() => null),
     nextConvoFor(playerId, today).catch(() => null),
     fetchWeeklyPlan(startOfWeek(today)).catch(() => null),
+    sb.from("published_trainings").select("plan_id").eq("plan_date", today).range(0, 0),
   ]);
   for (const res of [w, r, next]) if (res.error) throw new Error(res.error.message);
   const mine = new Map<string, { w: boolean; r: boolean }>();
@@ -344,6 +349,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     attendance,
     convo,
     plan,
+    trainingToday: !pub.error && (pub.data ?? []).length > 0,
   };
 }
 
@@ -433,6 +439,16 @@ function Dashboard({
           </button>
         );
       })()}
+
+      {data?.trainingToday && (
+        <button type="button" className="wk-banner train" onClick={() => go("entreno")}>
+          <span className="wk-banner-k">📋 Entreno d&apos;avui</span>
+          <b>Ja està penjat. Mira les tasques i els equips!</b>
+          <span className="wk-banner-more">Veure l&apos;entreno ›</span>
+        </button>
+      )}
+
+      <BibsCard meId={me.id} today={today} />
 
       <RehabCard meId={me.id} today={today} />
 
@@ -527,6 +543,16 @@ function Dashboard({
                 ? `${data.attendance.present} de ${data.attendance.marked} · ${data.attendance.pct}%`
                 : "Encara sense dades"}
           </span>
+        </button>
+        <button type="button" className="tile" onClick={() => go("entreno")}>
+          {svg("M9 3h6v4H9zM5 5h4M15 5h4v16H5V5M8 12h8M8 16h5")}
+          <b>Entreno</b>
+          <span>{data?.trainingToday ? "El d'avui ja està penjat" : "Els entrenos penjats"}</span>
+        </button>
+        <button type="button" className="tile" onClick={() => go("planning")}>
+          {ICONS.calendari}
+          <b>Planning</b>
+          <span>{data?.plan ? "La setmana" : "Encara no penjat"}</span>
         </button>
         <button type="button" className="tile" onClick={() => go("stats")}>
           {svg("M4 20V10M10 20V4M16 20v-7M22 20H2")}

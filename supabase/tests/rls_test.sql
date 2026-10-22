@@ -604,3 +604,47 @@ select pg_temp.expect_error($$insert into public.weekly_plans (week_start, days)
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.weekly_plans$$, 'Anònim no veu el planning');
 reset role;
+
+-- =============== ENTRENO PENJAT A L'APP ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.published_trainings (plan_id, plan_date, data)
+select id, plan_date, '{"plan":{}}' from public.training_plans limit 1;
+select pg_temp.check((select count(*) from public.published_trainings) = 1, 'El responsable penja l''entreno a l''app');
+select pg_temp.expect_error($$insert into public.published_trainings (plan_id, plan_date, data) select id, plan_date, '[]' from public.training_plans limit 1$$, 'L''entreno penjat ha de ser un objecte');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c2', false);
+select pg_temp.check((select count(*) from public.published_trainings) = 1, 'La resta del staff veu l''entreno penjat');
+with u as (update public.published_trainings set data = '{}' returning 1) select pg_temp.check(count(*) = 0, 'Però no el pot canviar') from u;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);
+select pg_temp.check((select count(*) from public.published_trainings) = 1, 'La jugadora veu l''entreno penjat');
+with u as (delete from public.published_trainings returning 1) select pg_temp.check(count(*) = 0, 'La jugadora no el pot treure') from u;
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.published_trainings$$, 'Anònim no veu l''entreno penjat');
+
+-- =============== PETOS ===============
+reset role;
+-- Dorsals per ordre (1, 2, 3...) i quatre dies amb sessió lluny de les altres proves
+insert into public.player_numbers (profile_id, dorsal)
+select id, row_number() over (order by id) from public.profiles where role = 'player'
+on conflict (profile_id) do update set dorsal = excluded.dorsal;
+create temp table bibp as select array_agg(id order by id) as ids, count(*)::int as n from public.profiles where role = 'player';
+grant select on bibp to authenticated, anon;
+insert into public.sessions (session_date, kind, name) values
+  ((select today from vars) + 100, 'Entrenament', 'P1'), ((select today from vars) + 101, 'Entrenament', 'P2'),
+  ((select today from vars) + 101, 'Partit', 'P2b'), ((select today from vars) + 102, 'Partit', 'P3'), ((select today from vars) + 103, 'Entrenament', 'P4');
+update public.bib_settings set start_date = (select today from vars) + 100, start_player = (select ids[1] from bibp);
+-- El 2n dia, la que tocaria (dorsal 2) no hi és
+insert into public.attendance (session_id, player_id, present)
+select id, (select ids[2] from bibp), false from public.sessions where name = 'P2';
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select array_agg(player_id order by day) from public.bib_schedule((select today from vars) + 100, (select today from vars) + 103))
+  = (select array[ids[1], ids[3 % n + (case when 3 % n = 0 then n else 0 end)], ids[(3 % n) + 1], ids[((4) % n) + 1]] from bibp), 'Petos per ordre de dorsal (un per dia), i si no hi és li toca a la següent');
+select pg_temp.check((select count(*) from public.bib_schedule((select today from vars) + 101, (select today from vars) + 101)) = 1, 'Un sol responsable per dia encara que hi hagi dues sessions');
+with u as (update public.bib_settings set start_date = current_date returning 1) select pg_temp.check(count(*) = 0, 'La jugadora no pot canviar l''ordre dels petos') from u;
+select pg_temp.expect_error($$insert into public.bib_overrides (day, player_id) values (current_date, '00000000-0000-0000-0000-0000000000b2')$$, 'La jugadora no pot posar qui els porta');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.bib_overrides (day, player_id) values ((select today from vars) + 100, (select ids[2] from bibp));
+select pg_temp.check((select array_agg(player_id order by day) from public.bib_schedule((select today from vars) + 100, (select today from vars) + 101))
+  = (select array[ids[2], ids[3 % n + (case when 3 % n = 0 then n else 0 end)]] from bibp), 'El staff canvia qui els porta un dia i l''ordre segueix a partir d''ella');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.bib_schedule(current_date, current_date + 7)$$, 'Anònim no veu els petos');
+reset role;

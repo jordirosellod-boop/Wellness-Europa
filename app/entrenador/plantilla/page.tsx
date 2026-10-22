@@ -1,16 +1,18 @@
 "use client";
 
 import { Crest } from "@/components/crest";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from "react";
-import { DrillEditor, DrillView } from "@/components/drill-editor";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from "react";
+import { DrillEditor } from "@/components/drill-editor";
+import { fitSheet, PlanSheet, PositionBoard, baixes, shortName, SQUAD_BG, SQUAD_FG, type Roster } from "@/components/plan-sheet";
 import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
 import { escapulada } from "@/lib/fonts";
 import {
-  CONTENTS, fetchPlans, newTask, PLAN_COLS, uid, POSITION_NAMES, POSITIONS, STATUS_LABEL, TASK_TYPES,
+  CONTENTS, fetchPlans, newTask, PLAN_COLS, uid, POSITION_NAMES, POSITIONS, TASK_TYPES,
   type Guest, type Plan, type PlayerStatus, type Squad, type Team, SQUAD_NAMES, type Position, type Task,
 } from "@/lib/plan";
-import { ABSENCE_REASONS, reasonLabel, type AbsenceReason } from "@/lib/attendance";
+import { ABSENCE_REASONS, type AbsenceReason } from "@/lib/attendance";
 import { deliverPdf, planPdf } from "@/lib/plan-pdf";
+import { buildSnapshot } from "@/lib/published-training";
 import { safeName } from "@/lib/share-file";
 import { activeOn, fetchInjuries } from "@/lib/rehab";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -49,11 +51,6 @@ function Plans() {
 // ---------------------------------------------------------------------------
 // Llista i creació
 // ---------------------------------------------------------------------------
-
-type Roster = { players: Profile[]; positions: Map<string, Position>; nicks: Map<string, string> };
-
-/** Com surt a l'entreno: el sobrenom, si en té; si no, el primer nom. */
-const shortName = (r: Roster, p: Profile) => r.nicks.get(p.id) ?? p.display_name.split(" ")[0];
 
 async function fetchRoster(): Promise<Roster> {
   const sb = supabase();
@@ -182,6 +179,11 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
   const [editPos, setEditPos] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const ios = useIsIOS();
+  const [published, setPublished] = useState(false); // penjat a l'app de les jugadores
+  const [pubBusy, setPubBusy] = useState(false);
+  useEffect(() => {
+    supabase().from("published_trainings").select("plan_id").eq("plan_id", id).maybeSingle().then(({ data }) => setPublished(!!data));
+  }, [id]);
   const [pdf, setPdf] = useState<File | null>(null);
 
   useEffect(() => {
@@ -233,17 +235,47 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
   const updTask = (i: number, patch: Partial<Task>) => plan && upd({ tasks: plan.tasks.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
 
   /** Desa; només diu "Desat" quan el servidor ho confirma. */
-  async function save() {
-    if (!plan) return;
+  async function save(): Promise<boolean> {
+    if (!plan) return false;
     setSaving(true);
     setStatus(null);
     const { id: _id, updated_at: _u, ...row } = plan;
     void _id; void _u;
     const { data, error: e } = await supabase().from("training_plans").update(row).eq("id", plan.id).select("updated_at").maybeSingle();
     setSaving(false);
-    if (e || !data) return setStatus({ ok: false, text: `No s'ha pogut desar: ${e?.message ?? "torna-ho a provar"}` });
+    if (e || !data) {
+      setStatus({ ok: false, text: `No s'ha pogut desar: ${e?.message ?? "torna-ho a provar"}` });
+      return false;
+    }
     setDirty(false);
-    setStatus({ ok: true, text: "Desat ✓" });
+    setStatus({ ok: true, text: published ? "Desat ✓ (a l'app encara surt la versió penjada: toca «Actualitzar a l'app»)" : "Desat ✓" });
+    return true;
+  }
+
+  /** Penja (o actualitza) el full a l'app de les jugadores, sense lesions, baixes ni motius. */
+  async function publish() {
+    if (!plan || !roster) return;
+    if (dirty && !(await save())) return;
+    setPubBusy(true);
+    const snap = buildSnapshot(plan, roster, shortName);
+    const { data, error: e } = await supabase()
+      .from("published_trainings")
+      .upsert({ plan_id: plan.id, plan_date: plan.plan_date, data: snap, updated_at: new Date().toISOString(), ...(published ? {} : { published_at: new Date().toISOString() }) })
+      .select("published_at")
+      .maybeSingle();
+    setPubBusy(false);
+    if (e || !data) return setStatus({ ok: false, text: `No s'ha pogut penjar: ${e?.message ?? "torna-ho a provar"}` });
+    setPublished(true);
+    setStatus({ ok: true, text: "Penjat a l'app ✓ Les jugadores ja el poden veure (sense lesionades, baixes ni motius)." });
+  }
+  async function unpublish() {
+    if (!plan || !window.confirm("Treure l'entreno de l'app? Les jugadores ja no el veuran.")) return;
+    setPubBusy(true);
+    const { error: e } = await supabase().from("published_trainings").delete().eq("plan_id", plan.id);
+    setPubBusy(false);
+    if (e) return setStatus({ ok: false, text: `No s'ha pogut treure: ${e.message}` });
+    setPublished(false);
+    setStatus({ ok: true, text: "Tret de l'app." });
   }
 
   /** PDF d'una sola pàgina fet al dispositiu (no depèn del navegador). */
@@ -352,6 +384,10 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
         <span className={status && !status.ok ? "err" : ""}>{status ? status.text : dirty ? "Canvis sense desar" : "Tot desat"}</span>
         <span className="row" style={{ gap: 6 }}>
           <button className="btn small" disabled={saving || !dirty} onClick={save}>{saving ? "Desant…" : "Desar"}</button>
+          <button className="btn small secondary" disabled={pubBusy || saving} onClick={publish} title="Que les jugadores el vegin a l'app (sense lesions ni baixes)">
+            {pubBusy ? "Penjant…" : published ? "📲 Actualitzar a l'app" : "📲 Penjar a l'app"}
+          </button>
+          {published && <button className="btn small secondary" disabled={pubBusy} onClick={unpublish} title="Treure de l'app">✕ App</button>}
           <button className="btn small secondary" disabled={pdfBusy} onClick={makePdf} title="PDF d'una pàgina, per imprimir o enviar">
             {pdfBusy ? "Fent el PDF…" : "📄 PDF"}
           </button>
@@ -494,50 +530,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Jugadores per posicions, amb l'estat de cadascuna i el recompte de disponibles (inclou les afegides a mà). */
-function PositionBoard({ plan, roster, onToggle, print = false }: { plan: Plan; roster: Roster; onToggle?: (pid: string) => void; print?: boolean }) {
-  type Row = { id: string; name: string; pos: string; st: PlayerStatus; guest: boolean };
-  const rows: Row[] = [
-    ...roster.players.map((p) => ({ id: p.id, name: shortName(roster, p), pos: roster.positions.get(p.id) ?? "—", st: plan.players[p.id] ?? "disp", guest: false })),
-    ...plan.guests.map((g) => ({ id: g.id, name: g.name, pos: g.pos || "—", st: g.status as PlayerStatus, guest: true })),
-  ];
-  const cols = [...POSITIONS, "—"] as const;
-  const by = (c: string) => rows.filter((r) => r.pos === c);
-  const shown = cols.filter((c) => c !== "—" || by("—").length > 0);
-  return (
-    <div className={`pos-board${print ? " print" : ""}`} style={{ gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))` }}>
-      {shown.map((c) => {
-        const list = by(c);
-        const avail = list.filter((r) => r.st === "disp").length;
-        return (
-          <div key={c} className="pos-col">
-            <b className="esc">{c === "—" ? "Sense pos." : c}</b>
-            {list.map((r) => {
-              const cls = `pchip ${r.st}${r.guest ? " guest" : ""}`;
-              const title = `${r.name} · ${STATUS_LABEL[r.st]}${r.guest ? " · afegida a mà" : ""}`;
-              const inner = <>{r.name}{r.st !== "disp" && <i>{r.st === "les" ? "L" : r.st === "part" ? "P" : "B"}</i>}</>;
-              return onToggle ? (
-                <button key={r.id} type="button" className={cls} onClick={() => onToggle(r.id)} title={title}>{inner}</button>
-              ) : (
-                <span key={r.id} className={cls} title={title}>{inner}</span>
-              );
-            })}
-            <span className="pos-count esc">{avail}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Llista de les baixes amb el motiu de cadascuna. */
-function baixes(plan: Plan, roster: Roster) {
-  return [
-    ...roster.players.filter((p) => plan.players[p.id] === "baixa").map((p) => ({ id: p.id, name: roster.nicks.get(p.id) ?? p.display_name })),
-    ...plan.guests.filter((g) => g.status === "baixa").map((g) => ({ id: g.id, name: g.name })),
-  ];
-}
-
 function AbsenceReasons({ plan, roster, onChange }: { plan: Plan; roster: Roster; onChange: (r: Record<string, AbsenceReason>) => void }) {
   const list = baixes(plan, roster);
   if (!list.length) return null;
@@ -589,8 +581,6 @@ function AddGuest({ onAdd, full }: { onAdd: (g: Guest) => void; full: boolean })
 
 type PoolPlayer = { id: string; name: string; pos: Position | "" };
 const SQUAD_COLORS: Team[] = ["blue", "red", "yellow", "white", "gk"];
-const SQUAD_BG: Record<Team, string> = { blue: "#1452c8", red: "#d32f2f", yellow: "#f2c200", white: "#ffffff", gk: "#111111" };
-const SQUAD_FG: Record<Team, string> = { blue: "#fff", red: "#fff", yellow: "#0b1846", white: "#0b1846", gk: "#f2c200" };
 
 /** Fer equips tocant jugadores (en lloc d'escriure-les). També reparteix sol, equilibrant per posicions. */
 function SquadPicker({ pool, squads, onChange }: { pool: PoolPlayer[]; squads: Squad[]; onChange: (s: Squad[]) => void }) {
@@ -657,24 +647,6 @@ function SquadPicker({ pool, squads, onChange }: { pool: PoolPlayer[]; squads: S
         {pool.length === 0 && <span className="muted small">No hi ha jugadores disponibles.</span>}
       </div>
     </div>
-  );
-}
-
-/** Equips en text per al full imprès. */
-function SquadLines({ squads, pool }: { squads: Squad[]; pool: Map<string, string> }) {
-  return (
-    <>
-      {squads.map((s) => {
-        const names = s.ids.map((id) => pool.get(id)).filter(Boolean);
-        if (!names.length) return null;
-        return (
-          <p key={s.c} className="ps-squad">
-            <i style={{ background: SQUAD_BG[s.c], borderColor: s.c === "white" ? "#8a93ad" : SQUAD_BG[s.c] }} />
-            <b>{SQUAD_NAMES[s.c]} ({names.length})</b> {names.join(", ")}
-          </p>
-        );
-      })}
-    </>
   );
 }
 
@@ -768,127 +740,8 @@ function TaskEditor({ pool, n, t, last, onChange, onMove, onRemove }: {
 // ---------------------------------------------------------------------------
 
 // Pàgina A4 horitzontal menys els marges de 8 mm (en píxels CSS: 96 per polzada).
-const MM = 96 / 25.4;
-const PAGE_W = 281 * MM;
-const PAGE_H = 192 * MM; // 194 mm útils, amb una mica de marge per seguretat
-
-/** Calcula quant s'ha de reduir el full perquè hi càpiga tot en una sola pàgina. */
-function fitSheet(el: HTMLElement) {
-  const fits = (k: number) => {
-    el.style.width = `${PAGE_W / k}px`; // més ample i després reduït: el text ocupa menys línies
-    return el.offsetHeight * k <= PAGE_H;
-  };
-  let k = 1;
-  if (!fits(1)) {
-    let lo = 0.2, hi = 1;
-    for (let i = 0; i < 12; i++) {
-      const mid = (lo + hi) / 2;
-      if (fits(mid)) lo = mid;
-      else hi = mid;
-    }
-    k = lo;
-    fits(k);
-  }
-  el.style.setProperty("--ps-fit", String(k));
-  // Si el navegador imprimeix en vertical (Safari no fa cas de la mida de pàgina), cal reduir-lo més.
-  el.style.setProperty("--ps-fit-portrait", String(k * PORTRAIT));
-  return k;
-}
-// Ample útil d'un full vertical (A4 o carta, menys marges) respecte al de l'horitzontal.
-const PORTRAIT = 190 / 281;
 
 /** iPhone i iPad (també l'iPad que es fa passar per Mac): imprimir des del navegador no respecta l'A4 horitzontal. */
 const isIOS = () =>
   /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const useIsIOS = () => useSyncExternalStore(() => () => {}, isIOS, () => false);
-
-function PlanSheet({ plan, roster }: { plan: Plan; roster: Roster }) {
-  const sheet = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const h = () => sheet.current && fitSheet(sheet.current);
-    window.addEventListener("beforeprint", h);
-    return () => window.removeEventListener("beforeprint", h);
-  }, []);
-  const available = roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").length + plan.guests.filter((g) => g.status === "disp").length;
-  // Només les disponibles (si una s'ha donat de baixa després de fer els equips, no surt).
-  const names = new Map([
-    ...roster.players.filter((p) => (plan.players[p.id] ?? "disp") === "disp").map((p) => [p.id, shortName(roster, p)] as [string, string]),
-    ...plan.guests.filter((g) => g.status === "disp").map((g) => [g.id, g.name] as [string, string]),
-  ]);
-  const cell = (k: string, v: ReactNode) => (<div className="ps-cell"><span>{k}</span><b>{v || "–"}</b></div>);
-  return (
-    <div className="plan-sheet" ref={sheet}>
-      <header className="ps-head">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/escut.png" alt="" width={46} height={46} />
-        <div className="ps-title">
-          <b className="esc">Club Esportiu Europa</b>
-          <span className="esc">Juvenil C 2026/2027 · Sessió d&apos;entrenament</span>
-        </div>
-      </header>
-      <div className="ps-top">
-        <div className="ps-info">
-          {cell("Dia", fmtDate(plan.plan_date))}
-          {cell("Hora", plan.start_time?.slice(0, 5))}
-          {cell("Sessió", plan.session_no)}
-          {cell("Jornada", plan.jornada)}
-          {cell("Rival", plan.rival ? <span className="team-inline" style={{ gap: 4 }}><Crest name={plan.rival} size={14} />{plan.rival}</span> : null)}
-          {cell("Microcicle", plan.microcycle)}
-          {cell("Mesocicle", plan.mesocycle)}
-          {cell("Temps", plan.duration_min ? `${plan.duration_min}'` : "")}
-          {cell("Jugadores", String(available))}
-          {cell("Continguts", plan.contents.join(" · "))}
-          <div className="ps-cell wide"><span>Observacions</span><b>{plan.observations || "–"}</b></div>
-          <div className="ps-cell wide"><span>Puntuació</span><b>{plan.score_notes || "–"}</b></div>
-          {baixes(plan, roster).length > 0 && (
-            <div className="ps-cell wide"><span>Baixes</span><b>{baixes(plan, roster).map((b) => `${b.name.split(" ")[0]}${plan.reasons[b.id] ? ` (${reasonLabel(plan.reasons[b.id])})` : ""}`).join(" · ")}</b></div>
-          )}
-        </div>
-        <PositionBoard plan={plan} roster={roster} print />
-      </div>
-      <div className="ps-tasks">
-        {plan.tasks.map((t, i) => (
-          <article key={t.id} className="ps-task">
-            <div className="ps-task-head esc">
-              <span>Tasca {i + 1}</span><b>{t.type || "–"}</b>
-              <span>Temps</span><b>{t.time || "–"}</b>
-              <span>ID</span><b>{t.code || "–"}</b>
-              <span>Total</span><b>{t.total || "–"}</b>
-              <span>Espai</span><b>{t.space || "–"}</b>
-              <span>Porteres</span><b>{t.gks || "–"}</b>
-            </div>
-            <div className="ps-task-body">
-              <div className="ps-text">
-                {t.description && <p><b>Descripció</b>{t.description}</p>}
-                {t.objective && <p><b>Objectiu</b>{t.objective}</p>}
-                {t.rules && <p><b>Normes de provocació</b>{t.rules}</p>}
-                {t.cues && <p><b>Consignes</b>{t.cues}</p>}
-                {t.staff.some((r) => r.who || r.role) && (
-                  <table className="ps-staff">
-                    <tbody>
-                      {t.staff.filter((r) => r.who || r.role || r.extra).map((r, j) => (
-                        <tr key={j}><td>{r.who}</td><td>{r.role}</td><td>{r.extra}</td></tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-              <div className="ps-draw">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {t.image ? <img src={t.image} alt="" /> : <DrillView d={t.diagram} />}
-                {((t.squads?.length ?? 0) > 0 || t.teams) && (
-                  <div className="ps-teams">
-                    <p><b>Equips</b></p>
-                    <SquadLines squads={t.squads ?? []} pool={names} />
-                    {t.teams && <p>{t.teams}</p>}
-                  </div>
-                )}
-                {t.scoring && <p><b>Puntuació</b>{t.scoring}</p>}
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}

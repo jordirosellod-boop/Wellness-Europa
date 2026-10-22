@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { CoachShell, Footer } from "@/components/ui";
+import { BibsAdmin } from "@/components/bibs";
 import { WeekDays } from "@/components/weekly-view";
+import { bibName, fetchBibs } from "@/lib/bibs";
 import { addDays, startOfWeek, weekRange } from "@/lib/dates";
 import { supabase } from "@/lib/supabase";
 import {
@@ -34,6 +36,11 @@ function Planning() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [preview, setPreview] = useState(false);
+  const [bibs, setBibs] = useState<Map<string, string>>(new Map());
+  const [bibsVersion, setBibsVersion] = useState(0);
+  useEffect(() => {
+    fetchBibs(week, addDays(week, 6)).then((l) => setBibs(new Map(l.map((b) => [b.day, bibName(b)]))), () => {});
+  }, [week, bibsVersion]);
 
   useEffect(() => {
     let off = false;
@@ -208,7 +215,7 @@ function Planning() {
 
           {preview ? (
             <>
-              <WeekDays weekStart={week} days={draft.days} footer={draft.footer} />
+              <WeekDays weekStart={week} days={draft.days} footer={draft.footer} bibs={bibs} />
               <h2 style={{ marginTop: 18 }}>Text per al WhatsApp</h2>
               <textarea className="wk-wa" readOnly value={toWhatsApp(week, draft.days, draft.footer)} onFocus={(e) => e.currentTarget.select()} />
             </>
@@ -276,6 +283,7 @@ function Planning() {
           </div>
         </>
       )}
+      {saved !== undefined && <BibsAdmin weekStart={week} onChanged={() => setBibsVersion((v) => v + 1)} />}
     </>
   );
 }

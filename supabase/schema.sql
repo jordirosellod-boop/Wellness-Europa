@@ -467,6 +467,40 @@ create table if not exists public.weekly_plans (
   updated_at   timestamptz not null default now()
 );
 
+-- ENTRENO PENJAT A L'APP: còpia del full de la plantilla perquè el vegin les jugadores.
+-- Sense dades de salut: només hi surten les disponibles (cap lesió, baixa ni motiu).
+create table if not exists public.published_trainings (
+  plan_id      uuid primary key references public.training_plans(id) on delete cascade,
+  plan_date    date not null,
+  data         jsonb not null check (jsonb_typeof(data) = 'object' and octet_length(data::text) < 4500000),
+  published_at timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists published_trainings_date_idx on public.published_trainings (plan_date desc, plan_id);
+
+-- PETOS: cada dia d'entreno o partit una jugadora els porta, per ordre de dorsal.
+-- Si aquell dia no hi és (absent a la llista o lesionada), li toca a la següent.
+create table if not exists public.bib_settings (
+  id           boolean primary key default true check (id),
+  start_date   date,
+  start_player uuid references public.profiles(id) on delete set null,
+  updated_at   timestamptz not null default now()
+);
+-- Comença el 22/10/2026 amb el dorsal 9 (si encara no s'havia configurat).
+insert into public.bib_settings (id, start_date, start_player)
+select true, date '2026-10-22', coalesce(
+  (select p.id from public.profiles p left join public.player_numbers n on n.profile_id = p.id
+   where p.role = 'player' and coalesce(n.dorsal::text, (select f.dorsal from public.fcf_players f where f.profile_id = p.id limit 1)) = '9'
+   order by p.created_at, p.id limit 1),
+  (select p.id from public.profiles p where p.role = 'player' and p.display_name ilike 'laura av%' order by p.created_at, p.id limit 1))
+on conflict (id) do nothing;
+-- Canvis a mà d'un dia concret (qui els porta aquell dia). La resta segueix l'ordre a partir d'ella.
+create table if not exists public.bib_overrides (
+  day        date primary key,
+  player_id  uuid not null references public.profiles(id) on delete cascade,
+  updated_at timestamptz not null default now()
+);
+
 -- BIG DATA DE LA LLIGA: actes de la FCF ja llegides (dades públiques), perquè no calgui baixar-les cada cop.
 -- Només hi escriu i en llegeix el servidor (sense polítiques: cap usuari hi té accés directe).
 create table if not exists public.fcf_league_actas (
@@ -1011,6 +1045,75 @@ drop trigger if exists convocations_stamp on public.convocations;
 create trigger convocations_stamp before insert or update on public.convocations
   for each row execute function public.stamp_convocation();
 
+-- PETOS: qui els porta cada dia (de p_from a p_to). Ho poden veure el staff i les jugadores.
+create or replace function public.bib_schedule(p_from date, p_to date)
+returns table (day date, player_id uuid, display_name text, dorsal smallint, manual boolean)
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  cfg public.bib_settings;
+  ids uuid[];
+  names text[];
+  dorsals smallint[];
+  n integer;
+  nxt integer := 1;
+  d date;
+  ov uuid;
+  k integer;
+  c integer;
+  pos integer;
+  found_i integer;
+begin
+  if not ((select public.is_coach()) or (select public.is_player())) then return; end if;
+  if p_to < p_from or p_to - p_from > 120 then return; end if;
+  select * into cfg from public.bib_settings where id;
+  if cfg.start_date is null then return; end if;
+  select array_agg(x.id order by x.dorsal nulls last, x.display_name, x.id),
+         array_agg(x.display_name order by x.dorsal nulls last, x.display_name, x.id),
+         array_agg(x.dorsal order by x.dorsal nulls last, x.display_name, x.id)
+    into ids, names, dorsals
+  from (
+    select p.id, p.display_name,
+           coalesce(nn.dorsal, (select case when f.dorsal ~ '^[0-9]{1,2}$' then f.dorsal::smallint end
+                                from public.fcf_players f where f.profile_id = p.id limit 1)) as dorsal
+    from public.profiles p left join public.player_numbers nn on nn.profile_id = p.id
+    where p.role = 'player'
+  ) x;
+  n := coalesce(array_length(ids, 1), 0);
+  if n = 0 then return; end if;
+  pos := array_position(ids, cfg.start_player);
+  nxt := coalesce(pos, 1);
+  for d in
+    select distinct s.session_date from public.sessions s
+    where not s.cancelled and s.session_date between cfg.start_date and p_to
+    order by 1
+  loop
+    found_i := null;
+    select o.player_id into ov from public.bib_overrides o where o.day = d;
+    if ov is not null and array_position(ids, ov) is not null then
+      found_i := array_position(ids, ov);
+    else
+      for k in 0 .. n - 1 loop
+        c := ((nxt - 1 + k) % n) + 1;
+        -- Se la salta si està lesionada o si a la llista d'aquell dia consta absent (i no present).
+        if public.is_injured_on(ids[c], d) then continue; end if;
+        if exists (select 1 from public.attendance a join public.sessions s on s.id = a.session_id
+                   where a.player_id = ids[c] and s.session_date = d and not a.present)
+           and not exists (select 1 from public.attendance a join public.sessions s on s.id = a.session_id
+                           where a.player_id = ids[c] and s.session_date = d and a.present) then continue; end if;
+        found_i := c;
+        exit;
+      end loop;
+    end if;
+    if found_i is null then continue; end if;
+    nxt := (found_i % n) + 1;
+    if d >= p_from then
+      day := d; player_id := ids[found_i]; display_name := names[found_i]; dorsal := dorsals[found_i]; manual := ov is not null;
+      return next;
+    end if;
+    ov := null;
+  end loop;
+end $$;
+
 -- Llista de la convocatòria: totes les jugadores, amb el dorsal i si estan convocades.
 -- El staff la veu sempre; una jugadora, només si la convocatòria està publicada.
 create or replace function public.convo_roster(cid uuid)
@@ -1246,6 +1349,9 @@ alter table public.analysis_buttons   enable row level security;
 alter table public.rival_scouting     enable row level security;
 alter table public.tactic_boards      enable row level security;
 alter table public.weekly_plans       enable row level security;
+alter table public.published_trainings enable row level security;
+alter table public.bib_settings       enable row level security;
+alter table public.bib_overrides      enable row level security;
 alter table public.fcf_league_actas   enable row level security;
 alter table public.scouting_targets   enable row level security;
 alter table public.corrections        enable row level security;
@@ -1259,7 +1365,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
-  public.weekly_plans,
+  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
@@ -1287,6 +1393,9 @@ grant all on public.analysis_matches, public.analysis_events, public.analysis_bu
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
 grant all on public.weekly_plans to service_role;
 grant select, insert, update, delete on public.weekly_plans to authenticated;
+grant all on public.published_trainings, public.bib_settings, public.bib_overrides to service_role;
+grant select, insert, update, delete on public.published_trainings, public.bib_overrides to authenticated;
+grant select, update on public.bib_settings to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;
 grant select, insert, update, delete on public.scouting_targets to authenticated;
 grant select, insert, update on public.rehab_entries to authenticated;
@@ -1294,6 +1403,8 @@ revoke all on function public.is_injured_on(uuid, date), public.rehab_is_open(uu
 grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) to authenticated;
 revoke all on function public.is_owner() from public, anon;
 grant execute on function public.is_owner() to authenticated;
+revoke all on function public.bib_schedule(date, date) from public, anon;
+grant execute on function public.bib_schedule(date, date) to authenticated;
 revoke all on function public.convo_roster(uuid) from public, anon;
 grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
@@ -1506,6 +1617,21 @@ create policy weekly_plans_update on public.weekly_plans for update to authentic
 drop policy if exists weekly_plans_delete on public.weekly_plans;
 create policy weekly_plans_delete on public.weekly_plans for delete to authenticated
   using ((select public.is_coach()));
+
+-- ENTRENO PENJAT: el veu tot l'equip; només el responsable (qui fa les plantilles) el penja o el treu.
+drop policy if exists published_trainings_select on public.published_trainings;
+create policy published_trainings_select on public.published_trainings for select to authenticated
+  using ((select public.is_coach()) or (select public.is_player()));
+drop policy if exists published_trainings_owner on public.published_trainings;
+create policy published_trainings_owner on public.published_trainings for all to authenticated
+  using ((select public.is_owner())) with check ((select public.is_owner()));
+-- PETOS: la configuració i els canvis, només el staff (les jugadores ho veuen amb bib_schedule).
+drop policy if exists bib_settings_coach on public.bib_settings;
+create policy bib_settings_coach on public.bib_settings for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists bib_overrides_coach on public.bib_overrides;
+create policy bib_overrides_coach on public.bib_overrides for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
 
 drop policy if exists tactic_boards_owner on public.tactic_boards;
 create policy tactic_boards_owner on public.tactic_boards for all to authenticated

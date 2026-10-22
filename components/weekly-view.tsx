@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { addDays, startOfWeek, weekRange } from "@/lib/dates";
+import { bibName, fetchBibs } from "@/lib/bibs";
 import { dayTitle, fetchWeeklyPlan, itemTime, type PlanDay, type WeeklyPlan } from "@/lib/weekly";
 import { todayMadrid } from "@/lib/wellness";
 
 /** Els 7 dies del planning (el d'avui destacat). */
-export function WeekDays({ weekStart, days, footer }: { weekStart: string; days: PlanDay[]; footer: string | null }) {
+export function WeekDays({ weekStart, days, footer, bibs }: { weekStart: string; days: PlanDay[]; footer: string | null; bibs?: Map<string, string> }) {
   const today = todayMadrid();
   return (
     <div className="wk">
@@ -16,6 +17,7 @@ export function WeekDays({ weekStart, days, footer }: { weekStart: string; days:
         return (
           <section key={i} className={`wk-day${date === today ? " today" : ""}${rest ? " rest" : ""}${date < today ? " past" : ""}`}>
             <h3>{dayTitle(weekStart, i)}{date === today && <span className="wk-today">Avui</span>}</h3>
+            {bibs?.get(date) && <p className="wk-bibs">🦺 Petos: <b>{bibs.get(date)}</b></p>}
             {rest ? (
               <p className="wk-rest">Descans 😴</p>
             ) : (
@@ -43,8 +45,10 @@ export function PlayerPlanning() {
   const [week, setWeek] = useState(thisWeek);
   const [plans, setPlans] = useState<Record<string, WeeklyPlan | null>>({});
   const [error, setError] = useState<string | null>(null);
+  const [bibs, setBibs] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
+    fetchBibs(thisWeek, addDays(thisWeek, 13)).then((l) => setBibs(new Map(l.map((b) => [b.day, bibName(b)]))), () => {});
     Promise.all([fetchWeeklyPlan(thisWeek), fetchWeeklyPlan(addDays(thisWeek, 7))]).then(
       ([a, b]) => setPlans({ [thisWeek]: a, [addDays(thisWeek, 7)]: b }),
       (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -68,7 +72,7 @@ export function PlayerPlanning() {
       )}
       {!loaded && !error && <p className="muted">Carregant…</p>}
       {loaded && !plan && <p className="card">El cos tècnic encara no ha publicat el planning d&apos;aquesta setmana.</p>}
-      {plan && <WeekDays weekStart={plan.week_start} days={plan.days} footer={plan.footer} />}
+      {plan && <WeekDays weekStart={plan.week_start} days={plan.days} footer={plan.footer} bibs={bibs} />}
     </>
   );
 }

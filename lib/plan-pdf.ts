@@ -38,7 +38,7 @@ export async function planPdf(el: HTMLElement, fileName: string): Promise<File> 
       backgroundColor: "#ffffff",
       width: w,
       height: h,
-      style: { position: "static", left: "0", top: "0", visibility: "visible", margin: "0" },
+      style: { position: "static", left: "0", top: "0", visibility: "visible", margin: "0", transform: "none" },
     });
     const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
     const boxW = PAGE_W - 2 * MARGIN;
