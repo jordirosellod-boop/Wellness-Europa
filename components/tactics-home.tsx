@@ -41,6 +41,7 @@ async function loadContext(): Promise<Ctx> {
       const u = (j.table as { team_id: string; pos: number; pts: number; pj: number; gf: number; gc: number }[]).find((x) => x.team_id === j.us_id);
       if (r) table = { pos: r.pos, pts: r.pts, pj: r.pj, gf: r.gf, gc: r.gc, form: r.form };
       if (u) usTable = { pos: u.pos, pts: u.pts, pj: u.pj, gf: u.gf, gc: u.gc };
+      if (j.stale_at) notes.push("La FCF no respon: classificació amb les dades guardades i les actes.");
     }
   } catch {
     notes.push("No s'han pogut llegir les dades de la FCF.");

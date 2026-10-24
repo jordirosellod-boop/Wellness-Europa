@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchActaPayload, fetchPlayerTotals, fetchTeamMatches, matchNames, parseActa } from "./fcf";
+import { fetchActaPayload, fetchPlayerTotals, matchNames, parseActa } from "./fcf";
+import { fresh, groupMatches, teamMatchesOf } from "./fcf-cache";
 
 type Config = { temporada: string; grup_id: string; team_id: string; team_match: string };
 
@@ -15,7 +16,9 @@ export async function syncFcf(db: SupabaseClient) {
   if (cErr || !cfg) throw new Error(cErr?.message ?? "Falta la configuració de la FCF.");
   const c = cfg as Config;
   try {
-    const matches = await fetchTeamMatches(c.grup_id, c.team_id);
+    // Si la FCF no deixa consultar els partits, es fan servir els guardats i es completen amb les actes.
+    const f = fresh();
+    const matches = teamMatchesOf(await groupMatches(db, c.grup_id, f), c.team_id);
     const now = new Date().toISOString();
     if (matches.length) {
       const { error } = await db.from("fcf_matches").upsert(matches.map((m) => ({ ...m, updated_at: now })), { onConflict: "acta_id" });
@@ -34,13 +37,20 @@ export async function syncFcf(db: SupabaseClient) {
       }
     }
 
-    // Totals oficials de la FCF per jugadora.
+    // Totals oficials de la FCF per jugadora. Si la FCF no els dona, es compten a partir de les actes
+    // (partits i gols; les sancions es queden com estaven).
     const rows = [];
+    let officialOk = true;
     for (const p of players.values()) {
-      const t = await fetchPlayerTotals(p.fcf_id, c.grup_id, c.temporada);
-      const starts = appearances.filter((a) => a.fcf_id === p.fcf_id && a.titular).length;
-      rows.push({ ...p, matches: t.matches, goals: t.goals, sanctions: t.sanctions, starts, updated_at: now });
+      const mine = appearances.filter((a) => a.fcf_id === p.fcf_id);
+      const starts = mine.filter((a) => a.titular).length;
+      let t: { matches: number; goals: number; sanctions?: number } | null = null;
+      if (officialOk) t = await fetchPlayerTotals(p.fcf_id, c.grup_id, c.temporada).catch(() => ((officialOk = false), null));
+      t ??= { matches: mine.length, goals: mine.reduce((n, a) => n + a.goals, 0) };
+      rows.push({ ...p, matches: t.matches, goals: t.goals, ...(t.sanctions != null ? { sanctions: t.sanctions } : {}), starts, updated_at: now });
     }
+    // Totes les files amb les mateixes columnes (si no, les sancions que falten es posarien a zero).
+    if (!officialOk) for (const r of rows) delete (r as { sanctions?: number }).sanctions;
     if (rows.length) {
       const { error } = await db.from("fcf_players").upsert(rows, { onConflict: "fcf_id" });
       if (error) throw new Error(error.message);
@@ -64,7 +74,10 @@ export async function syncFcf(db: SupabaseClient) {
       if (!error) autoLinked++;
     }
 
-    await db.from("fcf_config").update({ last_sync: now, last_error: null }).eq("id", true);
+    const note = f.stale_at || !officialOk
+      ? `La FCF no deixa consultar el seu servei de dades: s'han fet servir les actes${f.stale_at ? " i la llista de partits guardada" : ""}.`
+      : null;
+    await db.from("fcf_config").update({ last_sync: now, last_error: note }).eq("id", true);
     return { matches: matches.length, closed: matches.filter((m) => m.closed).length, players: rows.length, autoLinked };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -5,6 +5,7 @@ import { AttackDefense, FormStrip, MirrorBars, PeriodBars, PositionRace } from "
 import { prettyTeam, rivalKey } from "@/lib/analysis";
 import { candidates, compute, needs, prettyPlayer, type BigRaw, type Candidate, type League, type PlayerStat } from "@/lib/bigdata";
 import { fetchAll, supabase } from "@/lib/supabase";
+import { FcfStaleNote } from "@/components/fcf-note";
 
 type Tab = "resum" | "equips" | "jugadores" | "fitxatges" | "disciplina";
 type Target = { id: string; fcf_id: string; name: string; team: string | null; status: "seguiment" | "contactar" | "descartada"; note: string | null };
@@ -115,6 +116,7 @@ export function BigData() {
         ))}
       </div>
       {error && <p className="msg error">{error}</p>}
+      <FcfStaleNote at={raw?.stale_at} />
 
       {tab === "resum" && <Summary L={L} sel={sel} onPick={(id) => { setSel(id); setTab("equips"); }} />}
       {tab === "equips" && <Teams L={L} raw={raw!} sel={sel ?? us?.id ?? L.teams[0]?.id ?? null} onSel={setSel} followed={followed} onFollow={follow} />}

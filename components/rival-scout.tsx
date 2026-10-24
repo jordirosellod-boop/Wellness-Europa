@@ -1,6 +1,7 @@
 "use client";
 
 import { Crest, MatchLine } from "@/components/crest";
+import { FcfStaleNote } from "@/components/fcf-note";
 import { useEffect, useState } from "react";
 import { AMATCH_COLS, fetchAEvents, prettyTeam, rivalKey, type AEvent, type AMatch } from "@/lib/analysis";
 import { FORMATION_NAMES } from "@/lib/convo";
@@ -14,6 +15,7 @@ type RivalData = {
   us_id: string;
   rival_matches: GroupMatch[];
   vs_us: GroupMatch[];
+  stale_at?: string | null;
 };
 
 type KeyPlayer = { dorsal: string; name: string; pos: string; note: string };
@@ -154,6 +156,7 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
 
   return (
     <div className="rival">
+      <FcfStaleNote at={data?.stale_at} />
       <section className="card rival-hero">
         <div className="rv-top">
           <div className="rv-top-text">

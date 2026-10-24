@@ -1,4 +1,5 @@
-import { fetchGroupMatches, isCrestFile } from "@/lib/fcf";
+import { isCrestFile } from "@/lib/fcf";
+import { fresh, groupMatches } from "@/lib/fcf-cache";
 import { adminClient } from "@/lib/server-admin";
 
 export const maxDuration = 30;
@@ -10,9 +11,10 @@ const TTL = 12 * 3600 * 1000;
 export async function GET() {
   if (!cache || Date.now() - cache.at > TTL) {
     try {
-      const { data: cfg } = await adminClient().from("fcf_config").select("grup_id").eq("id", true).single();
+      const db = adminClient();
+      const { data: cfg } = await db.from("fcf_config").select("grup_id").eq("id", true).single();
       if (!cfg?.grup_id) return Response.json({ teams: [] });
-      const all = await fetchGroupMatches(cfg.grup_id as string);
+      const all = await groupMatches(db, cfg.grup_id as string, fresh(), 0);
       const teams = new Map<string, { id: string; name: string; crest: string }>();
       for (const m of all) {
         for (const [id, name, file] of [[m.home_id, m.home, m.home_crest], [m.away_id, m.away, m.away_crest]] as const) {

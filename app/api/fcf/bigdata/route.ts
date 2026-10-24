@@ -1,5 +1,5 @@
-import { fetchGroupMatches } from "@/lib/fcf";
-import { fetchActaFull, fetchScorers, fetchSanctions, type ActaFull } from "@/lib/fcf-bigdata";
+import { fetchActaFull, type ActaFull } from "@/lib/fcf-bigdata";
+import { fresh, groupMatches, sanctionsCached, scorersCached } from "@/lib/fcf-cache";
 import { adminClient } from "@/lib/server-admin";
 
 export const maxDuration = 60;
@@ -27,7 +27,8 @@ export async function GET(req: Request) {
   if (!cfg) return Response.json({ error: "Falta la configuració de la FCF." }, { status: 500 });
   const grup = String(cfg.grup_id);
   try {
-    const [matches, scorers, sanctions] = await Promise.all([fetchGroupMatches(grup), fetchScorers(grup), fetchSanctions(grup)]);
+    const f = fresh();
+    const [matches, scorers, sanctions] = await Promise.all([groupMatches(db, grup, f), scorersCached(db, grup, f), sanctionsCached(db, grup, f)]);
     const closed = matches.filter((m) => m.closed);
 
     // Actes ja llegides (paginat per si n'hi ha moltes)
@@ -58,6 +59,7 @@ export async function GET(req: Request) {
       scorers,
       sanctions,
       pending,
+      stale_at: f.stale_at,
       updated_at: new Date().toISOString(),
     });
   } catch (e) {

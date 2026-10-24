@@ -13,6 +13,7 @@ export type BigRaw = {
   sanctions: Sanction[];
   pending: number;
   updated_at: string;
+  stale_at?: string | null; // si la FCF no respon: de quan són les dades
 };
 
 export const PERIODS = ["0-15'", "15-30'", "30-45'", "45-60'", "60-75'", "75-90'"];

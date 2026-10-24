@@ -1258,3 +1258,4 @@ body:has(.bd) main { max-width: 1240px; }
 .bibs-start summary { cursor: pointer; font-weight: 600; margin-top: 10px; }
 .wk-bibs { margin: 0 0 6px; font-size: .9rem; color: #7a5a12; }
 @media print { .plan-sheet.on-screen { transform: none !important; box-shadow: none; } }
+.msg.fcf-stale { background: #fff6e0; color: #6b4a05; border: 1px solid #e8c770; }

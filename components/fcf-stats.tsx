@@ -116,7 +116,9 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
       {mode === "coach" && (
         <div className="row" style={{ marginBottom: 12 }}>
           <button className="btn" disabled={busy} onClick={syncNow}>{busy ? "Actualitzant…" : "↻ Actualitzar ara"}</button>
-          {data.config?.last_error && <span className="muted small">Últim error: {data.config.last_error}</span>}
+          {data.config?.last_error && (
+            <span className="muted small">{/^La FCF no deixa/.test(data.config.last_error) ? `⚠️ ${data.config.last_error}` : `Últim error: ${data.config.last_error}`}</span>
+          )}
         </div>
       )}
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}

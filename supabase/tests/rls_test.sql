@@ -648,3 +648,9 @@ select pg_temp.check((select array_agg(player_id order by day) from public.bib_s
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.bib_schedule(current_date, current_date + 7)$$, 'Anònim no veu els petos');
 reset role;
+
+-- =============== CÒPIA DE LA FCF (només el servidor) ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.expect_error($$select * from public.fcf_cache$$, 'Ni el staff llegeix la còpia de la FCF directament');
+select pg_temp.expect_error($$insert into public.fcf_cache (key, data) values ('x', '{}')$$, 'Ni la pot escriure');
+reset role;

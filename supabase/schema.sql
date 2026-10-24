@@ -512,6 +512,14 @@ create table if not exists public.fcf_league_actas (
 );
 create index if not exists fcf_league_actas_grup_idx on public.fcf_league_actas (grup_id);
 
+-- Còpia de l'última resposta bona de la FCF (partits del grup, golejadores, sancions, camps),
+-- per si la FCF deixa de respondre. Només el servidor (sense polítiques).
+create table if not exists public.fcf_cache (
+  key        text primary key check (char_length(key) between 1 and 120),
+  data       jsonb not null check (octet_length(data::text) < 2000000),
+  fetched_at timestamptz not null default now()
+);
+
 -- Jugadores en seguiment (possibles fitxatges). Només el responsable. Dades mínimes: nom, equip i una nota.
 create table if not exists public.scouting_targets (
   id         uuid primary key default gen_random_uuid(),
@@ -1349,6 +1357,7 @@ alter table public.analysis_buttons   enable row level security;
 alter table public.rival_scouting     enable row level security;
 alter table public.tactic_boards      enable row level security;
 alter table public.weekly_plans       enable row level security;
+alter table public.fcf_cache          enable row level security;
 alter table public.published_trainings enable row level security;
 alter table public.bib_settings       enable row level security;
 alter table public.bib_overrides      enable row level security;
@@ -1365,7 +1374,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
-  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides,
+  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
@@ -1393,7 +1402,7 @@ grant all on public.analysis_matches, public.analysis_events, public.analysis_bu
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
 grant all on public.weekly_plans to service_role;
 grant select, insert, update, delete on public.weekly_plans to authenticated;
-grant all on public.published_trainings, public.bib_settings, public.bib_overrides to service_role;
+grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache to service_role;
 grant select, insert, update, delete on public.published_trainings, public.bib_overrides to authenticated;
 grant select, update on public.bib_settings to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;

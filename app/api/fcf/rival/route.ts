@@ -1,4 +1,5 @@
-import { fetchGroupMatches, standings } from "@/lib/fcf";
+import { standings } from "@/lib/fcf";
+import { fresh, groupMatches } from "@/lib/fcf-cache";
 import { adminClient } from "@/lib/server-admin";
 
 export const maxDuration = 30;
@@ -16,11 +17,12 @@ export async function GET(req: Request) {
   const { data: cfg } = await db.from("fcf_config").select("grup_id, team_id").eq("id", true).single();
   if (!cfg) return Response.json({ error: "Falta la configuració de la FCF." }, { status: 500 });
   try {
-    const all = await fetchGroupMatches(cfg.grup_id as string);
+    const f = fresh();
+    const all = await groupMatches(db, cfg.grup_id as string, f);
     const ours = all.filter((m) => m.home_id === cfg.team_id || m.away_id === cfg.team_id);
     // Proper partit: el primer sense tancar (si no n'hi ha, l'últim jugat).
     const next = ours.find((m) => !m.closed) ?? ours[ours.length - 1] ?? null;
-    if (!next) return Response.json({ next: null });
+    if (!next) return Response.json({ next: null, stale_at: f.stale_at });
     const rivalId = next.home_id === cfg.team_id ? next.away_id : next.home_id;
     const table = standings(all);
     const rivalMatches = all.filter((m) => m.closed && (m.home_id === rivalId || m.away_id === rivalId)).reverse();
@@ -31,6 +33,7 @@ export async function GET(req: Request) {
       us_id: cfg.team_id,
       rival_matches: rivalMatches,
       vs_us: vsUs,
+      stale_at: f.stale_at,
     });
   } catch (e) {
     return Response.json({ error: `No s'ha pogut llegir la FCF: ${e instanceof Error ? e.message : e}` }, { status: 502 });
