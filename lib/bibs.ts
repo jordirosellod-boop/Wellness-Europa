@@ -8,7 +8,7 @@ export type BibDay = { day: string; player_id: string; display_name: string; dor
 export async function fetchBibs(from: string, to: string): Promise<BibDay[]> {
   const { data, error } = await supabase().rpc("bib_schedule", { p_from: from, p_to: to });
   if (error) throw new Error(error.message);
-  return (data ?? []) as BibDay[];
+  return Array.isArray(data) ? (data as BibDay[]) : [];
 }
 
 export const bibName = (b: Pick<BibDay, "display_name" | "dorsal">) => `${b.display_name}${b.dorsal != null ? ` (${b.dorsal})` : ""}`;
