@@ -1259,3 +1259,4 @@ body:has(.bd) main { max-width: 1240px; }
 .wk-bibs { margin: 0 0 6px; font-size: .9rem; color: #7a5a12; }
 @media print { .plan-sheet.on-screen { transform: none !important; box-shadow: none; } }
 .msg.fcf-stale { background: #fff6e0; color: #6b4a05; border: 1px solid #e8c770; }
+.rival-prev { display: grid; gap: 2px; margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: #eef2fc; border-left: 4px solid #dbb34d; font-size: .9rem; }

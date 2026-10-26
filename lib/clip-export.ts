@@ -3,6 +3,17 @@
 // i el nom de l'acció a sobre, i es fa un MP4 nou. Fa servir el xip de vídeo del dispositiu (WebCodecs).
 
 import type { Shape } from "@/components/telestrator";
+import type { RivalSummary } from "@/lib/rival-summary";
+
+/** Fitxa del rival (pantalles a l'inici del vídeo amb tots els talls). Els noms ja venen arreglats. */
+export type RivalCard = {
+  s: RivalSummary;
+  name: string;
+  crest: string | null; // adreça de l'escut (de l'app)
+  last: { label: string; score: string; res: "G" | "E" | "P" }[];
+  scorers: { name: string; goals: number }[];
+  scout?: { system: string; strengths: string; weaknesses: string; keys: string; players: string[] } | null;
+};
 
 export type Clip = {
   start: number; // segons del vídeo original
@@ -23,11 +34,13 @@ export type ExportOptions = {
   drawings: boolean; // pausa amb el dibuix
   font: string; // família de la lletra (Escapulada)
   crests?: { us: string | null; rival: string | null }; // adreces dels escuts (de l'app)
+  rival?: RivalCard | null; // fitxa del rival (només amb la pantalla inicial)
   onProgress?: (fraction: number) => void;
   signal?: AbortSignal;
 };
 
 const CARD_S = 2.5;
+const RIVAL_S = 7; // cada pantalla de la fitxa del rival (temps per llegir-la)
 const FREEZE_S = 3;
 const MAX_W = 1280;
 const MAX_H = 720;
@@ -35,8 +48,8 @@ const MAX_H = 720;
 export class ExportError extends Error {}
 
 /** Durada total aproximada (per mostrar-la abans de començar). */
-export function totalSeconds(sections: Section[], o: Pick<ExportOptions, "cards" | "drawings" | "intro">) {
-  let t = o.intro ? CARD_S : 0;
+export function totalSeconds(sections: Section[], o: Pick<ExportOptions, "cards" | "drawings" | "intro" | "rival">) {
+  let t = o.intro ? CARD_S + (o.rival ? rivalPages(o.rival) * RIVAL_S : 0) : 0;
   for (const s of sections) {
     if (o.cards) t += CARD_S;
     for (const c of s.clips) t += c.end - c.start + (o.drawings && c.drawing?.length ? FREEZE_S : 0);
@@ -124,6 +137,14 @@ export async function exportClips(file: File | string, sections: Section[], o: E
     if (o.intro) {
       drawCard(ctx, W, H, o.font, crests, o.intro.title, o.intro.sub, "#dbb34d", true);
       await hold(CARD_S);
+      if (o.rival) {
+        const img = o.rival.crest ? await loadImage(o.rival.crest) : null;
+        for (let page = 0; page < rivalPages(o.rival); page++) {
+          check();
+          drawRival(ctx, W, H, o.font, o.rival, img, page);
+          await hold(RIVAL_S);
+        }
+      }
     }
 
     for (const sec of sections) {
@@ -285,6 +306,201 @@ function drawCard(ctx: CanvasRenderingContext2D, W: number, H: number, font: str
   ctx.fillStyle = "#dbb34d";
   fitText(ctx, sub.toUpperCase(), W * 0.86, Math.round(H * 0.065), font);
   ctx.fillText(sub.toUpperCase(), W / 2, H * 0.74);
+}
+
+// ---------------------------------------------------------------------------
+// Fitxa del rival
+// ---------------------------------------------------------------------------
+
+const RES_COLOR = { G: "#1e9e4a", E: "#9aa3bd", P: "#d32f2f" } as const;
+const hasScout = (r: RivalCard) => !!r.scout && !!(r.scout.system || r.scout.strengths || r.scout.weaknesses || r.scout.keys || r.scout.players.length);
+export const rivalPages = (r: RivalCard) => (hasScout(r) ? 3 : 2);
+
+/** Text en diverses línies (com a molt `maxLines`; l'última amb «…» si no hi cap). */
+function wrap(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number, maxLines: number) {
+  const words = text.replace(/\s+/g, " ").trim().split(" ");
+  let line = "", n = 0;
+  for (let i = 0; i < words.length; i++) {
+    const test = line ? `${line} ${words[i]}` : words[i];
+    if (ctx.measureText(test).width > maxW && line) {
+      if (n === maxLines - 1) {
+        let cut = line;
+        while (cut && ctx.measureText(`${cut}…`).width > maxW) cut = cut.slice(0, -1);
+        ctx.fillText(`${cut}…`, x, y + n * lineH);
+        return n + 1;
+      }
+      ctx.fillText(line, x, y + n * lineH);
+      n++;
+      line = words[i];
+    } else line = test;
+  }
+  if (line) {
+    ctx.fillText(line, x, y + n * lineH);
+    n++;
+  }
+  return n;
+}
+
+function rivalBg(ctx: CanvasRenderingContext2D, W: number, H: number, font: string, title: string, r: RivalCard, img: HTMLImageElement | null) {
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, "#0b1846");
+  g.addColorStop(1, "#13307d");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#dbb34d";
+  ctx.fillRect(0, 0, W, H * 0.012);
+  const pad = W * 0.05;
+  const cs = H * 0.13;
+  if (img) drawCrest(ctx, img, pad + cs / 2, H * 0.1, cs);
+  const tx = img ? pad + cs + W * 0.02 : pad;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#dbb34d";
+  ctx.font = `400 ${Math.round(H * 0.038)}px ${font}`;
+  ctx.fillText(title.toUpperCase(), tx, H * 0.065);
+  ctx.fillStyle = "#fff";
+  fitText(ctx, r.name.toUpperCase(), W - tx - pad, Math.round(H * 0.075), font);
+  ctx.fillText(r.name.toUpperCase(), tx, H * 0.13);
+  return pad;
+}
+
+function statBox(ctx: CanvasRenderingContext2D, font: string, x: number, y: number, w: number, h: number, value: string, label: string, color = "#fff") {
+  ctx.fillStyle = "rgba(255,255,255,.08)";
+  ctx.fillRect(x, y, w, h);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = color;
+  fitText(ctx, value, w * 0.9, Math.round(h * 0.5), font);
+  ctx.fillText(value, x + w / 2, y + h * 0.42);
+  ctx.fillStyle = "#b9c3e0";
+  ctx.font = `400 ${Math.round(h * 0.17)}px ${font}`;
+  ctx.fillText(label.toUpperCase(), x + w / 2, y + h * 0.8);
+}
+
+function badge(ctx: CanvasRenderingContext2D, font: string, x: number, y: number, size: number, res: "G" | "E" | "P") {
+  ctx.fillStyle = RES_COLOR[res];
+  ctx.beginPath();
+  ctx.roundRect(x, y, size, size, size * 0.18);
+  ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `400 ${Math.round(size * 0.6)}px ${font}`;
+  ctx.fillText(res, x + size / 2, y + size * 0.54);
+}
+
+function drawRival(ctx: CanvasRenderingContext2D, W: number, H: number, font: string, r: RivalCard, img: HTMLImageElement | null, page: number) {
+  const s = r.s;
+  if (page === 0) {
+    const pad = rivalBg(ctx, W, H, font, "Fitxa del rival · com van a la lliga", r, img);
+    const top = H * 0.25, bw = (W - pad * 2 - W * 0.03 * 3) / 4, bh = H * 0.2;
+    statBox(ctx, font, pad, top, bw, bh, s.pos ? `${s.pos}a` : "–", `de ${s.teams} equips`, "#dbb34d");
+    statBox(ctx, font, pad + (bw + W * 0.03), top, bw, bh, String(s.pts), `punts · ${s.pj} PJ`);
+    statBox(ctx, font, pad + (bw + W * 0.03) * 2, top, bw, bh, `${s.g}-${s.e}-${s.p}`, "guanyats-empats-perduts");
+    statBox(ctx, font, pad + (bw + W * 0.03) * 3, top, bw, bh, `${s.gf}:${s.gc}`, "gols a favor : en contra");
+    const y2 = top + bh + H * 0.06;
+    const bw2 = (W - pad * 2 - W * 0.03 * 2) / 3, bh2 = H * 0.16;
+    const pm = (n: number) => (s.pj ? (n / s.pj).toFixed(1).replace(".", ",") : "–");
+    statBox(ctx, font, pad, y2, bw2, bh2, pm(s.gf), "gols marcats per partit");
+    statBox(ctx, font, pad + bw2 + W * 0.03, y2, bw2, bh2, pm(s.gc), "gols encaixats per partit");
+    statBox(ctx, font, pad + (bw2 + W * 0.03) * 2, y2, bw2, bh2, String(s.clean_sheets), "porteria a zero");
+    // Ratxa i casa/fora
+    const y3 = y2 + bh2 + H * 0.07;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#dbb34d";
+    ctx.font = `400 ${Math.round(H * 0.045)}px ${font}`;
+    ctx.fillText("RATXA", pad, y3);
+    const bs = H * 0.065;
+    let bx = pad + ctx.measureText("RATXA").width + W * 0.02;
+    if (s.form.length) for (const f of s.form) { badge(ctx, font, bx, y3 - bs / 2, bs, f); bx += bs * 1.2; }
+    else { ctx.fillStyle = "#b9c3e0"; ctx.fillText("encara sense partits", bx, y3); }
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fff";
+    ctx.font = `400 ${Math.round(H * 0.042)}px ${font}`;
+    ctx.fillText(`A CASA ${s.home.g}-${s.home.e}-${s.home.p}  ·  A FORA ${s.away.g}-${s.away.e}-${s.away.p}`, W - pad, y3);
+    if (s.stale_at) {
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#b9c3e0";
+      ctx.font = `400 ${Math.round(H * 0.028)}px ${font}`;
+      ctx.fillText("DADES DE LA FCF GUARDADES I COMPLETADES AMB LES ACTES", W / 2, H * 0.95);
+    }
+    return;
+  }
+  if (page === 1) {
+    const pad = rivalBg(ctx, W, H, font, "Últims partits i jugadores top", r, img);
+    const colW = (W - pad * 2 - W * 0.04) / 2;
+    const top = H * 0.25;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#dbb34d";
+    ctx.font = `400 ${Math.round(H * 0.045)}px ${font}`;
+    ctx.fillText("ÚLTIMS PARTITS", pad, top);
+    const rowH = H * 0.11, bs = H * 0.07;
+    if (!r.last.length) { ctx.fillStyle = "#b9c3e0"; ctx.fillText("Encara no ha jugat", pad, top + rowH); }
+    r.last.slice(0, 5).forEach((g, i) => {
+      const y = top + rowH * (i + 0.85);
+      badge(ctx, font, pad, y - bs / 2, bs, g.res);
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#fff";
+      ctx.font = `400 ${Math.round(H * 0.05)}px ${font}`;
+      ctx.fillText(g.score, pad + bs * 1.3, y);
+      const sw = ctx.measureText("00-00 ").width;
+      ctx.fillStyle = "#dfe5f5";
+      fitText(ctx, g.label.toUpperCase(), colW - bs * 1.3 - sw, Math.round(H * 0.036), font);
+      ctx.fillText(g.label.toUpperCase(), pad + bs * 1.3 + sw, y);
+    });
+    const x2 = pad + colW + W * 0.04;
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#dbb34d";
+    ctx.font = `400 ${Math.round(H * 0.045)}px ${font}`;
+    ctx.fillText("GOLEJADORES", x2, top);
+    if (!r.scorers.length) { ctx.fillStyle = "#b9c3e0"; ctx.fillText("Encara cap gol", x2, top + rowH); }
+    const max = Math.max(1, ...r.scorers.map((p) => p.goals));
+    r.scorers.slice(0, 4).forEach((p, i) => {
+      const y = top + rowH * (i + 0.85);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "left";
+      fitText(ctx, p.name.toUpperCase(), colW * 0.62, Math.round(H * 0.042), font);
+      ctx.fillText(p.name.toUpperCase(), x2, y);
+      const bx = x2 + colW * 0.64, bwMax = colW * 0.26;
+      ctx.fillStyle = i === 0 ? "#dbb34d" : "#5f79c9";
+      ctx.fillRect(bx, y - H * 0.018, Math.max(H * 0.02, (bwMax * p.goals) / max), H * 0.036);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "right";
+      ctx.font = `400 ${Math.round(H * 0.045)}px ${font}`;
+      ctx.fillText(String(p.goals), x2 + colW, y);
+    });
+    if (s.team_goals_by_top >= 30 && r.scorers[0]) {
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#dbb34d";
+      ctx.font = `400 ${Math.round(H * 0.034)}px ${font}`;
+      wrap(ctx, `ULL: ${r.scorers[0].name.toUpperCase()} FA EL ${s.team_goals_by_top}% DELS GOLS DE L'EQUIP`, x2, top + rowH * 5.1, colW, H * 0.045, 2);
+    }
+    return;
+  }
+  // Pàgina 3: claus de l'informe del rival
+  const pad = rivalBg(ctx, W, H, font, "Claus del rival · informe", r, img);
+  const sc = r.scout!;
+  let y = H * 0.25;
+  const block = (title: string, text: string, lines: number) => {
+    if (!text.trim()) return;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#dbb34d";
+    ctx.font = `400 ${Math.round(H * 0.036)}px ${font}`;
+    ctx.fillText(title.toUpperCase(), pad, y);
+    ctx.fillStyle = "#fff";
+    ctx.font = `400 ${Math.round(H * 0.036)}px ${font}`;
+    const n = wrap(ctx, text, pad, y + H * 0.05, W - pad * 2, H * 0.045, lines);
+    y += H * 0.05 + n * H * 0.045 + H * 0.025;
+  };
+  // (com a molt 7 línies de text perquè hi càpiga tot)
+  block("Sistema", sc.system, 1);
+  block("Punts forts", sc.strengths, 2);
+  block("Punts febles", sc.weaknesses, 2);
+  if (sc.players.length) block("Jugadores clau", sc.players.join(" · "), 1);
+  block("Claus del partit", sc.keys, 1);
 }
 
 /** Etiqueta a sobre del vídeo: acció i minut (i jugadora). */

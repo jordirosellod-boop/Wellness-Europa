@@ -1,10 +1,13 @@
 "use client";
 
 import { crestFor, useCrests } from "@/components/crest";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Shape } from "@/components/telestrator";
-import { minuteOf, teamLabels, toVideo, type AButton, type AEvent, type AMatch } from "@/lib/analysis";
-import { exportClips, ExportError, totalSeconds, type Clip, type Section } from "@/lib/clip-export";
+import { minuteOf, prettyTeam, rivalKey, teamLabels, toVideo, type AButton, type AEvent, type AMatch } from "@/lib/analysis";
+import { prettyPlayer } from "@/lib/bigdata";
+import { exportClips, ExportError, rivalPages, totalSeconds, type Clip, type RivalCard, type Section } from "@/lib/clip-export";
+import type { RivalSummary } from "@/lib/rival-summary";
+import { supabase } from "@/lib/supabase";
 import { canShareFile, deliverFile, safeName } from "@/lib/share-file";
 import { fmtDate } from "@/lib/wellness";
 
@@ -12,6 +15,51 @@ type TeamFilter = "us" | "rival" | "all";
 type Job = { label: string; progress: number; ctrl: AbortController };
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+
+type ScoutFields = { system?: string; strengths?: string; weaknesses?: string; keys?: string; key_players?: { dorsal: string; name: string; pos: string }[] };
+
+/** Fitxa del rival: dades de la FCF (classificació, partits, golejadores) i el nostre informe, si n'hi ha. */
+function useRivalCard(match: AMatch, crest: string | null): { card: RivalCard | null; loading: boolean; error: string | null } {
+  const [state, setState] = useState<{ card: RivalCard | null; loading: boolean; error: string | null }>({ card: null, loading: !!match.rival, error: null });
+  useEffect(() => {
+    if (!match.rival) return;
+    let alive = true;
+    (async () => {
+      const sb = supabase();
+      const { data: sess } = await sb.auth.getSession();
+      const res = await fetch(`/api/fcf/team?name=${encodeURIComponent(match.rival!)}`, { headers: { Authorization: `Bearer ${sess.session?.access_token ?? ""}` }, cache: "no-store" });
+      const j = (await res.json().catch(() => ({}))) as { summary?: RivalSummary | null; error?: string };
+      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+      const s = j.summary;
+      if (!s) return null;
+      // Informe del rival (el més recent fins al dia del partit).
+      const { data: rows } = await sb.from("rival_scouting").select("fields, match_date").eq("rival_key", rivalKey(prettyTeam(s.name)))
+        .lte("match_date", match.match_date).order("match_date", { ascending: false }).order("id").range(0, 0);
+      const f = ((rows ?? [])[0]?.fields ?? null) as ScoutFields | null;
+      const card: RivalCard = {
+        s,
+        name: prettyTeam(s.name),
+        crest,
+        last: s.last.map((g) => ({ label: `J${g.jornada} · ${g.home ? "a casa" : "a fora"} vs ${prettyTeam(g.opp)}`, score: `${g.gf}-${g.ga}`, res: g.res })),
+        scorers: s.scorers.map((p) => ({ name: prettyPlayer(p.name), goals: p.goals })),
+        scout: f
+          ? {
+              system: f.system ?? "", strengths: f.strengths ?? "", weaknesses: f.weaknesses ?? "", keys: f.keys ?? "",
+              players: (f.key_players ?? []).filter((k) => k.name || k.dorsal).map((k) => [k.dorsal && `${k.dorsal}`, k.name, k.pos && `(${k.pos})`].filter(Boolean).join(" ")),
+            }
+          : null,
+      };
+      return card;
+    })().then(
+      (card) => alive && setState({ card, loading: false, error: null }),
+      (e) => alive && setState({ card: null, loading: false, error: e instanceof Error ? e.message : String(e) }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [match.rival, match.match_date, crest]);
+  return state;
+}
 
 /** Descarregar els talls del vídeo: un per un, per apartats (accions) o tots junts. */
 export function ClipExport({ match, events, buttons, file, playerName }: {
@@ -22,6 +70,7 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
   const [cards, setCards] = useState(true);
   const [overlay, setOverlay] = useState(true);
   const [drawings, setDrawings] = useState(true);
+  const [withRival, setWithRival] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [ready, setReady] = useState<File | null>(null);
@@ -32,6 +81,8 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
   const crests = match.kind === "rival"
     ? { us: crestFor(teams, match.rival), rival: null }
     : { us: "/escut.png", rival: crestFor(teams, match.rival) };
+  const rivalInfo = useRivalCard(match, crestFor(teams, match.rival));
+  const rival = withRival ? rivalInfo.card : null;
 
   // Apartats ordenats com els botons d'etiquetar; dins de cada apartat, per temps.
   const sections = useMemo(() => {
@@ -72,9 +123,9 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
   }, [events, buttons, team, match, L.us, L.rival, playerName]);
 
   const base = `${match.title} · ${match.match_date}`;
-  const opts = { cards, overlay, drawings };
+  const opts = { cards, overlay, drawings, rival };
 
-  async function run(label: string, fileName: string, secs: Section[], o: { intro: boolean; cards: boolean }) {
+  async function run(label: string, fileName: string, secs: Section[], o: { intro: boolean; cards: boolean; introSub?: string }) {
     if (!file || job) return;
     setMsg(null);
     setReady(null);
@@ -83,12 +134,13 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
     const font = root.current ? getComputedStyle(root.current).getPropertyValue("--font-escapulada").trim() || "sans-serif" : "sans-serif";
     try {
       const blob = await exportClips(file, secs, {
-        intro: o.intro ? { title: match.title, sub: `${fmtDate(match.match_date)} · ${secs.reduce((n, s) => n + s.clips.length, 0)} talls` } : null,
+        intro: o.intro ? { title: match.title, sub: o.introSub ?? `${fmtDate(match.match_date)} · ${secs.reduce((n, s) => n + s.clips.length, 0)} talls` } : null,
         cards: o.cards,
         overlay,
         drawings,
         font,
         crests,
+        rival: o.intro ? rival : null,
         signal: ctrl.signal,
         onProgress: (p) => setJob((j) => (j && j.ctrl === ctrl ? { ...j, progress: p } : j)),
       });
@@ -144,11 +196,19 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
           <label><input type="checkbox" checked={cards} onChange={(e) => setCards(e.target.checked)} disabled={busy} /> Títol a cada apartat</label>
           <label><input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} disabled={busy} /> Acció i minut a sobre</label>
           <label><input type="checkbox" checked={drawings} onChange={(e) => setDrawings(e.target.checked)} disabled={busy} /> Pausa amb els dibuixos</label>
+          {rivalInfo.card && <label><input type="checkbox" checked={withRival} onChange={(e) => setWithRival(e.target.checked)} disabled={busy} /> Fitxa del rival a l&apos;inici</label>}
         </div>
+        <RivalPreview info={rivalInfo} on={withRival} />
         <button className="btn block" disabled={busy || all === 0}
           onClick={() => run("Tots junts", `Talls · ${base}`, sections, { intro: true, cards })}>
           ⬇ Tots junts, ordenats per accions ({all} talls · {mmss(totalSeconds(sections, { ...opts, intro: { title: "", sub: "" } }))})
         </button>
+        {rival && (
+          <button className="btn small secondary" style={{ marginTop: 6 }} disabled={busy}
+            onClick={() => run("Fitxa del rival", `Fitxa rival · ${base}`, [], { intro: true, cards: false, introSub: `${fmtDate(match.match_date)} · Fitxa del rival` })}>
+            ⬇ Només la fitxa del rival ({mmss(totalSeconds([], { cards: false, drawings: false, intro: { title: "", sub: "" }, rival }))})
+          </button>
+        )}
         <p className="muted small" style={{ margin: "6px 0 0" }}>
           Es fa al teu dispositiu (el vídeo no es puja enlloc). Pot trigar una mica: deixa aquesta pantalla oberta.
         </p>
@@ -203,6 +263,25 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
           </section>
         );
       })}
+    </div>
+  );
+}
+
+/** Resum del rival que sortirà al vídeo (per veure-ho abans de fer-lo). */
+function RivalPreview({ info, on }: { info: { card: RivalCard | null; loading: boolean; error: string | null }; on: boolean }) {
+  if (info.loading) return <p className="muted small">Carregant la fitxa del rival…</p>;
+  if (info.error) return <p className="muted small">No s&apos;ha pogut fer la fitxa del rival: {info.error}</p>;
+  const c = info.card;
+  if (!c || !on) return null;
+  const s = c.s;
+  return (
+    <div className="rival-prev">
+      <b className="esc">Fitxa del rival · {c.name}</b>
+      <span>{s.pos ? `${s.pos}a de ${s.teams}` : "Sense classificar"} · {s.pts} punts · {s.pj} PJ · {s.g}-{s.e}-{s.p} · gols {s.gf}:{s.gc}</span>
+      {c.last.length > 0 && <span>Últims: {c.last.slice(0, 3).map((g) => `${g.score} (${g.label.replace(/^J\d+ · /, "")})`).join(" · ")}</span>}
+      {c.scorers.length > 0 && <span>Golejadores: {c.scorers.map((p) => `${p.name} ${p.goals}`).join(" · ")}</span>}
+      {c.scout && <span>+ claus de l&apos;informe del rival</span>}
+      <span className="muted small">{rivalPages(c)} pantalles al principi del vídeo amb tots els talls.{s.stale_at ? " (Dades de la FCF guardades i completades amb les actes.)" : ""}</span>
     </div>
   );
 }
