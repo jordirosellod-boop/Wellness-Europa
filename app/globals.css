@@ -247,9 +247,9 @@ select { appearance: auto; }
   --suau: #55608a;
   --vora: #d5dbee;
   --radi: 10px;
-  /* Tota l'app amb l'Escapulada (la lletra del club). Les altres, només si no es pot carregar. */
+  /* Títols, botons i xifres amb l'Escapulada (la lletra del club); el text normal (amb minúscules), en Poppins. */
   --display: var(--font-escapulada), var(--font-display), "Anton", "Bebas Neue", Impact, "Arial Narrow", sans-serif;
-  --cos: var(--font-escapulada), var(--font-body), "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --cos: var(--font-body), "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 html, body { background: var(--fons); color: var(--text); font-family: var(--cos); font-size: 16px; }

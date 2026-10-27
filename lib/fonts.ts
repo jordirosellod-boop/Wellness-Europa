@@ -1,6 +1,6 @@
 import localFont from "next/font/local";
 
-// Escapulada (Murri Studio & CE Europa): la lletra de tota l'app.
+// Escapulada (Murri Studio & CE Europa): títols, botons i xifres de tota l'app (el text normal va en Poppins).
 export const escapulada = localFont({ src: "../app/fonts/Escapulada.ttf", variable: "--font-escapulada", display: "swap" });
 
 // Lletra de samarreta (la de hummel de la imatge que va enviar el club), redibuixada lletra a
