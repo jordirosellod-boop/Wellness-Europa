@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CoachShell, Footer } from "@/components/ui";
 import { BibsAdmin } from "@/components/bibs";
 import { DutiesAdmin, DutiesCard } from "@/components/duties";
-import { dutyOf, fetchDuties, firstNames, type DutyGroup } from "@/lib/duties";
+import { dutyOf, fetchDuties, firstNames, groupName, type DutyGroup } from "@/lib/duties";
 import { WeekDays } from "@/components/weekly-view";
 import { bibName, fetchBibs } from "@/lib/bibs";
 import { addDays, startOfWeek, weekRange } from "@/lib/dates";
@@ -47,7 +47,7 @@ function Planning() {
   /** Línies del material i la porteria per al text del WhatsApp. */
   const dutyLines = (["material", "porteria"] as const).flatMap((t) => {
     const g = dutyOf(duties, t);
-    return g ? [`*${t === "material" ? "🧺 MATERIAL" : "🥅 PORTERIA"}: GRUP ${g.grp}*${g.players.length ? ` (${firstNames(g)})` : ""}`] : [];
+    return g ? [`*${t === "material" ? "🧺 MATERIAL" : "🥅 PORTERIA"}: ${groupName(g).toUpperCase()}*${g.players.length ? ` · ${firstNames(g)}` : ""}`] : [];
   });
   useEffect(() => {
     fetchBibs(week, addDays(week, 6)).then((l) => setBibs(new Map(l.map((b) => [b.day, bibName(b)]))), () => {});

@@ -519,6 +519,11 @@ create table if not exists public.duty_settings (
 );
 -- La setmana del 26/10/2026: material el grup 4 i porteria el grup 1.
 insert into public.duty_settings (id) values (true) on conflict (id) do nothing;
+-- Responsable de cada grup ({"1": "nom", ...}).
+alter table public.duty_settings add column if not exists labels jsonb not null default '{}'::jsonb;
+alter table public.duty_settings drop constraint if exists duty_settings_labels_check;
+alter table public.duty_settings add constraint duty_settings_labels_check check (jsonb_typeof(labels) = 'object' and octet_length(labels::text) < 2000);
+
 
 -- BIG DATA DE LA LLIGA: actes de la FCF ja llegides (dades públiques), perquè no calgui baixar-les cada cop.
 -- Només hi escriu i en llegeix el servidor (sense polítiques: cap usuari hi té accés directe).
@@ -1073,8 +1078,9 @@ create trigger convocations_stamp before insert or update on public.convocations
   for each row execute function public.stamp_convocation();
 
 -- GRUPS: a quin grup és cada jugadora i què li toca la setmana que comença a p_week (staff i jugadores).
+drop function if exists public.duty_week(date);
 create or replace function public.duty_week(p_week date)
-returns table (grp smallint, task text, player_id uuid, display_name text)
+returns table (grp smallint, task text, player_id uuid, display_name text, label text)
 language plpgsql stable security definer set search_path = '' as $$
 declare
   cfg public.duty_settings;
@@ -1091,7 +1097,7 @@ begin
   return query
     select g.n::smallint,
            case when g.n = mat then 'material' when g.n = gk then 'porteria' end,
-           p.id, p.display_name
+           p.id, p.display_name, nullif(cfg.labels ->> g.n::text, '')
     from generate_series(1, cfg.groups) as g(n)
     left join public.duty_groups d on d.grp = g.n
     left join public.profiles p on p.id = d.player_id and p.role = 'player'

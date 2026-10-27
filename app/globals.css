@@ -1275,3 +1275,6 @@ body:has(.bd) main { max-width: 1240px; }
 .duties-members li { display: flex; align-items: center; gap: 8px; }
 .duties-members li span { flex: 1; }
 .duties-members select { width: auto; }
+.duties-labels { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+.duties-labels label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.duties-labels input { width: 110px; padding: 6px 8px; }

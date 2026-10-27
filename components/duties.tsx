@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { addDays, startOfWeek, weekRange } from "@/lib/dates";
-import { dutyOf, fetchDuties, fetchDutyMembers, fetchDutySettings, firstNames, TASK_LABEL, type DutyGroup, type DutySettings } from "@/lib/duties";
+import { dutyOf, fetchDuties, fetchDutyMembers, fetchDutySettings, firstNames, groupName, TASK_LABEL, type DutyGroup, type DutySettings } from "@/lib/duties";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { todayMadrid } from "@/lib/wellness";
 
@@ -20,15 +20,15 @@ export function DutiesCard({ week, meId, title = "Aquesta setmana" }: { week?: s
   return (
     <section className={`card duties-card${mine?.task ? " mine" : ""}`}>
       <h2>{title}</h2>
-      {mine?.task && <p className="duties-me">Et toca a tu: <b>{TASK_LABEL[mine.task]}</b> (grup {mine.grp})</p>}
+      {mine?.task && <p className="duties-me">Et toca a tu: <b>{TASK_LABEL[mine.task]}</b> ({groupName(mine)})</p>}
       <ul className="duties-list">
         {[mat, gk].filter((g): g is DutyGroup => !!g).map((g) => (
           <li key={g.task}>
-            <b>{TASK_LABEL[g.task!]}</b> <span>Grup {g.grp}{g.players.length ? ` · ${firstNames(g)}` : ""}</span>
+            <b>{TASK_LABEL[g.task!]}</b> <span>{groupName(g)}{g.players.length ? ` · ${firstNames(g)}` : ""}</span>
           </li>
         ))}
       </ul>
-      {mine && !mine.task && <p className="muted small" style={{ margin: "6px 0 0" }}>Ets al grup {mine.grp}: aquesta setmana no et toca res.</p>}
+      {mine && !mine.task && <p className="muted small" style={{ margin: "6px 0 0" }}>Ets al {groupName(mine).replace(/^Grup/, "grup")}: aquesta setmana no et toca res.</p>}
     </section>
   );
 }
@@ -68,7 +68,7 @@ export function DutiesAdmin({ week }: { week: string }) {
     if (next.anchor_material === next.anchor_goal) return setMsg({ ok: false, text: "Material i porteria han de ser grups diferents." });
     setBusy(true);
     const { data, error } = await supabase().from("duty_settings")
-      .update({ groups: next.groups, anchor_week: week, anchor_material: next.anchor_material, anchor_goal: next.anchor_goal, updated_at: new Date().toISOString() })
+      .update({ groups: next.groups, anchor_week: week, anchor_material: next.anchor_material, anchor_goal: next.anchor_goal, labels: next.labels ?? {}, updated_at: new Date().toISOString() })
       .eq("id", true).select("groups").maybeSingle();
     setBusy(false);
     if (error || !data) return setMsg({ ok: false, text: `No s'ha pogut desar: ${error?.message ?? "torna-ho a provar"}` });
@@ -100,10 +100,27 @@ export function DutiesAdmin({ week }: { week: string }) {
           <thead><tr><th>Setmana</th><th>{TASK_LABEL.material}</th><th>{TASK_LABEL.porteria}</th></tr></thead>
           <tbody>
             {preview.map((p) => (
-              <tr key={p.week}><td>{weekRange(p.week)}</td><td>Grup {dutyOf(p.groups, "material")?.grp ?? "–"}</td><td>Grup {dutyOf(p.groups, "porteria")?.grp ?? "–"}</td></tr>
+              <tr key={p.week}><td>{weekRange(p.week)}</td>{(["material", "porteria"] as const).map((t) => { const g = dutyOf(p.groups, t); return <td key={t}>{g ? groupName(g) : "–"}</td>; })}</tr>
             ))}
           </tbody>
         </table>
+      )}
+      {cfg && (
+        <div className="duties-labels">
+          <span className="muted small">Responsable de cada grup:</span>
+          {opts.map((g) => (
+            <label key={g}>Grup {g}
+              <input type="text" maxLength={30} defaultValue={cfg.labels?.[String(g)] ?? ""} disabled={busy} aria-label={`Responsable del grup ${g}`}
+                onBlur={(e) => {
+                  const v = e.target.value.replace(/[<>]/g, "").trim().slice(0, 30);
+                  if (v === (cfg.labels?.[String(g)] ?? "")) return;
+                  const labels = { ...(cfg.labels ?? {}), [String(g)]: v };
+                  if (!v) delete labels[String(g)];
+                  setThisWeek({ labels, anchor_material: dutyOf(cur, "material")?.grp ?? cfg.anchor_material, anchor_goal: dutyOf(cur, "porteria")?.grp ?? cfg.anchor_goal });
+                }} />
+            </label>
+          ))}
+        </div>
       )}
       <details className="duties-members" open={members.size === 0}>
         <summary>Qui hi ha a cada grup</summary>
