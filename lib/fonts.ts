@@ -1,6 +1,6 @@
 import localFont from "next/font/local";
 
-// Escapulada (Murri Studio & CE Europa): NOMÉS per a la pissarra de l'onze (staff).
+// Escapulada (Murri Studio & CE Europa): la lletra de tota l'app.
 export const escapulada = localFont({ src: "../app/fonts/Escapulada.ttf", variable: "--font-escapulada", display: "swap" });
 
 // Lletra de samarreta (la de hummel de la imatge que va enviar el club), redibuixada lletra a

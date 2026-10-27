@@ -654,3 +654,24 @@ reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0
 select pg_temp.expect_error($$select * from public.fcf_cache$$, 'Ni el staff llegeix la còpia de la FCF directament');
 select pg_temp.expect_error($$insert into public.fcf_cache (key, data) values ('x', '{}')$$, 'Ni la pot escriure');
 reset role;
+
+-- =============== GRUPS DE MATERIAL I PORTERIA ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.duty_groups (player_id, grp) values ('00000000-0000-0000-0000-0000000000b2', 4);
+insert into public.duty_groups (player_id, grp) select id, 1 from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id limit 1;
+select pg_temp.check((select string_agg(grp || ':' || coalesce(task, '-'), ',' order by grp) from (select distinct grp, task from public.duty_week(date '2026-10-28')) x)
+  = '1:porteria,2:-,3:-,4:material', 'Setmana del 26/10: material el grup 4 i porteria el grup 1');
+select pg_temp.check((select string_agg(grp || ':' || task, ',' order by grp) from (select distinct grp, task from public.duty_week(date '2026-11-02')) x where task is not null)
+  = '1:material,2:porteria', 'La setmana següent: material el 1 i porteria el 2');
+select pg_temp.check((select string_agg(grp || ':' || task, ',' order by grp) from (select distinct grp, task from public.duty_week(date '2026-11-23')) x where task is not null)
+  = '1:porteria,4:material', 'Al cap de 4 setmanes torna a començar');
+select pg_temp.check((select string_agg(grp || ':' || task, ',' order by grp) from (select distinct grp, task from public.duty_week(date '2026-10-19')) x where task is not null)
+  = '3:material,4:porteria', 'I cap enrere també (la setmana anterior)');
+select pg_temp.expect_error($$update public.duty_settings set anchor_material = 6$$, 'No es pot posar un grup que no existeix');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false);
+select pg_temp.check((select count(*) from public.duty_week(date '2026-10-28') where display_name = 'Berta' and task = 'material') = 1, 'La jugadora veu que aquesta setmana li toca el material');
+select pg_temp.expect_error($$insert into public.duty_groups (player_id, grp) values ('00000000-0000-0000-0000-0000000000b2', 2) on conflict (player_id) do update set grp = 2$$, 'La jugadora no es pot canviar de grup');
+with u as (update public.duty_settings set anchor_material = 1 returning 1) select pg_temp.check(count(*) = 0, 'La jugadora no pot canviar la rotació') from u;
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.duty_week(current_date)$$, 'Anònim no veu els grups');
+reset role;

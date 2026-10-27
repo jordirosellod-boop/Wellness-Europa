@@ -501,6 +501,25 @@ create table if not exists public.bib_overrides (
   updated_at timestamptz not null default now()
 );
 
+-- GRUPS DE MATERIAL I PORTERIA: cada setmana (de dilluns a diumenge) un grup porta el material i un altre
+-- les porteries, i es va rotant (material 4 → 1 → 2 → 3…, porteria 1 → 2 → 3 → 4…).
+create table if not exists public.duty_groups (
+  player_id  uuid primary key references public.profiles(id) on delete cascade,
+  grp        smallint not null check (grp between 1 and 8),
+  updated_at timestamptz not null default now()
+);
+create table if not exists public.duty_settings (
+  id              boolean primary key default true check (id),
+  groups          smallint not null default 4 check (groups between 2 and 8),
+  anchor_week     date not null default date '2026-10-26' check (extract(isodow from anchor_week) = 1),
+  anchor_material smallint not null default 4 check (anchor_material between 1 and 8),
+  anchor_goal     smallint not null default 1 check (anchor_goal between 1 and 8),
+  updated_at      timestamptz not null default now(),
+  constraint duty_settings_in_range check (anchor_material <= groups and anchor_goal <= groups)
+);
+-- La setmana del 26/10/2026: material el grup 4 i porteria el grup 1.
+insert into public.duty_settings (id) values (true) on conflict (id) do nothing;
+
 -- BIG DATA DE LA LLIGA: actes de la FCF ja llegides (dades públiques), perquè no calgui baixar-les cada cop.
 -- Només hi escriu i en llegeix el servidor (sense polítiques: cap usuari hi té accés directe).
 create table if not exists public.fcf_league_actas (
@@ -1053,6 +1072,32 @@ drop trigger if exists convocations_stamp on public.convocations;
 create trigger convocations_stamp before insert or update on public.convocations
   for each row execute function public.stamp_convocation();
 
+-- GRUPS: a quin grup és cada jugadora i què li toca la setmana que comença a p_week (staff i jugadores).
+create or replace function public.duty_week(p_week date)
+returns table (grp smallint, task text, player_id uuid, display_name text)
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  cfg public.duty_settings;
+  k integer;
+  mat smallint;
+  gk smallint;
+begin
+  if not ((select public.is_coach()) or (select public.is_player())) then return; end if;
+  select * into cfg from public.duty_settings where id;
+  if cfg.id is null then return; end if;
+  k := ((date_trunc('week', p_week)::date - cfg.anchor_week) / 7);
+  mat := (((cfg.anchor_material - 1 + k) % cfg.groups + cfg.groups) % cfg.groups) + 1;
+  gk := (((cfg.anchor_goal - 1 + k) % cfg.groups + cfg.groups) % cfg.groups) + 1;
+  return query
+    select g.n::smallint,
+           case when g.n = mat then 'material' when g.n = gk then 'porteria' end,
+           p.id, p.display_name
+    from generate_series(1, cfg.groups) as g(n)
+    left join public.duty_groups d on d.grp = g.n
+    left join public.profiles p on p.id = d.player_id and p.role = 'player'
+    order by g.n, p.display_name nulls last, p.id;
+end $$;
+
 -- PETOS: qui els porta cada dia (de p_from a p_to). Ho poden veure el staff i les jugadores.
 create or replace function public.bib_schedule(p_from date, p_to date)
 returns table (day date, player_id uuid, display_name text, dorsal smallint, manual boolean)
@@ -1358,6 +1403,8 @@ alter table public.rival_scouting     enable row level security;
 alter table public.tactic_boards      enable row level security;
 alter table public.weekly_plans       enable row level security;
 alter table public.fcf_cache          enable row level security;
+alter table public.duty_groups        enable row level security;
+alter table public.duty_settings      enable row level security;
 alter table public.published_trainings enable row level security;
 alter table public.bib_settings       enable row level security;
 alter table public.bib_overrides      enable row level security;
@@ -1374,7 +1421,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
-  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache,
+  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
@@ -1402,7 +1449,9 @@ grant all on public.analysis_matches, public.analysis_events, public.analysis_bu
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
 grant all on public.weekly_plans to service_role;
 grant select, insert, update, delete on public.weekly_plans to authenticated;
-grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache to service_role;
+grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.duty_groups, public.duty_settings to service_role;
+grant select, insert, update, delete on public.duty_groups to authenticated;
+grant select, update on public.duty_settings to authenticated;
 grant select, insert, update, delete on public.published_trainings, public.bib_overrides to authenticated;
 grant select, update on public.bib_settings to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;
@@ -1412,6 +1461,8 @@ revoke all on function public.is_injured_on(uuid, date), public.rehab_is_open(uu
 grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open(uuid, date) to authenticated;
 revoke all on function public.is_owner() from public, anon;
 grant execute on function public.is_owner() to authenticated;
+revoke all on function public.duty_week(date) from public, anon;
+grant execute on function public.duty_week(date) to authenticated;
 revoke all on function public.bib_schedule(date, date) from public, anon;
 grant execute on function public.bib_schedule(date, date) to authenticated;
 revoke all on function public.convo_roster(uuid) from public, anon;
@@ -1635,6 +1686,13 @@ drop policy if exists published_trainings_owner on public.published_trainings;
 create policy published_trainings_owner on public.published_trainings for all to authenticated
   using ((select public.is_owner())) with check ((select public.is_owner()));
 -- PETOS: la configuració i els canvis, només el staff (les jugadores ho veuen amb bib_schedule).
+-- GRUPS: la configuració, només el staff (les jugadores ho veuen amb duty_week).
+drop policy if exists duty_groups_coach on public.duty_groups;
+create policy duty_groups_coach on public.duty_groups for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists duty_settings_coach on public.duty_settings;
+create policy duty_settings_coach on public.duty_settings for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
 drop policy if exists bib_settings_coach on public.bib_settings;
 create policy bib_settings_coach on public.bib_settings for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));

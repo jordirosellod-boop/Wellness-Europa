@@ -10,6 +10,7 @@ import { PlayerAttendance } from "@/components/player-attendance";
 import { RehabCard } from "@/components/rehab-card";
 import { PlayerPlanning } from "@/components/weekly-view";
 import { BibsCard } from "@/components/bibs";
+import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
 import { fetchWeeklyPlan, itemTime, type WeeklyPlan } from "@/lib/weekly";
 import { nextConvoFor, PlayerConvo } from "@/components/player-convo";
@@ -252,7 +253,7 @@ function PlayerHome({ me }: { me: Profile }) {
       {sessions !== null && section === "lliga" && <PlayerLeague meId={me.id} />}
       {sessions !== null && section === "assistencia" && <PlayerAttendance meId={me.id} />}
       {sessions !== null && section === "convo" && <PlayerConvo meId={me.id} />}
-      {sessions !== null && section === "planning" && <PlayerPlanning />}
+      {sessions !== null && section === "planning" && <PlayerPlanning meId={me.id} />}
       {sessions !== null && section === "entreno" && <PlayerTraining />}
 
       {sessions !== null && section === "avisos" && (
@@ -449,6 +450,7 @@ function Dashboard({
       )}
 
       <BibsCard meId={me.id} today={today} />
+      <DutiesCard meId={me.id} title="Material i porteria" />
 
       <RehabCard meId={me.id} today={today} />
 

@@ -110,7 +110,7 @@ export function itemTime(it: PlanItem): string {
 }
 
 /** Text per enganxar al WhatsApp (amb negretes *així*). */
-export function toWhatsApp(weekStart: string, days: PlanDay[], footer: string | null): string {
+export function toWhatsApp(weekStart: string, days: PlanDay[], footer: string | null, extra: string[] = []): string {
   const out = ["*PLANNING DE LA SETMANA*", ""];
   days.forEach((d, i) => {
     out.push(`*${dayTitle(weekStart, i)}*`);
@@ -118,6 +118,7 @@ export function toWhatsApp(weekStart: string, days: PlanDay[], footer: string | 
     else for (const it of d.items) out.push(`• ${[itemTime(it), it.icon, it.text.trim()].filter(Boolean).join(" ")}`);
     out.push("");
   });
+  if (extra.length) out.push(...extra, "");
   if (footer?.trim()) out.push(`*${footer.trim().toUpperCase()}*`);
   return out.join("\n").trim();
 }

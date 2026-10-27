@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { CoachShell, Footer } from "@/components/ui";
 import { BibsAdmin } from "@/components/bibs";
+import { DutiesAdmin, DutiesCard } from "@/components/duties";
+import { dutyOf, fetchDuties, firstNames, type DutyGroup } from "@/lib/duties";
 import { WeekDays } from "@/components/weekly-view";
 import { bibName, fetchBibs } from "@/lib/bibs";
 import { addDays, startOfWeek, weekRange } from "@/lib/dates";
@@ -38,6 +40,15 @@ function Planning() {
   const [preview, setPreview] = useState(false);
   const [bibs, setBibs] = useState<Map<string, string>>(new Map());
   const [bibsVersion, setBibsVersion] = useState(0);
+  const [duties, setDuties] = useState<DutyGroup[]>([]);
+  useEffect(() => {
+    fetchDuties(week).then(setDuties, () => setDuties([]));
+  }, [week]);
+  /** Línies del material i la porteria per al text del WhatsApp. */
+  const dutyLines = (["material", "porteria"] as const).flatMap((t) => {
+    const g = dutyOf(duties, t);
+    return g ? [`*${t === "material" ? "🧺 MATERIAL" : "🥅 PORTERIA"}: GRUP ${g.grp}*${g.players.length ? ` (${firstNames(g)})` : ""}`] : [];
+  });
   useEffect(() => {
     fetchBibs(week, addDays(week, 6)).then((l) => setBibs(new Map(l.map((b) => [b.day, bibName(b)]))), () => {});
   }, [week, bibsVersion]);
@@ -166,7 +177,7 @@ function Planning() {
 
   async function copyText() {
     if (!draft) return;
-    const text = toWhatsApp(week, draft.days, draft.footer);
+    const text = toWhatsApp(week, draft.days, draft.footer, dutyLines);
     try {
       await navigator.clipboard.writeText(text);
       setStatus({ ok: true, text: "Text copiat. Ja el pots enganxar al WhatsApp." });
@@ -215,9 +226,10 @@ function Planning() {
 
           {preview ? (
             <>
+              <DutiesCard week={week} title="Material i porteria" />
               <WeekDays weekStart={week} days={draft.days} footer={draft.footer} bibs={bibs} />
               <h2 style={{ marginTop: 18 }}>Text per al WhatsApp</h2>
-              <textarea className="wk-wa" readOnly value={toWhatsApp(week, draft.days, draft.footer)} onFocus={(e) => e.currentTarget.select()} />
+              <textarea className="wk-wa" readOnly value={toWhatsApp(week, draft.days, draft.footer, dutyLines)} onFocus={(e) => e.currentTarget.select()} />
             </>
           ) : (
             draft.days.map((d, i) => (
@@ -284,6 +296,7 @@ function Planning() {
         </>
       )}
       {saved !== undefined && <BibsAdmin weekStart={week} onChanged={() => setBibsVersion((v) => v + 1)} />}
+      {saved !== undefined && <DutiesAdmin key={week} week={week} />}
     </>
   );
 }

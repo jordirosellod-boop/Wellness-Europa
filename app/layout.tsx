@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Anton, Poppins } from "next/font/google";
 import "./globals.css";
+import { escapulada } from "@/lib/fonts";
 
 // Tipografia com la de ceeuropa.cat: títols estrets en majúscules i text en Poppins.
 const display = Anton({ weight: "400", subsets: ["latin", "latin-ext"], variable: "--font-display", display: "swap" });
@@ -22,7 +23,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ca" className={`${display.variable} ${body.variable}`}>
+    <html lang="ca" className={`${escapulada.variable} ${display.variable} ${body.variable}`}>
       <body>{children}</body>
     </html>
   );

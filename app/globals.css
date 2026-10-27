@@ -247,8 +247,9 @@ select { appearance: auto; }
   --suau: #55608a;
   --vora: #d5dbee;
   --radi: 10px;
-  --display: var(--font-display), "Anton", "Bebas Neue", Impact, "Arial Narrow", sans-serif;
-  --cos: var(--font-body), "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Tota l'app amb l'Escapulada (la lletra del club). Les altres, només si no es pot carregar. */
+  --display: var(--font-escapulada), var(--font-display), "Anton", "Bebas Neue", Impact, "Arial Narrow", sans-serif;
+  --cos: var(--font-escapulada), var(--font-body), "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 html, body { background: var(--fons); color: var(--text); font-family: var(--cos); font-size: 16px; }
@@ -1260,3 +1261,17 @@ body:has(.bd) main { max-width: 1240px; }
 @media print { .plan-sheet.on-screen { transform: none !important; box-shadow: none; } }
 .msg.fcf-stale { background: #fff6e0; color: #6b4a05; border: 1px solid #e8c770; }
 .rival-prev { display: grid; gap: 2px; margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: #eef2fc; border-left: 4px solid #dbb34d; font-size: .9rem; }
+
+/* Material i porteria */
+.duties-card h2 { margin: 0 0 4px; }
+.duties-card.mine { border: 2px solid #dbb34d; background: #fff8e6; }
+.duties-me { margin: 0 0 6px; font-size: 1.05rem; }
+.duties-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.duties-list li b { display: inline-block; min-width: 7.5em; }
+.duties-rot { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .92rem; }
+.duties-rot th, .duties-rot td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--vora, #d5dcea); }
+.duties-members summary { cursor: pointer; font-weight: 600; margin-top: 6px; }
+.duties-members ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.duties-members li { display: flex; align-items: center; gap: 8px; }
+.duties-members li span { flex: 1; }
+.duties-members select { width: auto; }

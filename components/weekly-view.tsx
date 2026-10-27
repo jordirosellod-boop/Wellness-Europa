@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { addDays, startOfWeek, weekRange } from "@/lib/dates";
 import { bibName, fetchBibs } from "@/lib/bibs";
+import { DutiesCard } from "@/components/duties";
 import { dayTitle, fetchWeeklyPlan, itemTime, type PlanDay, type WeeklyPlan } from "@/lib/weekly";
 import { todayMadrid } from "@/lib/wellness";
 
@@ -40,7 +41,7 @@ export function WeekDays({ weekStart, days, footer, bibs }: { weekStart: string;
 }
 
 /** Pantalla de la jugadora: el planning d'aquesta setmana (i el de la que ve, si ja està publicat). */
-export function PlayerPlanning() {
+export function PlayerPlanning({ meId }: { meId?: string }) {
   const thisWeek = startOfWeek(todayMadrid());
   const [week, setWeek] = useState(thisWeek);
   const [plans, setPlans] = useState<Record<string, WeeklyPlan | null>>({});
@@ -72,6 +73,7 @@ export function PlayerPlanning() {
       )}
       {!loaded && !error && <p className="muted">Carregant…</p>}
       {loaded && !plan && <p className="card">El cos tècnic encara no ha publicat el planning d&apos;aquesta setmana.</p>}
+      {loaded && <DutiesCard key={week} week={week} meId={meId} title={week === thisWeek ? "Material i porteria · aquesta setmana" : "Material i porteria · la setmana que ve"} />}
       {plan && <WeekDays weekStart={plan.week_start} days={plan.days} footer={plan.footer} bibs={bibs} />}
     </>
   );
