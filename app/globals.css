@@ -1447,3 +1447,75 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
   transition: background-size .35s var(--ease), color .25s var(--ease);
 }
 .seg-toggle button[aria-pressed="true"] { background-color: #fff; background-image: linear-gradient(var(--navy), var(--navy)); background-repeat: no-repeat; background-position: center; background-size: 100% 100%; }
+
+/* --- Convocatòria ---------------------------------------------------- */
+@keyframes from-left { from { opacity: 0; transform: translateX(-40px) scale(.9); } to { opacity: 1; transform: none; } }
+@keyframes from-right { from { opacity: 0; transform: translateX(40px) scale(.9); } to { opacity: 1; transform: none; } }
+@keyframes vs-pop { 0% { opacity: 0; transform: scale(.3) rotate(-20deg); } 70% { opacity: 1; transform: scale(1.25) rotate(4deg); } 100% { transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes shirt-in { 0% { opacity: 0; transform: translateY(24px) rotate(-6deg) scale(.9); } 70% { opacity: 1; transform: translateY(-3px) rotate(2deg); } 100% { transform: none; } }
+@keyframes crest-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes gold-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(219, 179, 77, .7); } 50% { box-shadow: 0 0 0 8px rgba(219, 179, 77, 0); } }
+@keyframes chip-in { from { opacity: 0; transform: translateY(10px) scale(.85); } to { opacity: 1; transform: none; } }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spot-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+.convo { animation: card-in .45s var(--ease) both; }
+.convo-head { animation: rise .45s var(--ease) both; }
+.convo-match > span:first-child { animation: from-left .6s var(--ease) .1s both; }
+.convo-match > span:last-child { animation: from-right .6s var(--ease) .1s both; }
+.convo-match > i { display: inline-block; animation: vs-pop .55s var(--ease-back) .35s both; }
+.convo-match .convo-crest { animation: crest-float 4s ease-in-out 1s infinite; }
+.convo-match > span:last-child .convo-crest { animation-delay: 3s; }
+.convo-date { animation: rise .45s var(--ease) .25s both; }
+.convo-me { animation: pop-in .45s var(--ease-back) .3s both; }
+.convo-me.yes { animation: pop-in .45s var(--ease-back) .3s both, gold-glow 2.4s ease-in-out 1s 3; }
+.convo-info > div { animation: rise .4s var(--ease) both; }
+.convo-info > div:nth-child(1) { animation-delay: .3s; } .convo-info > div:nth-child(2) { animation-delay: .36s; }
+.convo-info > div:nth-child(3) { animation-delay: .42s; } .convo-info > div:nth-child(4) { animation-delay: .48s; }
+.convo-info > div:nth-child(5) { animation-delay: .54s; }
+.convo-kit-shirts figure { animation: shirt-in .7s var(--ease-back) .35s both; transition: transform .3s var(--ease-back); }
+.convo-kit-shirts figure.gk { animation-delay: .5s; }
+@media (hover: hover) { .convo-kit-shirts figure:hover { transform: translateY(-4px) rotate(-2deg) scale(1.04); } }
+.convo-sub { animation: rise .4s var(--ease) .3s both; }
+.convo-grid li { animation: chip-in .4s var(--ease-back) both; transition: transform .2s var(--ease), box-shadow .25s var(--ease); }
+.convo-grid li:nth-child(1) { animation-delay: 0.385s; }
+.convo-grid li:nth-child(2) { animation-delay: 0.420s; }
+.convo-grid li:nth-child(3) { animation-delay: 0.455s; }
+.convo-grid li:nth-child(4) { animation-delay: 0.490s; }
+.convo-grid li:nth-child(5) { animation-delay: 0.525s; }
+.convo-grid li:nth-child(6) { animation-delay: 0.560s; }
+.convo-grid li:nth-child(7) { animation-delay: 0.595s; }
+.convo-grid li:nth-child(8) { animation-delay: 0.630s; }
+.convo-grid li:nth-child(9) { animation-delay: 0.665s; }
+.convo-grid li:nth-child(10) { animation-delay: 0.700s; }
+.convo-grid li:nth-child(11) { animation-delay: 0.735s; }
+.convo-grid li:nth-child(12) { animation-delay: 0.770s; }
+.convo-grid li:nth-child(13) { animation-delay: 0.805s; }
+.convo-grid li:nth-child(14) { animation-delay: 0.840s; }
+.convo-grid li:nth-child(15) { animation-delay: 0.875s; }
+.convo-grid li:nth-child(16) { animation-delay: 0.910s; }
+.convo-grid li:nth-child(17) { animation-delay: 0.945s; }
+.convo-grid li:nth-child(18) { animation-delay: 0.980s; }
+.convo-grid li:nth-child(19) { animation-delay: 1.015s; }
+.convo-grid li:nth-child(20) { animation-delay: 1.050s; }
+.convo-grid li:nth-child(21) { animation-delay: 1.085s; }
+.convo-grid li:nth-child(22) { animation-delay: 1.120s; }
+.convo-grid li:nth-child(23) { animation-delay: 1.155s; }
+.convo-grid li:nth-child(24) { animation-delay: 1.190s; }
+.convo-grid li:nth-child(25) { animation-delay: 1.225s; }
+.convo-grid li:nth-child(26) { animation-delay: 1.260s; }
+.convo-grid li:nth-child(27) { animation-delay: 1.295s; }
+.convo-grid li:nth-child(28) { animation-delay: 1.330s; }
+.convo-grid li:nth-child(29) { animation-delay: 1.365s; }
+.convo-grid li:nth-child(30) { animation-delay: 1.400s; }
+.convo-grid li:nth-child(n+31) { animation-delay: 1.4s; }
+.convo-grid li.mine { animation: chip-in .4s var(--ease-back) both, gold-glow 2.4s ease-in-out 1.5s 3; }
+@media (hover: hover) { .convo-grid li:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 8px 18px rgba(0, 0, 0, .25); } }
+.convo-out { animation: fade .5s var(--ease) .6s both; }
+/* Onze inicial: les jugadores «cauen» a la seva posició, i la que es tria batega */
+.pl.filled .pl-shirt { animation: chip-in .45s var(--ease-back) both; }
+.pl.picking .pl-shirt { animation: spot-pulse 1s ease-in-out infinite; }
+.picker-backdrop { animation: fade .2s var(--ease) both; }
+.picker { animation: sheet-up .35s var(--ease) both; }
