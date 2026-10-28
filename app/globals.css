@@ -1667,3 +1667,45 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230b1846' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right .55em center; background-size: .95em; padding-right: 2em !important;
 }
+
+/* --- Plantilles d'entrenament ----------------------------------------- */
+/* (res de dins del full imprès ni del PDF: només la pantalla d'editar) */
+@keyframes chip-part { 0% { transform: scale(.85); } 60% { transform: scale(1.08); } 100% { transform: none; } }
+@keyframes chip-baixa { 0%, 100% { transform: none; } 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
+@keyframes chip-disp { from { transform: scale(.9); filter: brightness(1.15); } to { transform: none; filter: none; } }
+@keyframes bar-up { from { transform: translateY(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes assign { 0% { transform: scale(.8); } 60% { transform: scale(1.1); } 100% { transform: none; } }
+.list > li { animation: card-in .4s var(--ease) both; }
+.list > li:nth-child(2) { animation-delay: .04s; } .list > li:nth-child(3) { animation-delay: .08s; }
+.list > li:nth-child(4) { animation-delay: .12s; } .list > li:nth-child(n+5) { animation-delay: .16s; }
+.plan .task-card { animation: card-in .45s var(--ease) both; }
+.plan-savebar { animation: bar-up .4s var(--ease) both; }
+/* Jugadores per posicions: entren columna a columna i canvien d'estat amb un gest */
+.pos-board:not(.print) .pos-col { animation: rise .4s var(--ease) both; }
+.pos-board:not(.print) .pos-col:nth-child(2) { animation-delay: .04s; } .pos-board:not(.print) .pos-col:nth-child(3) { animation-delay: .08s; }
+.pos-board:not(.print) .pos-col:nth-child(4) { animation-delay: .12s; } .pos-board:not(.print) .pos-col:nth-child(5) { animation-delay: .16s; }
+.pos-board:not(.print) .pos-col:nth-child(6) { animation-delay: .2s; } .pos-board:not(.print) .pos-col:nth-child(n+7) { animation-delay: .24s; }
+.pos-board:not(.print) .pchip { transition: background-color .25s var(--ease), color .25s var(--ease); animation: chip-disp .3s var(--ease) both; }
+.pos-board:not(.print) .pchip.part { animation: chip-part .35s var(--ease-back) both; }
+.pos-board:not(.print) .pchip.baixa { animation: chip-baixa .35s ease-in-out both; }
+.pos-board:not(.print) .pchip.les { animation: none; }
+.pos-board:not(.print) button.pchip:active { transform: scale(.94); }
+@media (hover: hover) { .pos-board:not(.print) button.pchip:hover { filter: brightness(.96); box-shadow: 0 2px 6px rgba(11, 24, 70, .15); } }
+/* Equips: la pestanya del color es pinta i la jugadora triada «salta» al seu color */
+.squad-tabs button, .squad-pool button { transition: background-color .25s var(--ease), color .25s var(--ease), border-color .25s var(--ease), transform .12s var(--ease), box-shadow .25s var(--ease); }
+.squad-tabs button[aria-pressed="true"] { animation: pop-in .25s var(--ease-back); }
+.squad-pool button { animation: chip-in .3s var(--ease-back) both; }
+.squad-pool button[style] { animation: assign .35s var(--ease-back) both; }
+.squad-pool button:active, .squad-tabs button:active { transform: scale(.93); }
+/* Dibuix de la tasca: eines vives i el camp entra suau */
+.drill-tools .tool { transition: background-color .2s var(--ease), border-color .2s var(--ease), transform .12s var(--ease), box-shadow .2s var(--ease); }
+.drill-tools .tool:active { transform: scale(.9); }
+.drill-tools .tool[aria-pressed="true"] { animation: pop-in .25s var(--ease-back); }
+@media (hover: hover) { .drill-tools .tool:not([aria-pressed="true"]):hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(11, 24, 70, .15); } }
+.drill.editing, .drill-img { animation: stage-in .45s var(--ease) both; }
+.plan-reasons, .add-guest, .drill-colors, .drill-size { animation: dd-in .3s var(--ease) both; }
+.plan .plan-grid > div { animation: rise .35s var(--ease) both; }
+.plan .plan-grid > div:nth-child(2) { animation-delay: .03s; } .plan .plan-grid > div:nth-child(3) { animation-delay: .06s; }
+.plan .plan-grid > div:nth-child(4) { animation-delay: .09s; } .plan .plan-grid > div:nth-child(n+5) { animation-delay: .12s; }
+/* El full per imprimir i el de les jugadores, sempre quiet */
+.plan-sheet, .plan-sheet * { animation: none !important; transition: none !important; }
