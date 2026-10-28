@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
@@ -121,6 +121,7 @@ export function Scale({
   high,
   label,
   disabled,
+  tone,
 }: {
   value: number | null;
   onChange: (v: number) => void;
@@ -130,11 +131,17 @@ export function Scale({
   high: string;
   label: string;
   disabled?: boolean;
+  /** Color de cada número: "up" = com més alt, millor (verd); "down" = com més alt, més dur (vermell). */
+  tone?: "up" | "down";
 }) {
   const nums = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  const hue = (n: number) => {
+    const t = (n - min) / (max - min);
+    return Math.round((tone === "down" ? 1 - t : t) * 125);
+  };
   return (
     <div>
-      <div className={`scale${min === 0 ? " rpe" : ""}`} role="group" aria-label={label}>
+      <div className={`scale${min === 0 ? " rpe" : ""}${tone ? " toned" : ""}`} role="group" aria-label={label}>
         {nums.map((n) => (
           <button
             key={n}
@@ -142,6 +149,7 @@ export function Scale({
             aria-pressed={value === n}
             aria-label={`${label}: ${n}`}
             disabled={disabled}
+            style={tone ? ({ "--h": hue(n) } as CSSProperties) : undefined}
             onClick={() => onChange(n)}
           >
             {n}

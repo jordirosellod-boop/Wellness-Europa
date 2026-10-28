@@ -23,6 +23,21 @@ function savedText(row: { submitted_at: string; updated_at: string }) {
 }
 
 
+/** Cara segons la resposta (1-10): com més alt, millor. */
+const FACE = (n: number) => (n <= 2 ? "😫" : n <= 4 ? "😟" : n <= 6 ? "😐" : n <= 8 ? "🙂" : "😁");
+/** Cara de l'esforç (0-10): com més alt, més dur. */
+const EFFORT = (n: number) => (n <= 1 ? "😌" : n <= 3 ? "🙂" : n <= 5 ? "😤" : n <= 7 ? "🥵" : "🔥");
+
+/** Quan s'envia per primera vegada: check animat i un missatge. */
+function SavedBurst({ text }: { text: string }) {
+  return (
+    <div className="saved-burst" role="status">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23" /><path d="M15 27l7 7 15-16" /></svg>
+      <b>{text}</b>
+    </div>
+  );
+}
+
 /** Com ha anat l'entreno per a ella (nota 1-10). */
 const RATING_LABEL = (n: number) =>
   n <= 2 ? "Molt dolent" : n <= 4 ? "Dolent" : n <= 6 ? "Normal" : n <= 8 ? "Bo" : "Excel·lent";
@@ -47,6 +62,7 @@ export function WellnessForm({
   const [pain, setPain] = useState(existing?.pain_description ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [burst, setBurst] = useState(false);
 
   const touched = () => status.kind !== "saving" && setStatus({ kind: "idle" });
 
@@ -78,6 +94,7 @@ export function WellnessForm({
       if (!res.data) throw new Error("row-level security");
       onSaved(res.data as Wellness);
       setStatus({ kind: "ok", text: savedText(res.data as Wellness) });
+      if (!existing) setBurst(true);
     } catch (err) {
       setStatus({ kind: "error", text: friendlyError(err instanceof Error ? err.message : String(err)) });
     }
@@ -90,8 +107,12 @@ export function WellnessForm({
     <form className="stack" onSubmit={save}>
       {WELLNESS_VARS.map((v) => (
         <div key={v.key}>
-          <label className="field">{v.label}</label>
+          <label className="field face-label">
+            {v.label}
+            {vals[v.key] != null && <span className="face" key={vals[v.key]} aria-hidden="true">{FACE(vals[v.key]!)}</span>}
+          </label>
           <Scale
+            tone="up"
             label={v.label}
             min={1}
             max={10}
@@ -160,6 +181,7 @@ export function WellnessForm({
           {status.kind === "saving" ? "Desant…" : existing ? "Desar canvis" : "Enviar wellness"}
         </button>
       )}
+      {burst && <SavedBurst text="Wellness enviat · +1 🔥 a la ratxa" />}
       {status.kind === "ok" && <p className="msg ok" role="status">✓ {status.text}</p>}
       {status.kind === "error" && <p className="msg error" role="alert">{status.text}</p>}
     </form>
@@ -184,6 +206,7 @@ export function RpeForm({
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [rating, setRating] = useState<number | null>(existing?.rating ?? null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [burst, setBurst] = useState(false);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -209,6 +232,7 @@ export function RpeForm({
       if (!res.data) throw new Error("row-level security");
       onSaved(res.data as Rpe);
       setStatus({ kind: "ok", text: savedText(res.data as Rpe) });
+      if (!existing) setBurst(true);
     } catch (err) {
       setStatus({ kind: "error", text: friendlyError(err instanceof Error ? err.message : String(err)) });
     }
@@ -225,8 +249,12 @@ export function RpeForm({
   return (
     <form className="stack" onSubmit={save}>
       <div>
-        <label className="field">Quin esforç t&apos;ha suposat la sessió?</label>
+        <label className="field face-label">
+          Quin esforç t&apos;ha suposat la sessió?
+          {value != null && <span className="face" key={value} aria-hidden="true">{EFFORT(value)}</span>}
+        </label>
         <Scale
+          tone="down"
           label="RPE"
           min={0}
           max={10}
@@ -270,8 +298,12 @@ export function RpeForm({
         )}
       </div>
       <div>
-        <label className="field">Quina nota li poses a l&apos;entreno?</label>
+        <label className="field face-label">
+          Quina nota li poses a l&apos;entreno?
+          {rating != null && <span className="face" key={rating} aria-hidden="true">{FACE(rating)}</span>}
+        </label>
         <Scale
+          tone="up"
           label="Nota de l'entreno"
           min={1}
           max={10}
@@ -308,6 +340,7 @@ export function RpeForm({
           {status.kind === "saving" ? "Desant…" : existing ? "Desar canvis" : "Enviar RPE"}
         </button>
       )}
+      {burst && <SavedBurst text="RPE enviat · gràcies! 💪" />}
       {status.kind === "ok" && <p className="msg ok" role="status">✓ {status.text}</p>}
       {status.kind === "error" && <p className="msg error" role="alert">{status.text}</p>}
     </form>

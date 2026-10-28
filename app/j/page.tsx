@@ -2,6 +2,7 @@
 
 import { Crest } from "@/components/crest";
 import { useEffect, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { RpeForm, WellnessForm } from "@/components/forms";
 import { FcfStats } from "@/components/fcf-stats";
@@ -14,6 +15,7 @@ import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
+import { MonthStories, MonthWrapBanner } from "@/components/month-wrap";
 import { fetchStreak, streakText } from "@/lib/streak";
 import { fetchWeeklyPlan, itemTime, type WeeklyPlan } from "@/lib/weekly";
 import { nextConvoFor, PlayerConvo } from "@/components/player-convo";
@@ -30,6 +32,7 @@ import {
   fmtDate,
   fmtSessionTime,
   fmtTime,
+  nowMadridHHMM,
   SESSION_COLS,
   dayBefore,
   rpeLate,
@@ -141,6 +144,25 @@ function PasteLink() {
   );
 }
 
+type VtKind = "grow" | "slide" | "back";
+type Vt = { finished: Promise<void> };
+
+/** Transició entre pantalles amb la View Transitions API. Sense suport o amb «menys moviment», canvia directament. */
+function transition(kind: VtKind, update: () => void, done?: () => void) {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => Vt };
+  if (!doc.startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    update();
+    done?.();
+    return;
+  }
+  const root = document.documentElement;
+  root.dataset.vt = kind;
+  doc.startViewTransition(update).finished.finally(() => {
+    delete root.dataset.vt;
+    done?.();
+  });
+}
+
 type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning" | "entreno" | "cromo";
 const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo", "planning", "entreno", "cromo"];
 
@@ -162,12 +184,15 @@ function PlayerHome({ me }: { me: Profile }) {
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [section, setSection] = useState<Section>("inici");
+  const [grow, setGrow] = useState(false);
 
   useEffect(() => {
     const sync = () => setSection(sectionFromUrl());
     sync();
-    window.addEventListener("popstate", sync);
-    return () => window.removeEventListener("popstate", sync);
+    // Enrere/endavant del mòbil: la pantalla llisca (si el navegador ho permet).
+    const onPop = () => transition("back", () => flushSync(sync));
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   useEffect(() => {
@@ -192,13 +217,25 @@ function PlayerHome({ me }: { me: Profile }) {
     })();
   }, [today, yesterday]);
 
-  function go(next: Section) {
-    if (next !== section) {
-      const url = `${window.location.pathname}${next === "inici" ? "" : `?s=${next}`}${window.location.hash}`;
-      window.history.pushState(null, "", url);
-      setSection(next);
-    }
-    window.scrollTo({ top: 0 });
+  /** Canvia d'apartat. Si ve d'un mosaic o un avís, aquest «creix» fins a ser la pantalla nova. */
+  function go(next: Section, from?: HTMLElement) {
+    const run = () => {
+      if (next !== section) {
+        const url = `${window.location.pathname}${next === "inici" ? "" : `?s=${next}`}${window.location.hash}`;
+        window.history.pushState(null, "", url);
+        setSection(next);
+      }
+      window.scrollTo({ top: 0 });
+    };
+    if (next === section) return run();
+    if (from) from.style.viewTransitionName = "panel";
+    transition(from ? "grow" : "slide", () => {
+      if (from) from.style.viewTransitionName = "";
+      flushSync(() => {
+        setGrow(!!from);
+        run();
+      });
+    }, () => setGrow(false));
   }
 
   function openSession(id: string) {
@@ -216,6 +253,7 @@ function PlayerHome({ me }: { me: Profile }) {
 
   return (
     <div className="player-app">
+      <div className="section-view" style={grow ? { viewTransitionName: "panel" } : undefined}>
       {error && <p className="msg error">{error}</p>}
       {sessions === null && !error && <Loading />}
 
@@ -263,6 +301,7 @@ function PlayerHome({ me }: { me: Profile }) {
         <>
           <h1>El meu cromo</h1>
           <PlayerCard meId={me.id} name={me.display_name} today={today} />
+          <MyMonthButton meId={me.id} name={me.display_name} today={today} />
         </>
       )}
 
@@ -272,6 +311,8 @@ function PlayerHome({ me }: { me: Profile }) {
           <Reminders />
         </>
       )}
+
+      </div>
 
       <nav className="bottom-nav" aria-label="Menú">
         {([
@@ -400,6 +441,43 @@ function PlayerLeague({ meId }: { meId: string }) {
   );
 }
 
+/** Al cromo: el resum del mes en curs (fins avui). */
+function MyMonthButton({ meId, name, today }: { meId: string; name: string; today: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className="mw-banner" onClick={() => setOpen(true)} style={{ marginTop: 14 }}>
+        <span className="mw-banner-k">🎬 El teu mes</span>
+        <b>Com t&apos;està anant aquest mes</b>
+        <span>Entrenaments, wellness, partits i lliga ›</span>
+      </button>
+      {open && <MonthStories meId={meId} name={name} day={today} today={today} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+const GREET = { mati: "Bon dia", tarda: "Bona tarda", nit: "Bona nit" } as const;
+const dayPart = (hhmm: string): keyof typeof GREET => (hhmm >= "06:00" && hhmm < "13:00" ? "mati" : hhmm >= "13:00" && hhmm < "20:00" ? "tarda" : "nit");
+
+/** Salutació segons l'hora, amb el cel de fons: sol al matí, posta a la tarda i estrelles a la nit. */
+function Greeting({ name, today, level }: { name: string; today: string; level: number | null }) {
+  const [part, setPart] = useState<keyof typeof GREET>(() => dayPart(nowMadridHHMM()));
+  useEffect(() => {
+    const id = setInterval(() => setPart(dayPart(nowMadridHHMM())), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <header className={`greet ${part}`}>
+      <span className="greet-sky" aria-hidden="true" />
+      <h1>{GREET[part]}, {name}!</h1>
+      <p className="row" style={{ gap: 8, margin: 0 }}>
+        <span>{fmtDate(today)}</span>
+        {level ? <LevelBadge level={level} /> : null}
+      </p>
+    </header>
+  );
+}
+
 /** Ratxa de wellness. Quan puja, la flama salta; cada 5 seguits, confeti. */
 function StreakCard({ meId, n }: { meId: string; n: number }) {
   const [up, setUp] = useState(false);
@@ -434,7 +512,7 @@ function Dashboard({
   sessions: Session[];
   yesterdaySessions: Session[];
   version: number;
-  go: (s: Section) => void;
+  go: (s: Section, from?: HTMLElement) => void;
   onOpenSession: (id: string) => void;
 }) {
   const [data, setData] = useState<DashData | null>(null);
@@ -448,12 +526,10 @@ function Dashboard({
 
   return (
     <>
-      <h1>Hola, {me.display_name}!</h1>
-      <p className="muted row" style={{ marginTop: -6, gap: 8 }}>
-        <span>{fmtDate(today)}</span>
-        {data?.level ? <LevelBadge level={data.level} /> : null}
-      </p>
+      <Greeting name={me.display_name} today={today} level={data?.level ?? null} />
       {error && <p className="msg error">{error}</p>}
+
+      <MonthWrapBanner meId={me.id} name={me.display_name} today={today} />
 
       <ResultCard today={today} />
 
@@ -462,7 +538,7 @@ function Dashboard({
       )}
 
       {data?.convo && data.convo.c.match_date !== today && (
-        <button type="button" className={`convo-banner ${data.convo.called ? "yes" : "no"}`} onClick={() => go("convo")}>
+        <button type="button" className={`convo-banner ${data.convo.called ? "yes" : "no"}`} onClick={(e) => go("convo", e.currentTarget)}>
           <span className="convo-banner-k">Convocatòria · {fmtShort(data.convo.c.match_date)}{data.convo.c.kickoff ? ` · ${hhmm(data.convo.c.kickoff)} h` : ""}</span>
           <b className="team-inline"><Crest name={data.convo.c.rival} size={30} />{data.convo.c.is_home ? `CE Europa – ${data.convo.c.rival}` : `${data.convo.c.rival} – CE Europa`}</b>
           <span>{data.convo.called ? "✓ Estàs convocada · Veure la convocatòria" : "Veure la convocatòria"}</span>
@@ -473,7 +549,7 @@ function Dashboard({
         const d = data.plan.days[isoDow(today) - 1];
         const rest = !d || d.rest || d.items.length === 0;
         return (
-          <button type="button" className="wk-banner" onClick={() => go("planning")}>
+          <button type="button" className="wk-banner" onClick={(e) => go("planning", e.currentTarget)}>
             <span className="wk-banner-k">🗓️ Planning de la setmana · Avui</span>
             {rest ? <b>Descans 😴</b> : (
               <span className="wk-banner-items">
@@ -486,7 +562,7 @@ function Dashboard({
       })()}
 
       {data?.trainingToday && (
-        <button type="button" className="wk-banner train" onClick={() => go("entreno")}>
+        <button type="button" className="wk-banner train" onClick={(e) => go("entreno", e.currentTarget)}>
           <span className="wk-banner-k">📋 Entreno d&apos;avui</span>
           <b>Ja està penjat. Mira les tasques i els equips!</b>
           <span className="wk-banner-more">Veure l&apos;entreno ›</span>
@@ -550,22 +626,22 @@ function Dashboard({
       )}
 
       <div className="tiles">
-        <button type="button" className="tile" onClick={() => go("calendari")}>
+        <button type="button" className="tile" onClick={(e) => go("calendari", e.currentTarget)}>
           {ICONS.calendari}
           <b>Calendari</b>
           <span>{data?.next ? `Propera: ${fmtShort(data.next.session_date)}` : "Les meves sessions"}</span>
         </button>
-        <button type="button" className="tile" onClick={() => go("multes")}>
+        <button type="button" className="tile" onClick={(e) => go("multes", e.currentTarget)}>
           {ICONS.multes}
           <b>Multes</b>
           <span>{data ? (data.pending ? `Deus ${fmtEuros(data.pending)}` : "Estàs al dia") : "…"}</span>
         </button>
-        <button type="button" className={`tile${data && data.reminders !== "on" ? " tile-alert" : ""}`} onClick={() => go("avisos")}>
+        <button type="button" className={`tile${data && data.reminders !== "on" ? " tile-alert" : ""}`} onClick={(e) => go("avisos", e.currentTarget)}>
           {svg("M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0")}
           <b>Avisos</b>
           <span>{data ? (data.reminders === "on" ? "Activats" : "Activa'ls aquí") : "…"}</span>
         </button>
-        <button type="button" className="tile" onClick={() => go("lliga")}>
+        <button type="button" className="tile" onClick={(e) => go("lliga", e.currentTarget)}>
           {ICONS.lliga}
           <b>Lliga interna</b>
           <span>
@@ -576,12 +652,12 @@ function Dashboard({
                 : `Et falten ${data.leaguePos.missing} entrenaments`}
           </span>
         </button>
-        <button type="button" className="tile" onClick={() => go("convo")}>
+        <button type="button" className="tile" onClick={(e) => go("convo", e.currentTarget)}>
           {svg("M9 3h6l1 3h4v15H4V6h4zM9 12l2 2 4-4")}
           <b>Convocatòria</b>
           <span>{data?.convo ? (data.convo.called ? "Estàs convocada ✓" : "Ja està penjada") : "Encara no n'hi ha"}</span>
         </button>
-        <button type="button" className="tile" onClick={() => go("assistencia")}>
+        <button type="button" className="tile" onClick={(e) => go("assistencia", e.currentTarget)}>
           {svg("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M16 11l2 2 4-4")}
           <b>Assistència</b>
           <span>
@@ -592,27 +668,27 @@ function Dashboard({
                 : "Encara sense dades"}
           </span>
         </button>
-        <button type="button" className="tile" onClick={() => go("entreno")}>
+        <button type="button" className="tile" onClick={(e) => go("entreno", e.currentTarget)}>
           {svg("M9 3h6v4H9zM5 5h4M15 5h4v16H5V5M8 12h8M8 16h5")}
           <b>Entreno</b>
           <span>{data?.trainingToday ? "El d'avui ja està penjat" : "Els entrenos penjats"}</span>
         </button>
-        <button type="button" className="tile" onClick={() => go("planning")}>
+        <button type="button" className="tile" onClick={(e) => go("planning", e.currentTarget)}>
           {ICONS.calendari}
           <b>Planning</b>
           <span>{data?.plan ? "La setmana" : "Encara no penjat"}</span>
         </button>
-        <button type="button" className="tile tile-cromo" onClick={() => go("cromo")}>
+        <button type="button" className="tile tile-cromo" onClick={(e) => go("cromo", e.currentTarget)}>
           {svg("M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM9 7h6M8 17h8M12 10l1.2 2.4 2.6.4-1.9 1.8.5 2.6L12 16l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z")}
           <b>El meu cromo</b>
           <span>La teva carta de jugadora</span>
         </button>
-        <button type="button" className="tile" onClick={() => go("stats")}>
+        <button type="button" className="tile" onClick={(e) => go("stats", e.currentTarget)}>
           {svg("M4 20V10M10 20V4M16 20v-7M22 20H2")}
           <b>Estadístiques</b>
           <span>Partits, gols i targetes</span>
         </button>
-        <button type="button" className="tile" onClick={() => go("normes")}>
+        <button type="button" className="tile" onClick={(e) => go("normes", e.currentTarget)}>
           {svg("M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM8 7h8M8 11h6")}
           <b>Normes</b>
           <span>De l&apos;equip</span>
