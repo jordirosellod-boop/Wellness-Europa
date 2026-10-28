@@ -31,8 +31,24 @@ export async function detect(): Promise<Status> {
   return sub ? "on" : "off";
 }
 
-/** Botó per activar el recordatori de les 7:30 els dies d'entrenament. */
-export function Reminders() {
+const TEXT = {
+  player: {
+    title: "Avisos al mòbil",
+    off: "Rep un avís a les 7:30 els dies d'entrenament per omplir el wellness, la vigília si et toquen els petos, el dilluns si el teu grup porta el material o les porteries, i 2 hores abans de la quedada els dies de partit.",
+    on: "Rebràs els avisos de wellness (7:30), petos, material i porteries, i de la quedada dels partits.",
+    done: "Fet! Rebràs els avisos de wellness, petos, material i partits.",
+  },
+  staff: {
+    title: "Resum setmanal al mòbil",
+    off: "Rep cada diumenge al vespre un resum de la setmana: assistència, wellness, RPE i lesionades.",
+    on: "Rebràs el resum de la setmana cada diumenge al vespre.",
+    done: "Fet! Rebràs el resum cada diumenge al vespre.",
+  },
+} as const;
+
+/** Botó per activar els avisos al mòbil (jugadores: recordatoris; staff: resum setmanal). */
+export function Reminders({ staff = false }: { staff?: boolean } = {}) {
+  const t = TEXT[staff ? "staff" : "player"];
   const [status, setStatus] = useState<Status>("loading");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -68,7 +84,7 @@ export function Reminders() {
         throw new Error(dbErr?.message ?? "No s'ha confirmat.");
       }
       setStatus("on");
-      setMsg({ ok: true, text: "Fet! Rebràs l'avís a les 7:30 els dies d'entrenament." });
+      setMsg({ ok: true, text: t.done });
     } catch (e) {
       setMsg({ ok: false, text: friendlyError(e instanceof Error ? e.message : String(e)) });
     } finally {
@@ -87,7 +103,7 @@ export function Reminders() {
         await sub.unsubscribe();
       }
       setStatus("off");
-      setMsg({ ok: true, text: "Recordatoris desactivats en aquest mòbil." });
+      setMsg({ ok: true, text: "Avisos desactivats en aquest mòbil." });
     } catch (e) {
       setMsg({ ok: false, text: friendlyError(e instanceof Error ? e.message : String(e)) });
     } finally {
@@ -100,18 +116,18 @@ export function Reminders() {
   return (
     <section className="card">
       <div className="row between">
-        <h3 style={{ margin: 0 }}>Recordatori 7:30</h3>
+        <h3 style={{ margin: 0 }}>{t.title}</h3>
         {status === "on" && <span className="chip fet">Activat</span>}
       </div>
       {status === "off" && (
         <>
-          <p className="muted small">Rep un avís al mòbil a les 7:30 els dies d&apos;entrenament per omplir el wellness.</p>
-          <button className="btn block" disabled={busy} onClick={enable}>{busy ? "Activant…" : "Activar recordatoris"}</button>
+          <p className="muted small">{t.off}</p>
+          <button className="btn block" disabled={busy} onClick={enable}>{busy ? "Activant…" : "Activar avisos"}</button>
         </>
       )}
       {status === "on" && (
         <>
-          <p className="muted small">Rebràs l&apos;avís a les 7:30 els dies d&apos;entrenament (si encara no has fet el wellness).</p>
+          <p className="muted small">{t.on}</p>
           <button className="btn small secondary" disabled={busy} onClick={disable}>Desactivar</button>
         </>
       )}
@@ -121,7 +137,7 @@ export function Reminders() {
           <ol style={{ paddingLeft: 20, margin: 0 }}>
             <li>Toca el botó <b>Compartir</b> (el quadrat amb la fletxa) del Safari.</li>
             <li>Tria <b>Afegir a la pantalla d&apos;inici</b>.</li>
-            <li>Obre l&apos;app des de la nova icona i toca <b>Activar recordatoris</b>.</li>
+            <li>Obre l&apos;app des de la nova icona i toca <b>Activar avisos</b>.</li>
           </ol>
         </div>
       )}

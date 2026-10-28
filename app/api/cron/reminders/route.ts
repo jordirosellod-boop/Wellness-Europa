@@ -24,7 +24,11 @@ export async function POST(req: Request) {
   const { data: done } = await db.from("wellness").select("player_id").in("session_id", ids);
   const already = new Set((done ?? []).map((w) => w.player_id as string));
 
-  const { data: subs, error: pErr } = await db.from("push_subscriptions").select("id, player_id, endpoint, p256dh, auth").order("id");
+  const { data: players, error: rErr } = await db.from("profiles").select("id").eq("role", "player");
+  if (rErr) return Response.json({ error: rErr.message }, { status: 500 });
+  // Només jugadores: el staff també pot tenir els avisos activats, però no fa el wellness.
+  const { data: subs, error: pErr } = await db.from("push_subscriptions").select("id, player_id, endpoint, p256dh, auth")
+    .in("player_id", (players ?? []).map((p) => p.id as string)).order("id");
   if (pErr) return Response.json({ error: pErr.message }, { status: 500 });
 
   const { publicKey, privateKey } = await vapidKeys(db);

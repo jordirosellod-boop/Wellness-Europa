@@ -675,3 +675,26 @@ with u as (update public.duty_settings set anchor_material = 1 returning 1) sele
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.duty_week(current_date)$$, 'Anònim no veu els grups');
 reset role;
+
+-- =============== AVISOS AUTOMÀTICS ===============
+-- El servidor (clau secreta) pot consultar grups i petos per enviar els avisos
+reset role; select set_config('request.jwt.claim.sub','', false); set role service_role;
+select pg_temp.check((select count(*) from public.duty_week(date '2026-10-28') where display_name = 'Berta' and task = 'material') = 1, 'El servidor veu a qui toca el material (per avisar-la)');
+select pg_temp.check((select count(*) from public.bib_schedule((now() at time zone 'Europe/Madrid')::date + 100, (now() at time zone 'Europe/Madrid')::date + 101)) = 2, 'El servidor veu qui porta els petos (per avisar-la)');
+insert into public.push_log (key) values ('petos:test');
+select pg_temp.check((select count(*) from public.push_log where key = 'petos:test') = 1, 'El servidor apunta els avisos enviats');
+reset role;
+-- Ningú més toca el registre d'avisos
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.expect_error($$select * from public.push_log$$, 'Ni el staff llegeix el registre d''avisos');
+select pg_temp.expect_error($$insert into public.push_log (key) values ('x')$$, 'Ni el pot escriure');
+select pg_temp.expect_error($$select public.trigger_auto_push()$$, 'Ningú pot llançar els avisos des de fora');
+-- El staff pot activar els avisos al seu mòbil (per rebre el resum setmanal)
+insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://push.example/staff', 'k', 'a');
+select pg_temp.check((select count(*) from public.push_subscriptions where endpoint = 'https://push.example/staff') = 1, 'El staff activa els avisos al seu mòbil');
+select pg_temp.expect_error($$insert into public.push_subscriptions (player_id, endpoint, p256dh, auth) values ('00000000-0000-0000-0000-0000000000a1', 'https://push.example/y', 'k', 'a')$$, 'El staff no pot registrar un mòbil en nom d''una jugadora');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000cc', false); set role authenticated;
+select pg_temp.expect_error($$insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://push.example/z', 'k', 'a')$$, 'Un compte sense perfil no pot activar avisos');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.duty_week(current_date)$$, 'Anònim continua sense veure els grups');
+reset role;

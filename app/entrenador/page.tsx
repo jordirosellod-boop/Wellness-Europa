@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { CoachShell, Footer, useIsOwner } from "@/components/ui";
+import { Reminders } from "@/components/reminders";
 import { viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, fmtSessionTime, friendlyError, SESSION_COLS, todayMadrid, type Kind, type Session } from "@/lib/wellness";
@@ -141,6 +142,7 @@ function CoachCalendar() {
           )
         }
       />
+      <Reminders staff />
     </>
   );
 }

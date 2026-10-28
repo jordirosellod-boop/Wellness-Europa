@@ -10,17 +10,13 @@ export function adminClient(): SupabaseClient {
 }
 
 /**
- * Envia un avís a totes les jugadores que tenen les notificacions activades.
+ * Envia un avís als mòbils d'unes persones concretes (jugadores o staff).
  * Esborra les subscripcions que ja no existeixen. Torna quants mòbils l'han rebut.
  */
-export async function pushToPlayers(db: SupabaseClient, msg: { title: string; body: string; url: string }): Promise<{ sent: number; players: number }> {
-  const { data: players, error: pErr } = await db.from("profiles").select("id").eq("role", "player");
-  if (pErr) throw new Error(pErr.message);
-  const ids = (players ?? []).map((p) => p.id as string);
-  const { data: subs, error: sErr } = ids.length
-    ? await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("player_id", ids).order("id")
-    : { data: [], error: null };
-  if (sErr) throw new Error(sErr.message);
+export async function pushTo(db: SupabaseClient, ids: string[], msg: { title: string; body: string; url: string }): Promise<number> {
+  if (!ids.length) return 0;
+  const { data: subs, error } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("player_id", ids).order("id");
+  if (error) throw new Error(error.message);
   const { publicKey, privateKey } = await vapidKeys(db);
   webpush.setVapidDetails("https://wellness-europa.vercel.app", publicKey, privateKey);
   const payload = JSON.stringify(msg);
@@ -36,7 +32,32 @@ export async function pushToPlayers(db: SupabaseClient, msg: { title: string; bo
     }
   }
   if (gone.length) await db.from("push_subscriptions").delete().in("id", gone);
-  return { sent, players: ids.length };
+  return sent;
+}
+
+async function idsOf(db: SupabaseClient, role: "player" | "coach"): Promise<string[]> {
+  const { data, error } = await db.from("profiles").select("id").eq("role", role);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((p) => p.id as string);
+}
+
+/** Avís a totes les jugadores que tenen les notificacions activades. */
+export async function pushToPlayers(db: SupabaseClient, msg: { title: string; body: string; url: string }): Promise<{ sent: number; players: number }> {
+  const ids = await idsOf(db, "player");
+  return { sent: await pushTo(db, ids, msg), players: ids.length };
+}
+
+/** Avís al staff (només als que l'han activat al seu mòbil). */
+export async function pushToStaff(db: SupabaseClient, msg: { title: string; body: string; url: string }): Promise<number> {
+  return pushTo(db, await idsOf(db, "coach"), msg);
+}
+
+/** Apunta un avís com a enviat. Torna false si ja ho estava (així cada avís surt una sola vegada). */
+export async function claimPush(db: SupabaseClient, key: string): Promise<boolean> {
+  const { error } = await db.from("push_log").insert({ key });
+  if (!error) return true;
+  if (error.code === "23505") return false;
+  throw new Error(error.message);
 }
 
 /**

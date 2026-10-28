@@ -544,6 +544,13 @@ create table if not exists public.fcf_cache (
   fetched_at timestamptz not null default now()
 );
 
+-- AVISOS AUTOMÀTICS (petos, material, quedada, resum del staff): quins ja s'han enviat,
+-- perquè cada un surti només una vegada. Només el servidor (sense polítiques).
+create table if not exists public.push_log (
+  key     text primary key check (char_length(key) between 1 and 100),
+  sent_at timestamptz not null default now()
+);
+
 -- Jugadores en seguiment (possibles fitxatges). Només el responsable. Dades mínimes: nom, equip i una nota.
 create table if not exists public.scouting_targets (
   id         uuid primary key default gen_random_uuid(),
@@ -875,6 +882,21 @@ begin
   );
 end $$;
 
+-- AVISOS AUTOMÀTICS: cada 15 minuts la base de dades avisa el servidor, que decideix si toca
+-- enviar res (petos la vigília, material dilluns, quedada 2 h abans, resum del staff diumenge).
+create or replace function public.trigger_auto_push()
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  secret text;
+begin
+  select value into secret from public.app_secrets where name = 'cron_secret';
+  perform net.http_post(
+    url := 'https://wellness-europa.vercel.app/api/cron/avisos',   -- si canvieu d'adreça, canvieu-la aquí
+    body := '{}'::jsonb,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', secret)
+  );
+end $$;
+
 -- ESTADÍSTIQUES FCF: la base de dades demana al servidor de l'app que les actualitzi.
 create or replace function public.trigger_fcf_sync()
 returns void language plpgsql security definer set search_path = '' as $$
@@ -1088,7 +1110,7 @@ declare
   mat smallint;
   gk smallint;
 begin
-  if not ((select public.is_coach()) or (select public.is_player())) then return; end if;
+  if not ((select public.is_coach()) or (select public.is_player()) or current_setting('role', true) = 'service_role') then return; end if;
   select * into cfg from public.duty_settings where id;
   if cfg.id is null then return; end if;
   k := ((date_trunc('week', p_week)::date - cfg.anchor_week) / 7);
@@ -1122,7 +1144,7 @@ declare
   pos integer;
   found_i integer;
 begin
-  if not ((select public.is_coach()) or (select public.is_player())) then return; end if;
+  if not ((select public.is_coach()) or (select public.is_player()) or current_setting('role', true) = 'service_role') then return; end if;
   if p_to < p_from or p_to - p_from > 120 then return; end if;
   select * into cfg from public.bib_settings where id;
   if cfg.start_date is null then return; end if;
@@ -1409,6 +1431,7 @@ alter table public.rival_scouting     enable row level security;
 alter table public.tactic_boards      enable row level security;
 alter table public.weekly_plans       enable row level security;
 alter table public.fcf_cache          enable row level security;
+alter table public.push_log           enable row level security;
 alter table public.duty_groups        enable row level security;
 alter table public.duty_settings      enable row level security;
 alter table public.published_trainings enable row level security;
@@ -1427,7 +1450,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
-  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.duty_groups, public.duty_settings,
+  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
@@ -1455,7 +1478,7 @@ grant all on public.analysis_matches, public.analysis_events, public.analysis_bu
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
 grant all on public.weekly_plans to service_role;
 grant select, insert, update, delete on public.weekly_plans to authenticated;
-grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.duty_groups, public.duty_settings to service_role;
+grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings to service_role;
 grant select, insert, update, delete on public.duty_groups to authenticated;
 grant select, update on public.duty_settings to authenticated;
 grant select, insert, update, delete on public.published_trainings, public.bib_overrides to authenticated;
@@ -1468,14 +1491,14 @@ grant execute on function public.is_injured_on(uuid, date), public.rehab_is_open
 revoke all on function public.is_owner() from public, anon;
 grant execute on function public.is_owner() to authenticated;
 revoke all on function public.duty_week(date) from public, anon;
-grant execute on function public.duty_week(date) to authenticated;
+grant execute on function public.duty_week(date) to authenticated, service_role;
 revoke all on function public.bib_schedule(date, date) from public, anon;
-grant execute on function public.bib_schedule(date, date) to authenticated;
+grant execute on function public.bib_schedule(date, date) to authenticated, service_role;
 revoke all on function public.convo_roster(uuid) from public, anon;
 grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
 revoke all on function public.wellness_open_at(uuid, timestamp), public.rpe_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
-  public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync(), public.attendance_to_league(), public.session_delete_attendance(), public.attendance_rpe_fine() from public, anon, authenticated;
+  public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync(), public.trigger_auto_push(), public.attendance_to_league(), public.session_delete_attendance(), public.attendance_rpe_fine() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
 revoke all on function public.league_table(date), public.league_winners(), public.league_change(uuid, text, integer),
@@ -1530,11 +1553,11 @@ drop policy if exists fines_write on public.fines;
 create policy fines_write on public.fines for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 
--- RECORDATORIS: cada jugadora gestiona només els seus mòbils.
+-- RECORDATORIS: cada persona (jugadora o staff) gestiona només els seus mòbils.
 drop policy if exists push_own on public.push_subscriptions;
 create policy push_own on public.push_subscriptions for all to authenticated
   using (player_id = (select auth.uid()))
-  with check (player_id = (select auth.uid()) and (select public.is_player()));
+  with check (player_id = (select auth.uid()) and ((select public.is_player()) or (select public.is_coach())));
 
 -- CONFIGURACIÓ DE MULTES AUTOMÀTIQUES: només el staff.
 drop policy if exists auto_fine_settings_coach on public.auto_fine_settings;
@@ -1759,6 +1782,7 @@ create policy rpe_update on public.rpe for update to authenticated
 --    · cada 15 minuts: multes automàtiques
 --    · 5:30 i 6:30 UTC: recordatori de les 7:30 (només actua a les 7 de Barcelona)
 --    · cada 6 hores: estadístiques de la Federació
+--    · cada 15 minuts: avisos automàtics (petos, material, quedada i resum del staff)
 --    · cada nit a les 00:05: posició de la lliga interna (per a les fletxes de pujada/baixada)
 -- =====================================================================
 create extension if not exists pg_cron;
@@ -1766,6 +1790,7 @@ create extension if not exists pg_net;
 select cron.schedule('multes-automatiques', '*/15 * * * *', 'select public.apply_auto_fines()');
 select cron.schedule('recordatori-wellness', '30 5,6 * * *', 'select public.send_wellness_reminder()');
 select cron.schedule('estadistiques-fcf', '20 */6 * * *', 'select public.trigger_fcf_sync()');
+select cron.schedule('avisos-automatics', '*/15 * * * *', 'select public.trigger_auto_push()');
 select cron.schedule('lliga-cada-nit', '5 22,23 * * *', 'select public.snapshot_league_if_midnight()');
 
 -- =====================================================================
