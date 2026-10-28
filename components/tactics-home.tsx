@@ -13,6 +13,7 @@ import {
 } from "@/lib/tactics";
 import { loadImg, sceneImage, scenesVideo, type RenderOpts } from "@/lib/tactics-render";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 type BoardRow = { id: string; title: string; rival_key: string | null; match_date: string | null; updated_at: string };
 type Ctx = {
@@ -242,7 +243,7 @@ function TacticsEditor({ id, onBack }: { id: string; onBack: () => void }) {
     return () => window.removeEventListener("beforeunload", h);
   }, [dirty]);
 
-  if (!row) return status ? <p className="msg error">{status.text}</p> : <p className="muted">Carregant…</p>;
+  if (!row) return status ? <p className="msg error">{status.text}</p> : <Loading />;
   const scenes = row.data.scenes;
   const scene = scenes[Math.min(si, scenes.length - 1)];
   const upd = (data: BoardData, title = row.title) => {

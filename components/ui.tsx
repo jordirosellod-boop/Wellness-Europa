@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export function Brand() {
   return (
@@ -100,7 +101,7 @@ export function CoachShell({ children }: { children: (me: Profile) => ReactNode 
         </nav>
       </header>
       <main>
-        {error ? <p className="msg error">{error}</p> : me ? children(me) : <p className="muted">Carregant…</p>}
+        {error ? <p className="msg error">{error}</p> : me ? children(me) : <Loading />}
         {me && (
           <div className="center" style={{ marginTop: 28 }}>
             <button className="btn small secondary" onClick={logout}>Tancar sessió</button>
@@ -185,7 +186,7 @@ export function useIsOwner(): boolean | null {
 /** Mostra el contingut només al responsable; a la resta, un avís. */
 export function OwnerOnly({ children }: { children: ReactNode }) {
   const owner = useIsOwner();
-  if (owner === null) return <p className="muted">Carregant…</p>;
+  if (owner === null) return <Loading />;
   if (!owner) return <p className="card">Aquesta secció és privada de l&apos;entrenador responsable.</p>;
   return <>{children}</>;
 }

@@ -4,6 +4,7 @@ import { MatchLine } from "@/components/crest";
 import { useCallback, useEffect, useState } from "react";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDateTime, friendlyError, type Profile } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 type Match = {
   acta_id: string; jornada: number; kickoff: string | null; home: string; away: string;
@@ -88,7 +89,7 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
   }
 
   if (error) return <p className="msg error">{friendlyError(error)}</p>;
-  if (!data) return <p className="muted">Carregant…</p>;
+  if (!data) return <Loading />;
 
   const played = data.matches.filter((m) => result(m));
   const tally = { G: 0, E: 0, P: 0 } as Record<"G" | "E" | "P", number>;

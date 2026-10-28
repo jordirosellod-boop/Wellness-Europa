@@ -22,6 +22,7 @@ import { addDays } from "@/lib/dates";
 import { escapulada } from "@/lib/fonts";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export default function AnalysisPage() {
   return (
@@ -173,7 +174,7 @@ function MatchList({ onOpen }: { onOpen: (id: string) => void }) {
           </ul>
         </section>
       )}
-      {!list && !error && <p className="muted">Carregant…</p>}
+      {!list && !error && <Loading />}
     </>
   );
 }
@@ -342,7 +343,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   }
 
   if (error) return (<><p className="msg error">{error}</p><button className="btn small secondary" onClick={onBack}>← Partits</button></>);
-  if (!match) return <p className="muted">Carregant…</p>;
+  if (!match) return <Loading />;
 
   const clock = mode === "live" ? liveNow(live) : fromVideo(match, vt);
   const name = (pid: string | null) => {

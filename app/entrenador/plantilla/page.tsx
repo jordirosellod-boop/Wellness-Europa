@@ -17,6 +17,7 @@ import { safeName } from "@/lib/share-file";
 import { activeOn, fetchInjuries } from "@/lib/rehab";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export default function PlansPage() {
   return (
@@ -144,7 +145,7 @@ function PlanList({ onOpen }: { onOpen: (id: string) => void }) {
         </p>
       </section>
       {error && <p className="msg error">{error}</p>}
-      {!plans && !error && <p className="muted">Carregant…</p>}
+      {!plans && !error && <Loading />}
       {plans && plans.length > 0 && (
         <section className="card">
           <h2>Les meves plantilles</h2>
@@ -359,7 +360,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
   }
 
   if (error) return (<><p className="msg error">{error}</p><button className="btn small secondary" onClick={onBack}>← Tornar</button></>);
-  if (!plan || !roster) return <p className="muted">Carregant…</p>;
+  if (!plan || !roster) return <Loading />;
 
   const statusOf = (pid: string): PlayerStatus => plan.players[pid] ?? "disp";
   const available = roster.players.filter((p) => statusOf(p.id) === "disp").length + plan.guests.filter((g) => g.status === "disp").length;

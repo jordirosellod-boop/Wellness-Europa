@@ -6,6 +6,7 @@ import { LeagueEditor, LevelEditor } from "@/components/league-admin";
 import { CoachShell, Footer } from "@/components/ui";
 import { adminAction, fetchAll, supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export default function TeamPage() {
   return (
@@ -58,7 +59,7 @@ function Team({ me }: { me: Profile }) {
   }, [load]);
 
   if (error) return <p className="msg error">{error}</p>;
-  if (!people) return <p className="muted">Carregant…</p>;
+  if (!people) return <Loading />;
 
   const players = people.filter((p) => p.role === "player");
   const staff = people.filter((p) => p.role === "coach");

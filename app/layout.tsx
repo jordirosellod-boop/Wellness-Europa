@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Anton, Poppins } from "next/font/google";
 import "./globals.css";
-import { escapulada } from "@/lib/fonts";
+import { escapulada, kitFont } from "@/lib/fonts";
 
 // Tipografia com la de ceeuropa.cat: títols estrets en majúscules i text en Poppins.
 const display = Anton({ weight: "400", subsets: ["latin", "latin-ext"], variable: "--font-display", display: "swap" });
@@ -23,8 +23,17 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ca" className={`${escapulada.variable} ${display.variable} ${body.variable}`}>
-      <body>{children}</body>
+    <html lang="ca" className={`${escapulada.variable} ${kitFont.variable} ${display.variable} ${body.variable}`}>
+      <body>
+        {/* Entrada: l'escut apareix i s'esvaeix (només CSS; no bloqueja res i no surt si es demana menys moviment). */}
+        <div className="splash" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/escut.png" alt="" width={112} height={112} />
+          <b>Juvenil C</b>
+          <span>CE Europa</span>
+        </div>
+        {children}
+      </body>
     </html>
   );
 }

@@ -5,6 +5,7 @@ import { activeOn, fetchInjuries, fetchRehab, type Injury, type RehabEntry } fro
 import { addDays } from "@/lib/dates";
 import { supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 /** Staff: qui està lesionada, donar d'alta, i els entrenaments a part que han omplert. */
 export function InjuriesAdmin({ players }: { players: Profile[] }) {
@@ -101,7 +102,7 @@ export function InjuriesAdmin({ players }: { players: Profile[] }) {
       </form>
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
 
-      {!injuries && !error && <p className="muted">Carregant…</p>}
+      {!injuries && !error && <Loading />}
       {injuries && active.length === 0 && <p className="muted" style={{ marginBottom: 0 }}>Ara mateix no hi ha cap lesionada.</p>}
       {active.length > 0 && (
         <ul className="list">

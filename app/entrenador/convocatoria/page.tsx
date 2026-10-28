@@ -9,6 +9,7 @@ import { CONVO_COLS, fetchConvocations, fetchRoster, FRIENDLY, GUEST_ORIGINS, hh
 import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export default function ConvoPage() {
   return (
@@ -74,7 +75,7 @@ function Convos() {
           }}
         />
       )}
-      {!list && !error && <p className="muted">Carregant…</p>}
+      {!list && !error && <Loading />}
       {shown?.length === 0 && !creating && (
         <p className="card">{section === "amistosos" ? "Encara no hi ha cap amistós. Toca «+ Nova» per afegir-ne un." : "Encara no hi ha cap convocatòria. Toca «+ Nova»."}</p>
       )}
@@ -442,7 +443,7 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
   }
 
   if (error) return <p className="msg error">{error}</p>;
-  if (!roster) return <p className="muted">Carregant…</p>;
+  if (!roster) return <Loading />;
   const calledN = roster.filter((r) => r.called).length;
   const own = roster.filter((r) => !r.guest); // les de l'equip (les afegides van a part)
   const guests = roster.filter((r) => r.guest);

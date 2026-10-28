@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Brand, Footer, useMe } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
+import { Loading } from "@/components/loading";
 
 export default function Home() {
   const router = useRouter();
@@ -49,7 +50,7 @@ export default function Home() {
       </header>
       <main>
         {me === undefined ? (
-          <p className="muted">Carregant…</p>
+          <Loading />
         ) : (
           <>
             <div className="card">

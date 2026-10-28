@@ -12,6 +12,9 @@ import { PlayerPlanning } from "@/components/weekly-view";
 import { BibsCard } from "@/components/bibs";
 import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
+import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
+import { PlayerCard } from "@/components/player-card";
+import { fetchStreak, streakText } from "@/lib/streak";
 import { fetchWeeklyPlan, itemTime, type WeeklyPlan } from "@/lib/weekly";
 import { nextConvoFor, PlayerConvo } from "@/components/player-convo";
 import { hhmm } from "@/lib/convo";
@@ -38,6 +41,7 @@ import {
   type Session,
   type Wellness,
 } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 type State =
   | { kind: "loading" }
@@ -100,7 +104,7 @@ export default function PlayerPage() {
         {state.kind === "ready" && <span className="small">{state.me.display_name}</span>}
       </header>
       <main>
-        {state.kind === "loading" && <p className="muted">Carregant…</p>}
+        {state.kind === "loading" && <Loading />}
         {state.kind === "nolink" && <PasteLink />}
         {state.kind === "badlink" && (
           <div className="card">
@@ -137,8 +141,8 @@ function PasteLink() {
   );
 }
 
-type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning" | "entreno";
-const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo", "planning", "entreno"];
+type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning" | "entreno" | "cromo";
+const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo", "planning", "entreno", "cromo"];
 
 function sectionFromUrl(): Section {
   const s = new URLSearchParams(window.location.search).get("s") as Section | null;
@@ -213,7 +217,7 @@ function PlayerHome({ me }: { me: Profile }) {
   return (
     <div className="player-app">
       {error && <p className="msg error">{error}</p>}
-      {sessions === null && !error && <p className="muted">Carregant…</p>}
+      {sessions === null && !error && <Loading />}
 
       {sessions !== null && section === "inici" && (
         <Dashboard me={me} today={today} sessions={todaySessions} yesterdaySessions={yesterdaySessions} version={version} go={go} onOpenSession={openSession} />
@@ -255,6 +259,12 @@ function PlayerHome({ me }: { me: Profile }) {
       {sessions !== null && section === "convo" && <PlayerConvo meId={me.id} />}
       {sessions !== null && section === "planning" && <PlayerPlanning meId={me.id} />}
       {sessions !== null && section === "entreno" && <PlayerTraining />}
+      {sessions !== null && section === "cromo" && (
+        <>
+          <h1>El meu cromo</h1>
+          <PlayerCard meId={me.id} name={me.display_name} today={today} />
+        </>
+      )}
 
       {sessions !== null && section === "avisos" && (
         <>
@@ -305,6 +315,7 @@ type DashData = {
   convo: Awaited<ReturnType<typeof nextConvoFor>>;
   plan: WeeklyPlan | null;
   trainingToday: boolean;
+  streak: number | null;
 };
 
 async function loadMonthAttendance(playerId: string, today: string) {
@@ -315,7 +326,7 @@ async function loadMonthAttendance(playerId: string, today: string) {
 async function loadDashboard(playerId: string, today: string, sessions: Session[]): Promise<DashData> {
   const sb = supabase();
   const ids = sessions.map((s) => s.id);
-  const [w, r, fines, next, reminders, level, league, attendance, convo, plan, pub] = await Promise.all([
+  const [w, r, fines, next, reminders, level, league, attendance, convo, plan, pub, streak] = await Promise.all([
     ids.length ? sb.from("wellness").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     ids.length ? sb.from("rpe").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     fetchAll<{ amount_cents: number; paid: boolean }>((f, t) =>
@@ -330,6 +341,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     nextConvoFor(playerId, today).catch(() => null),
     fetchWeeklyPlan(startOfWeek(today)).catch(() => null),
     sb.from("published_trainings").select("plan_id").eq("plan_date", today).range(0, 0),
+    fetchStreak(playerId, today).catch(() => null),
   ]);
   for (const res of [w, r, next]) if (res.error) throw new Error(res.error.message);
   const mine = new Map<string, { w: boolean; r: boolean }>();
@@ -351,6 +363,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
     convo,
     plan,
     trainingToday: !pub.error && (pub.data ?? []).length > 0,
+    streak,
   };
 }
 
@@ -373,7 +386,7 @@ function PlayerLeague({ meId }: { meId: string }) {
         {left === 1 ? "Avui és l'últim dia del mes!" : `Queden ${left} dies.`} Les fletxes indiquen qui ha pujat o baixat des d&apos;ahir.
       </p>
       {error && <p className="msg error">{error}</p>}
-      {!rows && !error && <p className="muted">Carregant…</p>}
+      {!rows && !error && <Loading />}
       {rows && (
         <section className="card">
           <LeagueTable rows={rows} meId={meId} fromPrevious />
@@ -384,6 +397,31 @@ function PlayerLeague({ meId }: { meId: string }) {
         <Winners winners={winners} />
       </section>
     </>
+  );
+}
+
+/** Ratxa de wellness. Quan puja, la flama salta; cada 5 seguits, confeti. */
+function StreakCard({ meId, n }: { meId: string; n: number }) {
+  const [up, setUp] = useState(false);
+  const [party, setParty] = useState(false);
+  useEffect(() => {
+    const key = `ratxa:${meId}`;
+    let prev: number | null = null;
+    try { const v = localStorage.getItem(key); prev = v == null ? null : Number(v); localStorage.setItem(key, String(n)); } catch { /* sense emmagatzematge */ }
+    if (prev == null || n <= prev) return;
+    const t = setTimeout(() => { setUp(true); if (n % 5 === 0) setParty(true); }, 0);
+    return () => clearTimeout(t);
+  }, [meId, n]);
+  return (
+    <section className={`card streak-card${n >= 5 ? " hot" : ""}${up ? " up" : ""}`}>
+      {party && <Confetti onDone={() => setParty(false)} />}
+      <span className="streak-flame" aria-hidden="true">{n > 0 ? "🔥" : "💤"}</span>
+      <div>
+        <b>{n === 1 ? "1 wellness seguit" : `${n} wellness seguits`}</b>
+        <span className="muted small">{streakText(n)}</span>
+      </div>
+      {n > 0 && <span className="streak-n" key={n}>{n}</span>}
+    </section>
   );
 }
 
@@ -417,7 +455,13 @@ function Dashboard({
       </p>
       {error && <p className="msg error">{error}</p>}
 
-      {data?.convo && (
+      <ResultCard today={today} />
+
+      {data?.convo && data.convo.c.match_date === today && (
+        <MatchdayHero c={data.convo.c} called={data.convo.called} onOpen={() => go("convo")} />
+      )}
+
+      {data?.convo && data.convo.c.match_date !== today && (
         <button type="button" className={`convo-banner ${data.convo.called ? "yes" : "no"}`} onClick={() => go("convo")}>
           <span className="convo-banner-k">Convocatòria · {fmtShort(data.convo.c.match_date)}{data.convo.c.kickoff ? ` · ${hhmm(data.convo.c.kickoff)} h` : ""}</span>
           <b className="team-inline"><Crest name={data.convo.c.rival} size={30} />{data.convo.c.is_home ? `CE Europa – ${data.convo.c.rival}` : `${data.convo.c.rival} – CE Europa`}</b>
@@ -448,6 +492,8 @@ function Dashboard({
           <span className="wk-banner-more">Veure l&apos;entreno ›</span>
         </button>
       )}
+
+      {data?.streak != null && <StreakCard meId={me.id} n={data.streak} />}
 
       <BibsCard meId={me.id} today={today} />
       <DutiesCard meId={me.id} title="Material i porteria" />
@@ -556,6 +602,11 @@ function Dashboard({
           <b>Planning</b>
           <span>{data?.plan ? "La setmana" : "Encara no penjat"}</span>
         </button>
+        <button type="button" className="tile tile-cromo" onClick={() => go("cromo")}>
+          {svg("M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM9 7h6M8 17h8M12 10l1.2 2.4 2.6.4-1.9 1.8.5 2.6L12 16l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z")}
+          <b>El meu cromo</b>
+          <span>La teva carta de jugadora</span>
+        </button>
         <button type="button" className="tile" onClick={() => go("stats")}>
           {svg("M4 20V10M10 20V4M16 20v-7M22 20H2")}
           <b>Estadístiques</b>
@@ -594,7 +645,7 @@ function SessionForms({ me, session, onSaved }: { me: Profile; session: Session;
   }, [session.id, me.id]);
 
   if (error) return <p className="msg error">{error}</p>;
-  if (w === undefined || r === undefined) return <p className="muted">Carregant…</p>;
+  if (w === undefined || r === undefined) return <Loading />;
 
   return (
     <>

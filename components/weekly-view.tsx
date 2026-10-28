@@ -6,6 +6,7 @@ import { bibName, fetchBibs } from "@/lib/bibs";
 import { DutiesCard } from "@/components/duties";
 import { dayTitle, fetchWeeklyPlan, itemTime, type PlanDay, type WeeklyPlan } from "@/lib/weekly";
 import { todayMadrid } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 /** Els 7 dies del planning (el d'avui destacat). */
 export function WeekDays({ weekStart, days, footer, bibs }: { weekStart: string; days: PlanDay[]; footer: string | null; bibs?: Map<string, string> }) {
@@ -71,7 +72,7 @@ export function PlayerPlanning({ meId }: { meId?: string }) {
           {next && <button aria-pressed={week !== thisWeek} onClick={() => setWeek(addDays(thisWeek, 7))}>La setmana que ve</button>}
         </div>
       )}
-      {!loaded && !error && <p className="muted">Carregant…</p>}
+      {!loaded && !error && <Loading />}
       {loaded && !plan && <p className="card">El cos tècnic encara no ha publicat el planning d&apos;aquesta setmana.</p>}
       {loaded && <DutiesCard key={week} week={week} meId={meId} title={week === thisWeek ? "Material i porteria · aquesta setmana" : "Material i porteria · la setmana que ve"} />}
       {plan && <WeekDays weekStart={plan.week_start} days={plan.days} footer={plan.footer} bibs={bibs} />}

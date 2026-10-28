@@ -5,6 +5,7 @@ import { CoachShell, Footer } from "@/components/ui";
 import { centsToInput, FINE_COLS, fmtEuros, parseEuros, type Fine, type FineRule } from "@/lib/fines";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, friendlyError, todayMadrid, type Profile } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export default function FinesPage() {
   return (
@@ -38,7 +39,7 @@ function Fines() {
   }, [load]);
 
   if (error) return <p className="msg error">{friendlyError(error)}</p>;
-  if (!data) return <p className="muted">Carregant…</p>;
+  if (!data) return <Loading />;
 
   const total = data.fines.reduce((a, f) => a + f.amount_cents, 0);
   const paid = data.fines.filter((f) => f.paid).reduce((a, f) => a + f.amount_cents, 0);

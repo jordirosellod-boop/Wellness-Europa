@@ -5,6 +5,7 @@ import { CoachShell, Footer } from "@/components/ui";
 import { WEEKDAYS_SHORT } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, fmtSessionTime, friendlyError, todayMadrid, type Kind, type SessionRule } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export default function RulesPage() {
   return (
@@ -51,7 +52,7 @@ function Rules() {
       <section className="card">
         <h2>Programacions actuals</h2>
         {error && <p className="msg error">{friendlyError(error)}</p>}
-        {rules === null && !error && <p className="muted">Carregant…</p>}
+        {rules === null && !error && <Loading />}
         {rules?.length === 0 && <p className="muted" style={{ margin: 0 }}>Encara no n&apos;hi ha cap.</p>}
         <ul className="list">
           {rules?.map((r) => <RuleRow key={r.id} rule={r} onChange={load} />)}

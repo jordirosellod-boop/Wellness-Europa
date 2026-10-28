@@ -24,13 +24,14 @@ import {
   type Session,
   type Wellness,
 } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export default function SessionDetailPage() {
   return (
     <>
       <CoachShell>
         {() => (
-          <Suspense fallback={<p className="muted">Carregant…</p>}>
+          <Suspense fallback={<Loading />}>
             <Detail />
           </Suspense>
         )}
@@ -121,7 +122,7 @@ function Detail() {
   }
 
   if (error) return <p className="msg error">{error}</p>;
-  if (session === undefined) return <p className="muted">Carregant…</p>;
+  if (session === undefined) return <Loading />;
   if (session === null) return <p className="msg error">No s&apos;ha trobat la sessió.</p>;
 
   const ws = rows.flatMap((x) => (x.w ? [Number(x.w.score)] : []));

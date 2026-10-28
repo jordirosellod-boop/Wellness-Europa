@@ -10,6 +10,7 @@ import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, fmtSessionTime, todayMadrid, type Profile, type Session } from "@/lib/wellness";
 import { monthName } from "@/components/league";
+import { Loading } from "@/components/loading";
 
 export default function AttendancePage() {
   return (
@@ -113,7 +114,7 @@ function Roll() {
       )}
 
       {error && <p className="msg error">{error}</p>}
-      {!data && !error && <p className="muted">Carregant…</p>}
+      {!data && !error && <Loading />}
 
       {data && daySessions.length === 0 && <p className="card">Aquest dia no hi ha cap sessió.</p>}
 

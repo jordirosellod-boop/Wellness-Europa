@@ -6,6 +6,7 @@ import { ConvoSheet } from "@/components/convo-sheet";
 import { fetchConvocations, fetchRoster, type Convocation, type RosterRow } from "@/lib/convo";
 import { addDays } from "@/lib/dates";
 import { todayMadrid } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 /** Convocatòries publicades: la propera (o l'última) i, a sota, les anteriors. */
 export function PlayerConvo({ meId }: { meId: string }) {
@@ -43,7 +44,7 @@ export function PlayerConvo({ meId }: { meId: string }) {
     <>
       <h1>Convocatòria</h1>
       {error && <p className="msg error">{error}</p>}
-      {!list && !error && <p className="muted">Carregant…</p>}
+      {!list && !error && <Loading />}
       {list?.length === 0 && <p className="card">Encara no hi ha cap convocatòria penjada.</p>}
       {list && list.length > 1 && (
         <div className="tabs convo-tabs" style={{ marginBottom: 12 }}>
@@ -55,7 +56,7 @@ export function PlayerConvo({ meId }: { meId: string }) {
         </div>
       )}
       {c && roster?.id === c.id && <ConvoSheet c={c} roster={roster.rows} meId={meId} />}
-      {c && roster?.id !== c.id && !error && <p className="muted">Carregant…</p>}
+      {c && roster?.id !== c.id && !error && <Loading />}
     </>
   );
 }

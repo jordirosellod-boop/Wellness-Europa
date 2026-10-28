@@ -7,12 +7,13 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Juvenil C 2026/2027 · CE Europa",
     short_name: "Juvenil C",
     display: "standalone",
-    background_color: "#ffffff",
+    background_color: "#061847",
     theme_color: "#0a2ea0",
     lang: "ca",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

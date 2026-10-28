@@ -5,6 +5,7 @@ import { monthName } from "@/components/league";
 import { fetchAttendance, fetchSessionsBetween, monthBounds, pctClass, summarize, type Attendance } from "@/lib/attendance";
 import { addMonths, fmtShort } from "@/lib/dates";
 import { fmtSessionTime, todayMadrid, type Session } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 /** Assistència de la jugadora (només la seva), mes a mes. */
 export function PlayerAttendance({ meId }: { meId: string }) {
@@ -44,7 +45,7 @@ export function PlayerAttendance({ meId }: { meId: string }) {
       </div>
 
       {error && <p className="msg error">{error}</p>}
-      {!data && !error && <p className="muted">Carregant…</p>}
+      {!data && !error && <Loading />}
       {sum && (
         <section className="card">
           <h2>Entrenaments</h2>

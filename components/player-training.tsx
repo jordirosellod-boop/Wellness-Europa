@@ -7,6 +7,7 @@ import { deliverPdf, planPdf } from "@/lib/plan-pdf";
 import { fetchPublished, fetchPublishedList, snapshotRoster, type PublishedData, type PublishedRow } from "@/lib/published-training";
 import { safeName } from "@/lib/share-file";
 import { todayMadrid } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 /** El full es dibuixa a mida A4 i es redueix fins a l'amplada de la pantalla. */
 function FitSheet({ data }: { data: PublishedData }) {
@@ -85,7 +86,7 @@ export function PlayerTraining() {
     <>
       <h1>Entreno</h1>
       {error && <p className="msg error">{error}</p>}
-      {!list && !error && <p className="muted">Carregant…</p>}
+      {!list && !error && <Loading />}
       {list?.length === 0 && <p className="card">Encara no hi ha cap entreno penjat.</p>}
       {list && list.length > 1 && (
         <div className="tabs convo-tabs" style={{ marginBottom: 10 }}>

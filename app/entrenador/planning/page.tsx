@@ -14,6 +14,7 @@ import {
   type PlanDay, type PlanItem, type WeeklyPlan,
 } from "@/lib/weekly";
 import { fmtDateTime, todayMadrid } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export default function PlanningPage() {
   return (
@@ -205,7 +206,7 @@ function Planning() {
       {week !== thisWeek && <button type="button" className="btn small secondary" onClick={() => changeWeek(thisWeek)} style={{ marginBottom: 8 }}>Tornar a aquesta setmana</button>}
 
       {status && <p className={`msg${status.ok ? "" : " error"}`}>{status.text}</p>}
-      {saved === undefined && <p className="muted">Carregant…</p>}
+      {saved === undefined && <Loading />}
 
       {saved !== undefined && !draft && (
         <section className="card stack">

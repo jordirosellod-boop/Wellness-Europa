@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AEVENT_COLS, AMATCH_COLS, minuteOf, type AEvent, type AMatch } from "@/lib/analysis";
 import { fetchAll, supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 export const CORR_CATS = ["Atac", "Defensa", "Transicions", "ABP", "Porteria", "Individual", "Equip"] as const;
 export type Correction = {
@@ -128,7 +129,7 @@ export function CorrectionsPanel() {
   }
 
   if (error) return <p className="msg error">{error}</p>;
-  if (!list) return <p className="muted">Carregant…</p>;
+  if (!list) return <Loading />;
   const shown = list.filter((c) => (filter === "all" ? true : filter === "open" ? c.status !== "corregit" : c.status === filter));
   const pname = (id: string) => players.find((p) => p.id === id)?.display_name ?? "—";
 
