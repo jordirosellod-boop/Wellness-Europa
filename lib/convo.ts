@@ -115,5 +115,26 @@ export const FORMATIONS: Record<string, Spot[]> = {
     { x: 38, y: 76, label: "DC" }, { x: 62, y: 76, label: "DC" }],
   "5-4-1": [GK, ...D5, { x: 14, y: 54, label: "MI" }, { x: 38, y: 49, label: "MC" }, { x: 62, y: 49, label: "MC" }, { x: 86, y: 54, label: "MD" },
     { x: 50, y: 79, label: "DC" }],
+  // Amb rombe al mig del camp: pivot, dues interiors obertes i mitjapunta.
+  "4-4-2 rombe": [GK, ...D4, { x: 50, y: 38, label: "MCD" }, { x: 24, y: 51, label: "MI" }, { x: 76, y: 51, label: "MD" },
+    { x: 50, y: 62, label: "MP" }, { x: 37, y: 80, label: "DC" }, { x: 63, y: 80, label: "DC" }],
+  "3-4-3 rombe": [GK, ...D3, { x: 50, y: 37, label: "MCD" }, { x: 17, y: 51, label: "MI" }, { x: 83, y: 51, label: "MD" },
+    { x: 50, y: 61, label: "MP" }, { x: 15, y: 78, label: "EI" }, { x: 50, y: 83, label: "DC" }, { x: 85, y: 78, label: "ED" }],
+  "4-3-2-1": [GK, ...D4, { x: 28, y: 46, label: "MC" }, { x: 50, y: 41, label: "MCD" }, { x: 72, y: 46, label: "MC" },
+    { x: 34, y: 65, label: "MP" }, { x: 66, y: 65, label: "MP" }, { x: 50, y: 82, label: "DC" }],
+  "4-2-2-2": [GK, ...D4, { x: 37, y: 41, label: "MCD" }, { x: 63, y: 41, label: "MCD" },
+    { x: 20, y: 62, label: "MI" }, { x: 80, y: 62, label: "MD" }, { x: 38, y: 80, label: "DC" }, { x: 62, y: 80, label: "DC" }],
+  "4-2-4": [GK, ...D4, { x: 37, y: 45, label: "MC" }, { x: 63, y: 45, label: "MC" },
+    { x: 12, y: 72, label: "EI" }, { x: 38, y: 80, label: "DC" }, { x: 62, y: 80, label: "DC" }, { x: 88, y: 72, label: "ED" }],
+  "3-4-2-1": [GK, ...D3, ...M4, { x: 34, y: 66, label: "MP" }, { x: 66, y: 66, label: "MP" }, { x: 50, y: 83, label: "DC" }],
+  "3-1-4-2": [GK, ...D3, { x: 50, y: 36, label: "MCD" },
+    { x: 10, y: 55, label: "CI" }, { x: 36, y: 53, label: "MC" }, { x: 64, y: 53, label: "MC" }, { x: 90, y: 55, label: "CD" },
+    { x: 38, y: 79, label: "DC" }, { x: 62, y: 79, label: "DC" }],
+  "5-2-3": [GK, ...D5, { x: 37, y: 47, label: "MC" }, { x: 63, y: 47, label: "MC" },
+    { x: 17, y: 74, label: "EI" }, { x: 50, y: 81, label: "DC" }, { x: 83, y: 74, label: "ED" }],
 };
-export const FORMATION_NAMES = Object.keys(FORMATIONS);
+/** Ordre dels botons: cada variant al costat del seu sistema. */
+export const FORMATION_NAMES = [
+  "4-4-2", "4-4-2 rombe", "4-4-1-1", "4-3-3", "4-3-1-2", "4-3-2-1", "4-2-3-1", "4-2-2-2", "4-2-4", "4-1-4-1", "4-5-1",
+  "3-4-3", "3-4-3 rombe", "3-4-2-1", "3-4-1-2", "3-5-2", "3-1-4-2", "5-3-2", "5-4-1", "5-2-3",
+].filter((f) => f in FORMATIONS);

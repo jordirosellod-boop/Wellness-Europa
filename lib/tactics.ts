@@ -191,7 +191,7 @@ const has = (s: string, ...words: string[]) => words.some((w) => new RegExp(w).t
 
 /** Línies de cada equip a partir del sistema (defenses, migcampistes, davanteres). */
 function lines(system: string) {
-  const [d, ...rest] = system.split("-").map(Number);
+  const [d, ...rest] = system.split(" ")[0].split("-").map(Number);
   return { def: d || 4, mid: rest.slice(0, -1).reduce((a, b) => a + b, 0) || 4, att: rest[rest.length - 1] || 2 };
 }
 
