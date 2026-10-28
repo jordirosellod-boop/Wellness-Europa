@@ -40,7 +40,7 @@ export function Shirt({ n, gk = false, size = 30, tone = "home", className = "" 
       {/* El petit escapulat de l'esquena (la V de l'Europa), a dalt, per sobre del número */}
       <path className="sh-esc" d="M14.5 7.6 L20 11.4 L25.5 7.6 L25.5 9.6 L20 13.4 L14.5 9.6 Z" />
       <path className="sh-sleeve" d="M2 12 L6 18 L8.2 17 L4.4 10.6 Z M38 12 L34 18 L31.8 17 L35.6 10.6 Z" />
-      <text x="20" y="31.5" textAnchor="middle">{n == null ? "" : n}</text>
+      <text x="20" y="28.5" textAnchor="middle">{n == null ? "" : n}</text>
     </svg>
   );
 }
