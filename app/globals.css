@@ -2189,7 +2189,10 @@ html[data-vt="back"]::view-transition-new(root) { animation: vt-in-left .28s cub
 .shirt-ico { flex: none; display: inline-block; vertical-align: middle; filter: drop-shadow(0 2px 3px rgba(1,20,70,.25)); }
 .shirt-ico .sh-body { fill: #fff; stroke: var(--blau); stroke-width: 1.6; stroke-linejoin: round; }
 .shirt-ico .sh-v, .shirt-ico .sh-sleeve { fill: var(--blau); }
-.shirt-ico text { font-family: var(--font-kit), var(--display); font-size: 15px; fill: var(--blau); }
+.shirt-ico .sh-esc { fill: var(--blau); }
+.shirt-ico .sh-esc-line { fill: none; stroke: var(--or); stroke-width: 1; }
+.shirt-ico text { font-family: var(--font-kit), var(--display); font-size: 12.5px; fill: var(--blau); }
+.shirt-ico.gold .sh-esc { fill: var(--navy); }
 .shirt-ico.gold .sh-body { fill: #f3dc9a; stroke: #a37a1c; }
 .shirt-ico.gold .sh-v, .shirt-ico.gold .sh-sleeve { fill: var(--navy); }
 .shirt-ico.gold text { fill: var(--navy); }

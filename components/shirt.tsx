@@ -33,9 +33,12 @@ export function Shirt({ n, size = 30, tone = "home", className = "" }: { n: numb
   return (
     <svg className={`shirt-ico ${tone} ${className}`} width={size} height={size} viewBox="0 0 40 40" role="img" aria-label={label}>
       <path className="sh-body" d="M13 4 L8 6 L2 12 L6 18 L10 16 L10 37 L30 37 L30 16 L34 18 L38 12 L32 6 L27 4 Q20 9 13 4 Z" />
-      <path className="sh-v" d="M13 4 Q20 9 27 4 L25.5 6.5 Q20 13 14.5 6.5 Z" />
+      <path className="sh-v" d="M13 4 Q20 8 27 4 L26 5.6 Q20 9.6 14 5.6 Z" />
+      {/* L'escapulat de l'esquena (la V blava de l'Europa), per sobre del número */}
+      <path className="sh-esc" d="M10 9.5 L20 17.5 L30 9.5 L30 13.8 L20 21.8 L10 13.8 Z" />
+      <path className="sh-esc-line" d="M10 15.6 L20 23.6 L30 15.6" />
       <path className="sh-sleeve" d="M2 12 L6 18 L8.2 17 L4.4 10.6 Z M38 12 L34 18 L31.8 17 L35.6 10.6 Z" />
-      <text x="20" y="30" textAnchor="middle">{n == null ? "" : n}</text>
+      <text x="20" y="34.6" textAnchor="middle">{n == null ? "" : n}</text>
     </svg>
   );
 }
