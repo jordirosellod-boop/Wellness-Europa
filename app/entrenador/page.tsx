@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { CoachShell, Footer, useIsOwner } from "@/components/ui";
 import { Reminders } from "@/components/reminders";
-import { CoachToday } from "@/components/coach-today";
+import { StaffHome } from "@/components/staff-home";
 import { viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, fmtSessionTime, friendlyError, SESSION_COLS, todayMadrid, type Kind, type Session } from "@/lib/wellness";
@@ -13,7 +13,7 @@ import { fmtDate, fmtSessionTime, friendlyError, SESSION_COLS, todayMadrid, type
 export default function CoachSessionsPage() {
   return (
     <>
-      <CoachShell>{() => <CoachCalendar />}</CoachShell>
+      <CoachShell>{(me) => <CoachCalendar name={me.display_name} />}</CoachShell>
       <Footer />
     </>
   );
@@ -32,7 +32,7 @@ function coachStatus(s: Session, today: string, c: Counts, players: number): Cal
   return "pendent";
 }
 
-function CoachCalendar() {
+function CoachCalendar({ name }: { name: string }) {
   const today = todayMadrid();
   const owner = useIsOwner();
   const [view, setView] = useState<CalView>("mes");
@@ -66,22 +66,9 @@ function CoachCalendar() {
 
   return (
     <>
-      <div className="row between">
-        <h1>Calendari</h1>
-        <span className="row" style={{ gap: 6 }}>
-          {owner && (
-            <>
-              <Link className="btn small" href="/entrenador/plantilla">📋 Plantilles</Link>
-              <Link className="btn small" href="/entrenador/analisi">🎬 Anàlisi</Link>
-              <Link className="btn small" href="/entrenador/bigdata">📊 Big Data</Link>
-            </>
-          )}
-          <Link className="btn small" href="/entrenador/planning">🗓️ Planning</Link>
-          <Link className="btn small secondary" href="/entrenador/programacio">⟳ Programacions</Link>
-        </span>
-      </div>
+      <StaffHome name={name} today={today} owner={!!owner} />
+      <h2 className="sh-cal-title">Calendari</h2>
       {error && <p className="msg error">{friendlyError(error)}</p>}
-      <CoachToday today={today} />
       {data && (
         <div className="card rating-summary">
           <div>
