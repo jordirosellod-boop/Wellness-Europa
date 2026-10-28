@@ -698,3 +698,15 @@ select pg_temp.expect_error($$insert into public.push_subscriptions (endpoint, p
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.duty_week(current_date)$$, 'Anònim continua sense veure els grups');
 reset role;
+
+-- =============== DORSALS (samarretes al costat del nom) ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.team_dorsals() where dorsal is not null) >= 2
+  and (select dorsal from public.team_dorsals() where player_id = '00000000-0000-0000-0000-0000000000e5') is not null, 'La jugadora veu el dorsal de les companyes (per a les samarretes)');
+select pg_temp.check((select count(*) from public.team_dorsals() where player_id = '00000000-0000-0000-0000-00000000000a') = 0, 'El staff no surt a la llista de dorsals');
+select pg_temp.check((select count(*) from public.player_numbers) = 0, 'Però continua sense poder llegir la taula de dorsals directament');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000cc', false); set role authenticated;
+select pg_temp.check((select count(*) from public.team_dorsals()) = 0, 'Un compte sense perfil no veu cap dorsal');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.team_dorsals()$$, 'Anònim no veu els dorsals');
+reset role;

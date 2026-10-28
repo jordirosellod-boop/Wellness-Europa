@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Shirt, useDorsals } from "@/components/shirt";
 import { supabase } from "@/lib/supabase";
 
 export type LeagueRow = {
@@ -151,6 +152,7 @@ export function LeagueTable({
     : current;
   const firstUnq = showPrev ? -1 : order.findIndex((r) => !qualified(r));
   const rank = ranks(current);
+  const dorsals = useDorsals();
 
   // Animació FLIP: es mesura on era cada fila i es fa lliscar fins a la seva posició nova.
   const els = useRef(new Map<string, HTMLElement>());
@@ -175,6 +177,8 @@ export function LeagueTable({
   if (rows.length === 0) return <p className="muted">Encara no hi ha jugadores.</p>;
 
   return (
+    <>
+    <Podium rows={current.filter(qualified).slice(0, 3)} rank={rank} dorsals={dorsals} meId={meId} />
     <ol className="league">
       {order.map((r, i) => {
         const pos = rank.get(r.profile_id) ?? null;
@@ -193,6 +197,7 @@ export function LeagueTable({
             data-label={i === firstUnq ? `Encara no classificades · mínim ${r.min_trainings} entrenaments` : undefined}
           >
             <span className="league-pos">{shownPos ?? "–"}</span>
+            <Shirt n={dorsals.get(r.profile_id)} size={28} tone={r.profile_id === meId ? "gold" : "home"} />
             <span className="league-name">
               {r.display_name}
               {r.profile_id === meId && <span className="chip fet" style={{ marginLeft: 6 }}>Tu</span>}
@@ -214,5 +219,32 @@ export function LeagueTable({
         );
       })}
     </ol>
+    </>
+  );
+}
+
+const MEDAL = ["🥇", "🥈", "🥉"];
+
+/** Les tres primeres al podi (2a · 1a · 3a). La líder porta la corona. */
+function Podium({ rows, rank, dorsals, meId }: { rows: LeagueRow[]; rank: Map<string, number>; dorsals: Map<string, number | null>; meId?: string }) {
+  if (rows.length === 0) return null;
+  const order = [rows[1], rows[0], rows[2]];
+  return (
+    <div className="podium" aria-label="Podi">
+      {order.map((r, k) => {
+        if (!r) return <div key={k} className="podium-slot empty" />;
+        const pos = rank.get(r.profile_id) ?? k;
+        const step = pos <= 1 ? 1 : pos === 2 ? 2 : 3;
+        return (
+          <div key={r.profile_id} className={`podium-slot p${step}${r.profile_id === meId ? " mine" : ""}`}>
+            {step === 1 && <span className="podium-crown" aria-hidden="true">👑</span>}
+            <Shirt n={dorsals.get(r.profile_id)} size={step === 1 ? 64 : 52} tone={step === 1 ? "gold" : "home"} />
+            <b className="podium-name">{r.display_name}</b>
+            <span className="podium-avg">{fmtAvg(average(r))}</span>
+            <div className="podium-step"><span>{MEDAL[step - 1]}</span><i>{pos}</i></div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

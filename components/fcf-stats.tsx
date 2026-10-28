@@ -1,6 +1,7 @@
 "use client";
 
 import { MatchLine } from "@/components/crest";
+import { Shirt } from "@/components/shirt";
 import { useCallback, useEffect, useState } from "react";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDateTime, friendlyError, type Profile } from "@/lib/wellness";
@@ -162,8 +163,7 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
                     return (
                       <tr key={p.fcf_id} className={mine ? "mine" : ""}>
                         <td>
-                          <span className="pname">{prettyFcfName(p.full_name)}</span>
-                          {p.dorsal && <span className="muted small"> · {p.dorsal}</span>}
+                          <span className="pname"><Shirt n={/^\d{1,2}$/.test(p.dorsal ?? "") ? Number(p.dorsal) : null} size={24} tone={mine ? "gold" : "home"} />{prettyFcfName(p.full_name)}</span>
                           {mode === "coach" && (
                             <select
                               className="link-select"

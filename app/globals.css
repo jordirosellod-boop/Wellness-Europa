@@ -2182,3 +2182,81 @@ html[data-vt="slide"]::view-transition-new(root) { animation: vt-in-right .28s c
 html[data-vt="back"]::view-transition-old(root) { animation: vt-out-right .22s ease both; }
 html[data-vt="back"]::view-transition-new(root) { animation: vt-in-left .28s cubic-bezier(.2, .8, .2, 1) both; }
 @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+
+/* =====================================================================
+   Samarretes amb dorsal, podi de la lliga i l'«avui» del staff
+   ===================================================================== */
+.shirt-ico { flex: none; display: inline-block; vertical-align: middle; filter: drop-shadow(0 2px 3px rgba(1,20,70,.25)); }
+.shirt-ico .sh-body { fill: #fff; stroke: var(--blau); stroke-width: 1.6; stroke-linejoin: round; }
+.shirt-ico .sh-v, .shirt-ico .sh-sleeve { fill: var(--blau); }
+.shirt-ico text { font-family: var(--font-kit), var(--display); font-size: 15px; fill: var(--blau); }
+.shirt-ico.gold .sh-body { fill: #f3dc9a; stroke: #a37a1c; }
+.shirt-ico.gold .sh-v, .shirt-ico.gold .sh-sleeve { fill: var(--navy); }
+.shirt-ico.gold text { fill: var(--navy); }
+.league-row { gap: 8px; }
+.league-row .shirt-ico { margin-right: -2px; }
+/* «promig» a sota del número: deixa més lloc al nom */
+.league-pts { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+.league-pts span { font-size: .7rem; }
+.stats-table .pname { display: inline-flex; align-items: center; gap: 6px; }
+.bibs-now { display: flex; align-items: center; gap: 10px; }
+.bibs-now > :not(.shirt-ico) { min-width: 0; }
+.bibs-next li .shirt-ico { margin: 0 2px; }
+
+/* --- Podi --- */
+@keyframes podium-up { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes podium-pop { 0% { opacity: 0; transform: translateY(14px) scale(.7); } 70% { opacity: 1; transform: translateY(-3px) scale(1.06); } 100% { transform: none; } }
+@keyframes crown-bob { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-4px) rotate(6deg); } }
+.podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; align-items: end; gap: 8px; margin: 4px 0 16px; padding: 8px 4px 0; }
+.podium-slot { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; text-align: center; position: relative; }
+.podium-slot > :not(.podium-step) { animation: podium-pop .55s var(--ease-back) both; }
+.podium-slot.p1 > :not(.podium-step) { animation-delay: .55s; }
+.podium-slot.p2 > :not(.podium-step) { animation-delay: .4s; }
+.podium-slot.p3 > :not(.podium-step) { animation-delay: .25s; }
+.podium-slot > .podium-crown { font-size: 1.6rem; line-height: 1; margin-bottom: -6px; animation: podium-pop .55s var(--ease-back) .7s both, crown-bob 2.4s ease-in-out 1.3s infinite; }
+.podium-name { font-family: var(--display); font-weight: 400; text-transform: uppercase; letter-spacing: .3px; font-size: 1rem; line-height: 1.05; color: var(--navy); overflow-wrap: anywhere; }
+.podium-avg { font-size: .85rem; font-weight: 700; color: var(--suau); }
+.podium-step {
+  width: 100%; border-radius: 12px 12px 4px 4px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; padding-top: 8px; margin-top: 4px;
+  transform-origin: bottom; animation: podium-up .6s var(--ease) both; color: #fff;
+}
+.podium-step span { font-size: 1.5rem; line-height: 1; }
+.podium-step i { font-style: normal; font-family: var(--font-kit), var(--display); font-size: 1.8rem; line-height: 1; opacity: .9; }
+.podium-slot.p1 .podium-step { height: 104px; background: linear-gradient(180deg, #f3dc9a, var(--or) 50%, #b8892a); color: var(--navy); animation-delay: .2s; box-shadow: 0 10px 22px rgba(219,179,77,.35); }
+.podium-slot.p2 .podium-step { height: 84px; background: linear-gradient(180deg, #eef2fb, #b9c3da); color: var(--navy); animation-delay: .1s; }
+.podium-slot.p3 .podium-step { height: 70px; background: linear-gradient(180deg, #f1c39b, #c07a45); animation-delay: 0s; }
+.podium-slot.mine .podium-name { color: var(--blau); text-decoration: underline; text-decoration-color: var(--or); text-underline-offset: 3px; }
+.podium-slot.empty { visibility: hidden; }
+
+/* --- L'«avui» del staff --- */
+.coach-today {
+  border-radius: 18px; padding: 14px; margin: 0 0 14px; color: #fff; position: relative; overflow: hidden;
+  background: repeating-linear-gradient(115deg, rgba(255,255,255,.04) 0 20px, transparent 20px 40px), linear-gradient(160deg, #061847, var(--navy) 50%, var(--blau));
+  box-shadow: 0 12px 28px rgba(1,20,70,.3); animation: card-in .45s var(--ease) both;
+}
+.ct-top { display: flex; align-items: center; gap: 14px; }
+.ct-ring { --p: 0; flex: none; width: 104px; height: 104px; position: relative; display: grid; place-content: center; text-align: center; }
+.ct-ring::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--or) calc(var(--p) * 1%), rgba(255,255,255,.18) 0);
+  -webkit-mask: radial-gradient(circle, transparent 60%, #000 61%); mask: radial-gradient(circle, transparent 60%, #000 61%);
+  transition: background .6s var(--ease);
+}
+.ct-ring b { position: relative; font-family: var(--font-kit), var(--display); font-weight: 400; font-size: 2.1rem; line-height: 1; }
+.ct-ring b small { font-size: 1rem; opacity: .7; }
+.ct-ring span { position: relative; font-size: .68rem; text-transform: uppercase; letter-spacing: 1px; opacity: .8; font-weight: 700; }
+.ct-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.ct-k { font-family: var(--display); text-transform: uppercase; letter-spacing: 1px; font-size: .8rem; color: var(--or); }
+.ct-title { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: 1.35rem; line-height: 1.05; letter-spacing: .3px; overflow-wrap: anywhere; }
+.ct-sub { font-size: .88rem; opacity: .9; }
+.ct-go { margin-top: 6px; background: var(--or); border-color: var(--or); color: var(--navy); }
+.ct-alerts { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.ct-alerts li { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 12px; background: rgba(255,255,255,.1); border-left: 4px solid #ffd166; animation: rise .4s var(--ease) both; }
+.ct-alerts li.pain, .ct-alerts li.band-baix { border-left-color: #ff6b6b; background: rgba(255,107,107,.16); }
+.ct-alerts li b { font-weight: 700; }
+.ct-alerts li span { margin-left: auto; font-size: .85rem; opacity: .95; text-align: right; }
+.ct-alerts li:nth-child(2) { animation-delay: .06s; } .ct-alerts li:nth-child(3) { animation-delay: .12s; } .ct-alerts li:nth-child(4) { animation-delay: .18s; }
+.ct-alerts .shirt-ico { filter: none; }
+/* Sobre fons fosc: text blanc (les classes de franja de wellness pinten el text de color) */
+.coach-today .ct-alerts li { color: #fff; background: rgba(255,255,255,.1); }
+.coach-today .ct-alerts li.pain, .coach-today .ct-alerts li.band-baix { background: rgba(255,107,107,.2); }

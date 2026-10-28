@@ -1195,6 +1195,20 @@ begin
   end loop;
 end $$;
 
+-- DORSALS: el número de cada jugadora (el de l'app o, si no n'hi ha, el de la FCF), per pintar
+-- la samarreta al costat del nom. Ho poden veure el staff i les jugadores (és el que porten a l'esquena).
+create or replace function public.team_dorsals()
+returns table (player_id uuid, dorsal smallint)
+language sql stable security definer set search_path = '' as $$
+  select p.id,
+         coalesce(n.dorsal, (select case when f.dorsal ~ '^[0-9]{1,2}$' then f.dorsal::smallint end
+                             from public.fcf_players f where f.profile_id = p.id limit 1))
+  from public.profiles p
+  left join public.player_numbers n on n.profile_id = p.id
+  where p.role = 'player' and ((select public.is_coach()) or (select public.is_player()))
+  order by p.id;
+$$;
+
 -- Llista de la convocatòria: totes les jugadores, amb el dorsal i si estan convocades.
 -- El staff la veu sempre; una jugadora, només si la convocatòria està publicada.
 create or replace function public.convo_roster(cid uuid)
@@ -1494,6 +1508,8 @@ revoke all on function public.duty_week(date) from public, anon;
 grant execute on function public.duty_week(date) to authenticated, service_role;
 revoke all on function public.bib_schedule(date, date) from public, anon;
 grant execute on function public.bib_schedule(date, date) to authenticated, service_role;
+revoke all on function public.team_dorsals() from public, anon;
+grant execute on function public.team_dorsals() to authenticated;
 revoke all on function public.convo_roster(uuid) from public, anon;
 grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;

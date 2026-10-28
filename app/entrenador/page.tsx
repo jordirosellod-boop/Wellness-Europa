@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
 import { CoachShell, Footer, useIsOwner } from "@/components/ui";
 import { Reminders } from "@/components/reminders";
+import { CoachToday } from "@/components/coach-today";
 import { viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, fmtSessionTime, friendlyError, SESSION_COLS, todayMadrid, type Kind, type Session } from "@/lib/wellness";
@@ -80,6 +81,7 @@ function CoachCalendar() {
         </span>
       </div>
       {error && <p className="msg error">{friendlyError(error)}</p>}
+      <CoachToday today={today} />
       {data && (
         <div className="card rating-summary">
           <div>
