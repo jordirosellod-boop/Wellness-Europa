@@ -6,6 +6,7 @@ import { fetchAttendance, fetchSessionsBetween, monthBounds, pctClass, summarize
 import { addMonths, fmtShort } from "@/lib/dates";
 import { fmtSessionTime, todayMadrid, type Session } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Empty } from "@/components/empty";
 
 /** Assistència de la jugadora (només la seva), mes a mes. */
 export function PlayerAttendance({ meId }: { meId: string }) {
@@ -64,7 +65,7 @@ export function PlayerAttendance({ meId }: { meId: string }) {
         <section className="card">
           <h2>Sessions</h2>
           {list.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>Encara no s&apos;ha passat llista aquest mes.</p>
+            <Empty compact art="list" title="Encara no s&apos;ha passat llista aquest mes" />
           ) : (
             <ul className="list">
               {list.map((s) => (

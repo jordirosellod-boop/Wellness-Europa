@@ -8,6 +8,7 @@ import { fetchPublished, fetchPublishedList, snapshotRoster, type PublishedData,
 import { safeName } from "@/lib/share-file";
 import { todayMadrid } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Empty } from "@/components/empty";
 
 /** El full es dibuixa a mida A4 i es redueix fins a l'amplada de la pantalla. */
 function FitSheet({ data }: { data: PublishedData }) {
@@ -87,7 +88,7 @@ export function PlayerTraining() {
       <h1>Entreno</h1>
       {error && <p className="msg error">{error}</p>}
       {!list && !error && <Loading />}
-      {list?.length === 0 && <p className="card">Encara no hi ha cap entreno penjat.</p>}
+      {list?.length === 0 && <Empty art="board" title="Encara no hi ha cap entreno penjat" hint="Quan el cos tècnic el pengi, el veuràs aquí amb les tasques i els equips." />}
       {list && list.length > 1 && (
         <div className="tabs convo-tabs" style={{ marginBottom: 10 }}>
           {list.map((x) => (

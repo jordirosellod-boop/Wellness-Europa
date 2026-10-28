@@ -7,6 +7,7 @@ import { DutiesCard } from "@/components/duties";
 import { dayTitle, fetchWeeklyPlan, itemTime, type PlanDay, type WeeklyPlan } from "@/lib/weekly";
 import { todayMadrid } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Empty } from "@/components/empty";
 
 /** Els 7 dies del planning (el d'avui destacat). */
 export function WeekDays({ weekStart, days, footer, bibs }: { weekStart: string; days: PlanDay[]; footer: string | null; bibs?: Map<string, string> }) {
@@ -73,7 +74,7 @@ export function PlayerPlanning({ meId }: { meId?: string }) {
         </div>
       )}
       {!loaded && !error && <Loading />}
-      {loaded && !plan && <p className="card">El cos tècnic encara no ha publicat el planning d&apos;aquesta setmana.</p>}
+      {loaded && !plan && <Empty art="calendar" title="El planning d&apos;aquesta setmana encara no està penjat" hint="Quan es publiqui, t&apos;arribarà un avís al mòbil (si els tens activats)." />}
       {loaded && <DutiesCard key={week} week={week} meId={meId} title={week === thisWeek ? "Material i porteria · aquesta setmana" : "Material i porteria · la setmana que ve"} />}
       {plan && <WeekDays weekStart={plan.week_start} days={plan.days} footer={plan.footer} bibs={bibs} />}
     </>

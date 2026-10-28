@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDateTime, friendlyError, type Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Empty } from "@/components/empty";
 
 type Match = {
   acta_id: string; jornada: number; kickoff: string | null; home: string; away: string;
@@ -127,7 +128,7 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
 
       {data.matches.length === 0 ? (
-        <p className="card">Encara no hi ha dades. {mode === "coach" ? "Toca «Actualitzar ara»." : "Torna-ho a mirar més tard."}</p>
+        <Empty art="chart" title="Encara no hi ha dades de la FCF" hint={mode === "coach" ? "Toca «Actualitzar ara»." : "Torna-ho a mirar més tard."} />
       ) : (
         <>
           <section className="card">

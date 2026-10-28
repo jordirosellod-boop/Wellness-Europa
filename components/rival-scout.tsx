@@ -8,6 +8,7 @@ import { FORMATION_NAMES } from "@/lib/convo";
 import type { GroupMatch, StandingRow } from "@/lib/fcf";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
+import { Empty } from "@/components/empty";
 
 type RivalData = {
   next: (GroupMatch & { is_home: boolean; rival_id: string; rival: string }) | null;
@@ -139,7 +140,7 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
 
   if (error) return <p className="msg error">{error}</p>;
   if (!data) return <p className="muted">Llegint les dades de la FCF…</p>;
-  if (!data.next) return <p className="card">No hi ha cap partit al calendari de la FCF.</p>;
+  if (!data.next) return <Empty art="ball" title="No hi ha cap partit al calendari de la FCF" />;
 
   const n = data.next;
   const row = data.table.find((r) => r.team_id === n.rival_id);

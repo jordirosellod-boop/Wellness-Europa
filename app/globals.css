@@ -2309,3 +2309,47 @@ a.tile { text-decoration: none; }
 .greet-edit input { flex: 1; min-width: 0; }
 .greet-edit .btn.secondary { background: transparent; color: #fff; border-color: rgba(255,255,255,.6); }
 .greet-err { color: #ffd2d2; }
+
+/* =====================================================================
+   Pantalles buides i detalls de temporada
+   ===================================================================== */
+@keyframes empty-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.empty {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
+  padding: 20px 16px 22px; margin: 0 0 14px; border-radius: var(--radi); background: var(--card, #f3f5fa);
+  animation: card-in .45s var(--ease) both;
+}
+.empty-art { width: 120px; height: 100px; }
+.empty-float { animation: empty-float 3.2s ease-in-out infinite; transform-box: fill-box; }
+.empty-title { margin: 4px 0 0; font-family: var(--display); font-weight: 400; text-transform: uppercase; letter-spacing: .4px; font-size: 1.15rem; color: var(--blau); line-height: 1.15; }
+.empty-hint { margin: 4px 0 0; color: var(--suau); font-size: .92rem; max-width: 320px; }
+.empty.compact { flex-direction: row; text-align: left; gap: 10px; padding: 6px 0; margin: 0; background: none; animation: none; }
+.empty.compact .empty-art { width: 64px; height: 54px; flex: none; }
+.empty.compact .empty-title { font-size: 1rem; margin: 0; }
+.empty.compact .empty-hint { margin: 2px 0 0; font-size: .88rem; }
+
+/* Temporada: neu, pètals o fulles que cauen dins la salutació */
+@keyframes fall { from { transform: translateY(-20px) rotate(0); } to { transform: translateY(150px) rotate(220deg); } }
+.season-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.season-fx i { position: absolute; top: -12px; width: 7px; height: 7px; border-radius: 50%; background: #fff; opacity: .85; animation: fall 6s linear infinite; }
+.season-fx.petals i { width: 9px; height: 7px; border-radius: 70% 0 70% 0; background: #e5484d; }
+.season-fx.leaves i { width: 9px; height: 6px; border-radius: 0 80% 0 80%; background: #d4862e; }
+.season-fx i:nth-child(1) { left: 4%; animation-delay: -0.4s; animation-duration: 6.5s; }
+.season-fx i:nth-child(2) { left: 11%; animation-delay: -2.6s; animation-duration: 5.2s; }
+.season-fx i:nth-child(3) { left: 19%; animation-delay: -4.1s; animation-duration: 7.1s; transform: scale(.7); }
+.season-fx i:nth-child(4) { left: 26%; animation-delay: -1.3s; animation-duration: 5.8s; }
+.season-fx i:nth-child(5) { left: 34%; animation-delay: -3.7s; animation-duration: 6.9s; }
+.season-fx i:nth-child(6) { left: 41%; animation-delay: -0.9s; animation-duration: 5.4s; }
+.season-fx i:nth-child(7) { left: 49%; animation-delay: -5.2s; animation-duration: 7.4s; }
+.season-fx i:nth-child(8) { left: 57%; animation-delay: -2.1s; animation-duration: 6.1s; }
+.season-fx i:nth-child(9) { left: 64%; animation-delay: -4.6s; animation-duration: 5.6s; }
+.season-fx i:nth-child(10) { left: 72%; animation-delay: -1.8s; animation-duration: 6.7s; }
+.season-fx i:nth-child(11) { left: 79%; animation-delay: -3.2s; animation-duration: 5.9s; }
+.season-fx i:nth-child(12) { left: 86%; animation-delay: -0.2s; animation-duration: 7.2s; }
+.season-fx i:nth-child(13) { left: 92%; animation-delay: -2.9s; animation-duration: 6.3s; }
+.season-fx i:nth-child(14) { left: 97%; animation-delay: -4.9s; animation-duration: 5.5s; }
+.season-label {
+  position: relative; display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px;
+  background: rgba(255,255,255,.18); font-weight: 700; font-size: .88rem; animation: pop-in .5s var(--ease-back) .3s both;
+}
+@media (prefers-reduced-motion: reduce) { .season-fx { display: none; } }

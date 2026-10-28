@@ -7,6 +7,7 @@ import { fetchConvocations, fetchRoster, type Convocation, type RosterRow } from
 import { addDays } from "@/lib/dates";
 import { todayMadrid } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Empty } from "@/components/empty";
 
 /** Convocatòries publicades: la propera (o l'última) i, a sota, les anteriors. */
 export function PlayerConvo({ meId }: { meId: string }) {
@@ -45,7 +46,7 @@ export function PlayerConvo({ meId }: { meId: string }) {
       <h1>Convocatòria</h1>
       {error && <p className="msg error">{error}</p>}
       {!list && !error && <Loading />}
-      {list?.length === 0 && <p className="card">Encara no hi ha cap convocatòria penjada.</p>}
+      {list?.length === 0 && <Empty art="list" title="Encara no hi ha cap convocatòria penjada" hint="Quan el cos tècnic la publiqui, sortirà aquí i també a l&apos;inici." />}
       {list && list.length > 1 && (
         <div className="tabs convo-tabs" style={{ marginBottom: 12 }}>
           {[...list].reverse().map((x) => (

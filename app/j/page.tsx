@@ -15,6 +15,7 @@ import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
+import { SeasonFx } from "@/components/season";
 import { firstName, rememberSplashName } from "@/lib/first-name";
 import { MonthStories, MonthWrapBanner } from "@/components/month-wrap";
 import { fetchStreak, streakText } from "@/lib/streak";
@@ -46,6 +47,7 @@ import {
   type Wellness,
 } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Empty } from "@/components/empty";
 
 type State =
   | { kind: "loading" }
@@ -270,7 +272,7 @@ function PlayerHome({ me }: { me: Profile }) {
           <p className="muted" style={{ marginTop: -6 }}>{fmtDate(today)}</p>
           {tabSessions.length === 0 && (
             <div className="card">
-              <p style={{ margin: 0 }}>Avui no hi ha cap sessió programada.</p>
+              <Empty compact art="rest" title="Avui no hi ha cap sessió programada" />
             </div>
           )}
           {tabSessions.length > 1 && (
@@ -477,6 +479,7 @@ function Greeting({ name, today, level }: { name: string; today: string; level: 
         <span>{fmtDate(today)}</span>
         {level ? <LevelBadge level={level} /> : null}
       </p>
+      <SeasonFx today={today} />
     </header>
   );
 }
@@ -581,7 +584,7 @@ function Dashboard({
 
       <section className="card today-card">
         <h2>Avui</h2>
-        {sessions.length === 0 && <p style={{ margin: 0 }}>Avui no hi ha cap sessió. Bon descans!</p>}
+        {sessions.length === 0 && <Empty compact art="rest" title="Avui no hi ha cap sessió" hint="Bon descans! 😴" />}
         {sessions.map((s) => {
           const m = data?.mine.get(s.id);
           const wLate = wellnessLate(s);

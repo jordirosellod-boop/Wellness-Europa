@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoachToday } from "@/components/coach-today";
 import { DutiesCard } from "@/components/duties";
+import { SeasonFx } from "@/components/season";
 import { Shirt, useDorsals } from "@/components/shirt";
 import { fetchBibs } from "@/lib/bibs";
 import { firstName, rememberSplashName } from "@/lib/first-name";
@@ -129,6 +130,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
           </h1>
         )}
         <p className="row" style={{ gap: 8, margin: 0 }}><span>{fmtDate(today)}</span></p>
+        <SeasonFx today={today} />
       </header>
 
       <CoachToday today={today} />

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { fetchAEvents, type AEvent, type AMatch } from "@/lib/analysis";
 import { fetchAll, supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
+import { Empty } from "@/components/empty";
 
 type Data = { matches: AMatch[]; events: Map<string, AEvent[]>; players: Map<string, string> };
 
@@ -26,7 +27,7 @@ export function AnalysisSeason({ matches }: { matches: AMatch[] }) {
 
   if (error) return <p className="msg error">{error}</p>;
   if (!data) return <p className="muted">Carregant la temporada…</p>;
-  if (data.matches.length === 0) return <p className="card">Encara no hi ha cap partit analitzat.</p>;
+  if (data.matches.length === 0) return <Empty art="video" title="Encara no hi ha cap partit analitzat" hint="Puja el vídeo d&apos;un partit i marca-hi les accions." />;
 
   const all = [...data.events.values()].flat();
   const actions = [...new Set(all.map((e) => e.action))];

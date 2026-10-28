@@ -6,6 +6,7 @@ import { centsToInput, FINE_COLS, fmtEuros, parseEuros, type Fine, type FineRule
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, friendlyError, todayMadrid, type Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Empty } from "@/components/empty";
 
 export default function FinesPage() {
   return (
@@ -77,7 +78,7 @@ function Fines() {
 
       <section className="card">
         <h2>Per persona</h2>
-        {withFines.length === 0 && <p className="muted" style={{ margin: 0 }}>Encara no hi ha cap multa.</p>}
+        {withFines.length === 0 && <Empty compact art="party" title="Encara no hi ha cap multa" hint="Tot l&apos;equip al dia 🎉" />}
         <ul className="list">
           {withFines.map((p) => (
             <PersonFines key={p.id} person={p} fines={byPerson.get(p.id)!} onChange={load} />

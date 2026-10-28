@@ -10,6 +10,7 @@ import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Empty } from "@/components/empty";
 
 export default function ConvoPage() {
   return (
@@ -77,7 +78,7 @@ function Convos() {
       )}
       {!list && !error && <Loading />}
       {shown?.length === 0 && !creating && (
-        <p className="card">{section === "amistosos" ? "Encara no hi ha cap amistós. Toca «+ Nova» per afegir-ne un." : "Encara no hi ha cap convocatòria. Toca «+ Nova»."}</p>
+        <Empty art="list" title={section === "amistosos" ? "Encara no hi ha cap amistós" : "Encara no hi ha cap convocatòria"} hint={section === "amistosos" ? "Toca «+ Nova» per afegir-ne un." : "Toca «+ Nova» per fer la primera."} />
       )}
       {shown && shown.length > 0 && (
         <div className="tabs convo-tabs" style={{ margin: "12px 0" }}>
