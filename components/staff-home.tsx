@@ -6,6 +6,7 @@ import { CoachToday } from "@/components/coach-today";
 import { DutiesCard } from "@/components/duties";
 import { Shirt, useDorsals } from "@/components/shirt";
 import { fetchBibs } from "@/lib/bibs";
+import { firstName, rememberSplashName } from "@/lib/first-name";
 import { fetchConvocations, hhmm, type Convocation } from "@/lib/convo";
 import { fmtShort, startOfWeek } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -67,6 +68,7 @@ export function StaffHome({ name, today, owner }: { name: string; today: string;
   const [info, setInfo] = useState<Info | null>(null);
   const [part, hello] = GREET(nowMadridHHMM());
   const dorsals = useDorsals();
+  useEffect(() => rememberSplashName(name), [name]);
   useEffect(() => {
     let alive = true;
     loadInfo(today).then((x) => alive && setInfo(x), () => {});
@@ -85,7 +87,7 @@ export function StaffHome({ name, today, owner }: { name: string; today: string;
     <div className="staff-home">
       <header className={`greet ${part}`}>
         <span className="greet-sky" aria-hidden="true" />
-        <h1>{hello}, {name}!</h1>
+        <h1>{hello}, {firstName(name)}!</h1>
         <p className="row" style={{ gap: 8, margin: 0 }}><span>{fmtDate(today)}</span></p>
       </header>
 

@@ -15,6 +15,7 @@ import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
+import { firstName, rememberSplashName } from "@/lib/first-name";
 import { MonthStories, MonthWrapBanner } from "@/components/month-wrap";
 import { fetchStreak, streakText } from "@/lib/streak";
 import { fetchWeeklyPlan, itemTime, type WeeklyPlan } from "@/lib/weekly";
@@ -185,6 +186,8 @@ function PlayerHome({ me }: { me: Profile }) {
   const [version, setVersion] = useState(0);
   const [section, setSection] = useState<Section>("inici");
   const [grow, setGrow] = useState(false);
+
+  useEffect(() => rememberSplashName(me.display_name), [me.display_name]);
 
   useEffect(() => {
     const sync = () => setSection(sectionFromUrl());
@@ -526,7 +529,7 @@ function Dashboard({
 
   return (
     <>
-      <Greeting name={me.display_name} today={today} level={data?.level ?? null} />
+      <Greeting name={firstName(me.display_name)} today={today} level={data?.level ?? null} />
       {error && <p className="msg error">{error}</p>}
 
       <MonthWrapBanner meId={me.id} name={me.display_name} today={today} />

@@ -2300,3 +2300,5 @@ a.tile { text-decoration: none; }
 .sh-bibs h2 { margin: 0 0 6px; }
 .sh-bibs p { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 1.05rem; }
 .sh-cal-title { margin: 22px 0 10px; font-size: 1.6rem; }
+/* Entrada amb el nom: una mica més petit perquè hi càpiga */
+.splash b.named { font-size: 1.7rem; text-align: center; padding: 0 20px; }

@@ -29,9 +29,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="splash" aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/escut.png" alt="" width={112} height={112} />
-          <b>Juvenil C</b>
+          <b id="splash-hello" suppressHydrationWarning>Juvenil C</b>
           <span>CE Europa</span>
         </div>
+        {/* Si ja havia entrat abans, la saluda pel nom (es llegeix del mateix mòbil abans de pintar). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var n=localStorage.getItem('splash-name'),h=document.getElementById('splash-hello');if(n&&h){var t=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',hour:'2-digit',hourCycle:'h23'}).format(new Date());h.textContent=(t>='06'&&t<'13'?'Bon dia':t>='13'&&t<'20'?'Bona tarda':'Bona nit')+', '+n+'!';h.className='named'}}catch(e){}",
+          }}
+        />
         {children}
       </body>
     </html>
