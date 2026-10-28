@@ -196,7 +196,7 @@ function Planning() {
       <div className="wk-nav">
         <button type="button" className="btn small secondary" onClick={() => goWeek(-1)} aria-label="Setmana anterior">‹</button>
         <div>
-          <b>{weekRange(week)}</b>
+          <b key={week} className="wk-range">{weekRange(week)}</b>
           {week === thisWeek && <span className="muted small"> · aquesta setmana</span>}
           {week === addDays(thisWeek, 7) && <span className="muted small"> · la setmana que ve</span>}
         </div>
