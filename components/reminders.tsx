@@ -116,7 +116,7 @@ export function Reminders({ staff = false }: { staff?: boolean } = {}) {
   return (
     <section className="card">
       <div className="row between">
-        <h3 style={{ margin: 0 }}>{t.title}</h3>
+        <h2 style={{ margin: 0 }}>{t.title}</h2>
         {status === "on" && <span className="chip fet">Activat</span>}
       </div>
       {status === "off" && (

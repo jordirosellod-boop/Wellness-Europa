@@ -37,7 +37,7 @@ export function PlayerFines({ playerId, rulesOpen = false }: { playerId: string;
 
   return (
     <>
-      <h2 style={{ marginTop: 20 }}>Multes</h2>
+      <h1>Multes</h1>
       <section className="card">
         <div className="stats">
           <div className="stat">

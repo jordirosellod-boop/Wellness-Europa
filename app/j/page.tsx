@@ -806,7 +806,7 @@ function PlayerCalendar({ me, today, version, onOpenSession }: { me: Profile; to
 
   return (
     <>
-      <h2 style={{ marginTop: 20 }}>El meu calendari</h2>
+      <h1>El meu calendari</h1>
       {error && <p className="msg error">{error}</p>}
       <Calendar
         view={view}

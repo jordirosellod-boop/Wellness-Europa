@@ -2260,3 +2260,12 @@ html[data-vt="back"]::view-transition-new(root) { animation: vt-in-left .28s cub
 /* Sobre fons fosc: text blanc (les classes de franja de wellness pinten el text de color) */
 .coach-today .ct-alerts li { color: #fff; background: rgba(255,255,255,.1); }
 .coach-today .ct-alerts li.pain, .coach-today .ct-alerts li.band-baix { background: rgba(255,107,107,.2); }
+
+/* =====================================================================
+   Repassada de coherència
+   ===================================================================== */
+/* El peu sempre a baix de tot, encara que la pàgina sigui curta */
+body { min-height: 100dvh; display: flex; flex-direction: column; }
+body > main { flex: 1 0 auto; width: 100%; }
+/* La targeta d'avui del staff, separada dels botons de dalt */
+.coach-today { margin-top: 12px; }
