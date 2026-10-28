@@ -1,7 +1,7 @@
 "use client";
 
 import { MatchLine } from "@/components/crest";
-import { Shirt } from "@/components/shirt";
+import { Shirt, useDorsals } from "@/components/shirt";
 import { useCallback, useEffect, useState } from "react";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDateTime, friendlyError, type Profile } from "@/lib/wellness";
@@ -53,6 +53,7 @@ const RES_CLS = { G: "band-bo", E: "band-moderat", P: "band-baix" } as const;
 
 export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: string }) {
   const [data, setData] = useState<Data | null>(null);
+  const dorsals = useDorsals();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -163,7 +164,7 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
                     return (
                       <tr key={p.fcf_id} className={mine ? "mine" : ""}>
                         <td>
-                          <span className="pname"><Shirt n={/^\d{1,2}$/.test(p.dorsal ?? "") ? Number(p.dorsal) : null} size={24} tone={mine ? "gold" : "home"} />{prettyFcfName(p.full_name)}</span>
+                          <span className="pname"><Shirt n={/^\d{1,2}$/.test(p.dorsal ?? "") ? Number(p.dorsal) : null} gk={p.profile_id ? dorsals.get(p.profile_id)?.gk : false} size={24} tone={mine ? "gold" : "home"} />{prettyFcfName(p.full_name)}</span>
                           {mode === "coach" && (
                             <select
                               className="link-select"

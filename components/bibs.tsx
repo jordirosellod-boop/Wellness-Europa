@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { addDays, fmtShort } from "@/lib/dates";
-import { Shirt } from "@/components/shirt";
+import { Shirt, useDorsals } from "@/components/shirt";
 import { bibName, fetchBibPlayers, fetchBibs, fetchBibSettings, type BibDay, type BibSettings } from "@/lib/bibs";
 import { supabase } from "@/lib/supabase";
 
 /** Targeta de la jugadora: qui porta els petos avui (o el proper dia) i els següents. */
 export function BibsCard({ meId, today }: { meId: string; today: string }) {
   const [list, setList] = useState<BibDay[] | null>(null);
+  const dorsals = useDorsals();
   useEffect(() => {
     fetchBibs(today, addDays(today, 21)).then(setList, () => setList([]));
   }, [today]);
@@ -21,13 +22,13 @@ export function BibsCard({ meId, today }: { meId: string; today: string }) {
     <section className={`card bibs-card${mine ? " mine" : ""}`}>
       <h2>🦺 Petos</h2>
       <p className="bibs-now">
-        <Shirt n={first.dorsal} size={40} tone={mine ? "gold" : "home"} />
+        <Shirt n={first.dorsal} gk={dorsals.get(first.player_id)?.gk} size={40} tone={mine ? "gold" : "home"} />
         <span>{mine ? <b>{when} et toca a tu portar els petos!</b> : <><span>{when} els porta</span> <b>{bibName(first)}</b></>}</span>
       </p>
       {rest.length > 0 && (
         <ul className="bibs-next">
           {rest.slice(0, 3).map((b) => (
-            <li key={b.day} className={b.player_id === meId ? "me" : ""}><span>{fmtShort(b.day)}</span> <Shirt n={b.dorsal} size={22} /> {bibName(b)}{b.player_id === meId && " · tu"}</li>
+            <li key={b.day} className={b.player_id === meId ? "me" : ""}><span>{fmtShort(b.day)}</span> <Shirt n={b.dorsal} gk={dorsals.get(b.player_id)?.gk} size={22} /> {bibName(b)}{b.player_id === meId && " · tu"}</li>
           ))}
         </ul>
       )}

@@ -74,7 +74,7 @@ export function CoachToday({ today }: { today: string }) {
               <ul className="ct-alerts">
                 {alerts.map((a) => (
                   <li key={a.id} className={a.pain ? "pain" : bandOf(a.score).cls}>
-                    <Shirt n={dorsals.get(a.id)} size={26} />
+                    <Shirt n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={26} />
                     <b>{a.name}</b>
                     <span>
                       {a.pain && "🩹 Dolor"}

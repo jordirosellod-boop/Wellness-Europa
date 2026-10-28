@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Shirt, useDorsals } from "@/components/shirt";
+import { Shirt, useDorsals, type ShirtInfo } from "@/components/shirt";
 import { supabase } from "@/lib/supabase";
 
 export type LeagueRow = {
@@ -197,7 +197,7 @@ export function LeagueTable({
             data-label={i === firstUnq ? `Encara no classificades · mínim ${r.min_trainings} entrenaments` : undefined}
           >
             <span className="league-pos">{shownPos ?? "–"}</span>
-            <Shirt n={dorsals.get(r.profile_id)} size={28} tone={r.profile_id === meId ? "gold" : "home"} />
+            <Shirt n={dorsals.get(r.profile_id)?.n} gk={dorsals.get(r.profile_id)?.gk} size={28} tone={r.profile_id === meId ? "gold" : "home"} />
             <span className="league-name">
               {r.display_name}
               {r.profile_id === meId && <span className="chip fet" style={{ marginLeft: 6 }}>Tu</span>}
@@ -226,7 +226,7 @@ export function LeagueTable({
 const MEDAL = ["🥇", "🥈", "🥉"];
 
 /** Les tres primeres al podi (2a · 1a · 3a). La líder porta la corona. */
-function Podium({ rows, rank, dorsals, meId }: { rows: LeagueRow[]; rank: Map<string, number>; dorsals: Map<string, number | null>; meId?: string }) {
+function Podium({ rows, rank, dorsals, meId }: { rows: LeagueRow[]; rank: Map<string, number>; dorsals: Map<string, ShirtInfo>; meId?: string }) {
   if (rows.length === 0) return null;
   const order = [rows[1], rows[0], rows[2]];
   return (
@@ -238,7 +238,7 @@ function Podium({ rows, rank, dorsals, meId }: { rows: LeagueRow[]; rank: Map<st
         return (
           <div key={r.profile_id} className={`podium-slot p${step}${r.profile_id === meId ? " mine" : ""}`}>
             {step === 1 && <span className="podium-crown" aria-hidden="true">👑</span>}
-            <Shirt n={dorsals.get(r.profile_id)} size={step === 1 ? 64 : 52} tone={step === 1 ? "gold" : "home"} />
+            <Shirt n={dorsals.get(r.profile_id)?.n} gk={dorsals.get(r.profile_id)?.gk} size={step === 1 ? 64 : 52} tone={step === 1 ? "gold" : "home"} />
             <b className="podium-name">{r.display_name}</b>
             <span className="podium-avg">{fmtAvg(average(r))}</span>
             <div className="podium-step"><span>{MEDAL[step - 1]}</span><i>{pos}</i></div>

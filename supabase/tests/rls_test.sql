@@ -705,6 +705,13 @@ select pg_temp.check((select count(*) from public.team_dorsals() where dorsal is
   and (select dorsal from public.team_dorsals() where player_id = '00000000-0000-0000-0000-0000000000e5') is not null, 'La jugadora veu el dorsal de les companyes (per a les samarretes)');
 select pg_temp.check((select count(*) from public.team_dorsals() where player_id = '00000000-0000-0000-0000-00000000000a') = 0, 'El staff no surt a la llista de dorsals');
 select pg_temp.check((select count(*) from public.player_numbers) = 0, 'Però continua sense poder llegir la taula de dorsals directament');
+reset role;
+insert into public.player_positions (profile_id, position) values ('00000000-0000-0000-0000-0000000000e5', 'PO')
+  on conflict (profile_id) do update set position = 'PO';
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select goalkeeper from public.team_dorsals() where player_id = '00000000-0000-0000-0000-0000000000e5')
+  and not (select goalkeeper from public.team_dorsals() where player_id = '00000000-0000-0000-0000-0000000000b2'), 'Les porteres surten marcades (per a la samarreta de portera)');
+select pg_temp.check((select count(*) from public.player_positions) = 0, 'Però la jugadora no veu la taula de posicions');
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000cc', false); set role authenticated;
 select pg_temp.check((select count(*) from public.team_dorsals()) = 0, 'Un compte sense perfil no veu cap dorsal');
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
