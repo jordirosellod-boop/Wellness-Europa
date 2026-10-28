@@ -11,6 +11,7 @@ import { nowMadridHHMM, todayMadrid } from "@/lib/wellness";
 //  · la vigília a les 19 h: a qui li toquen els petos l'endemà
 //  · dilluns a les 9 h: als grups de material i de porteria de la setmana
 //  · el dia de partit, 2 h abans de la quedada: a les convocades
+//  · cada dia a les 22 h: a qui encara no ha fet l'RPE d'avui (menys les absents o que han avisat)
 //  · diumenge a les 20 h: resum de la setmana al staff
 export async function POST(req: Request) {
   const db = adminClient();
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
   if (hour >= 19 && hour < 22) await step("petos", () => bibsTomorrow(db, addDays(today, 1)));
   if (dow === 1 && hour >= 9 && hour < 13) await step("grups", () => dutyGroups(db, today));
   await step("quedada", () => meetReminder(db, today));
+  if (hour === 22) await step("rpe", () => rpeReminder(db, today));
   if (dow === 7 && hour >= 20 && hour < 23) await step("resum", () => weeklySummary(db, today));
 
   return Response.json({ done, errors }, { status: errors.length ? 500 : 200 });
@@ -95,6 +97,27 @@ async function meetReminder(db: SupabaseClient, today: string): Promise<number |
     sent = (sent ?? 0) + await pushTo(db, called.map((r) => r.player_id), { title: "⚽ Avui hi ha partit", body, url: "/j" });
   }
   return sent;
+}
+
+/** A les 22 h: recordatori de l'RPE a qui encara no l'ha fet (tenen fins a les 00:00). */
+async function rpeReminder(db: SupabaseClient, today: string): Promise<number | null> {
+  const sessions = await fetchAll<{ id: string }>((f, t) =>
+    db.from("sessions").select("id").eq("session_date", today).eq("cancelled", false).order("id").range(f, t));
+  if (!sessions.length || !(await claimPush(db, `rpe:${today}`))) return null;
+  const ids = sessions.map((s) => s.id);
+  const [players, rpe, att, notices] = await Promise.all([
+    fetchAll<{ id: string }>((f, t) => db.from("profiles").select("id").eq("role", "player").order("id").range(f, t)),
+    fetchAll<{ session_id: string; player_id: string }>((f, t) => db.from("rpe").select("session_id, player_id").in("session_id", ids).order("id").range(f, t)),
+    fetchAll<{ session_id: string; player_id: string }>((f, t) =>
+      db.from("attendance").select("session_id, player_id").in("session_id", ids).eq("present", false).order("session_id").order("player_id").range(f, t)),
+    fetchAll<{ session_id: string; player_id: string }>((f, t) =>
+      db.from("absence_notices").select("session_id, player_id").in("session_id", ids).order("session_id").order("player_id").range(f, t)),
+  ]);
+  const key = (x: { session_id: string; player_id: string }) => `${x.session_id}:${x.player_id}`;
+  const done = new Set(rpe.map(key));
+  const skip = new Set([...att, ...notices].map(key));
+  const missing = players.filter((p) => ids.some((sid) => !done.has(`${sid}:${p.id}`) && !skip.has(`${sid}:${p.id}`))).map((p) => p.id);
+  return pushTo(db, missing, { title: "⏰ Et falta l'RPE d'avui", body: "Tens fins a les 00:00 per omplir-lo. Només et costarà un minut!", url: "/j?s=avui" });
 }
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : null);

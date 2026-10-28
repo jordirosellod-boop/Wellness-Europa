@@ -2353,3 +2353,18 @@ a.tile { text-decoration: none; }
   background: rgba(255,255,255,.18); font-weight: 700; font-size: .88rem; animation: pop-in .5s var(--ease-back) .3s both;
 }
 @media (prefers-reduced-motion: reduce) { .season-fx { display: none; } }
+
+/* =====================================================================
+   Avisos de baixa i llista proposada
+   ===================================================================== */
+.absence-open { margin-top: 8px; }
+.absence { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--vora); animation: dd-in .3s var(--ease) both; }
+.absence.done { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; background: #fff6e0; border-color: var(--or); }
+.absence-reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.absence-reasons button { border: 1px solid var(--vora); background: #fff; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: .88rem; cursor: pointer; color: var(--navy); }
+.absence-reasons button[aria-pressed="true"] { background: var(--blau); border-color: var(--blau); color: #fff; }
+.ct-away li { border-left-color: #8fa6e8; }
+.roll-proposal { display: grid; gap: 8px; margin: 6px 0 10px; padding: 10px 12px; border-radius: 12px; background: #eef4ff; border: 1px solid #c9d7f7; }
+.roll-hint { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; vertical-align: middle; }
+.roll-hint.ok { background: #e6f6ec; color: #146c3a; }
+.roll-hint.away { background: #fff1d6; color: #8a5a00; }

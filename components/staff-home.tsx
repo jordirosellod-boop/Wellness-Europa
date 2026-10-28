@@ -7,9 +7,11 @@ import { DutiesCard } from "@/components/duties";
 import { SeasonFx } from "@/components/season";
 import { Shirt, useDorsals } from "@/components/shirt";
 import { fetchBibs } from "@/lib/bibs";
+import { fetchNotices } from "@/lib/absence";
+import { reasonLabel } from "@/lib/attendance";
 import { firstName, rememberSplashName } from "@/lib/first-name";
 import { fetchConvocations, hhmm, type Convocation } from "@/lib/convo";
-import { fmtShort, startOfWeek } from "@/lib/dates";
+import { addDays, fmtShort, startOfWeek } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fetchWeeklyPlan } from "@/lib/weekly";
 import { fmtDate, fmtSessionTime, nowMadridHHMM, SESSION_COLS, type Session } from "@/lib/wellness";
@@ -20,11 +22,12 @@ type Info = {
   convo: Convocation | null;
   planPublished: boolean | null;
   bibs: { player_id: string; display_name: string; dorsal: number | null } | null;
+  away: { id: string; name: string; day: string; reason: string | null }[];
 };
 
 async function loadInfo(today: string): Promise<Info> {
   const sb = supabase();
-  const [next, inj, players, convos, plan, bibs] = await Promise.all([
+  const [next, inj, players, convos, plan, bibs, week] = await Promise.all([
     sb.from("sessions").select(SESSION_COLS).gt("session_date", today).eq("cancelled", false)
       .order("session_date").order("start_time", { nullsFirst: true }).order("id").range(0, 0),
     fetchAll<{ player_id: string; start_date: string }>((f, t) =>
@@ -33,7 +36,13 @@ async function loadInfo(today: string): Promise<Info> {
     fetchConvocations(today).catch(() => []),
     fetchWeeklyPlan(startOfWeek(today)).catch(() => null),
     fetchBibs(today, today).catch(() => []),
+    // Entrenos dels propers 7 dies (per als avisos de baixa)
+    fetchAll<{ id: string; session_date: string }>((f, t) =>
+      sb.from("sessions").select("id, session_date").gt("session_date", today).lte("session_date", addDays(today, 7))
+        .eq("cancelled", false).eq("kind", "Entrenament").order("session_date").order("id").range(f, t)),
   ]);
+  const notices = await fetchNotices(week.map((w) => w.id)).catch(() => []);
+  const dayOf = new Map(week.map((w) => [w.id, w.session_date]));
   const name = new Map(players.map((p) => [p.id, p.display_name]));
   const seen = new Set<string>();
   return {
@@ -42,6 +51,8 @@ async function loadInfo(today: string): Promise<Info> {
     convo: convos[0] ?? null,
     planPublished: plan ? plan.published : null,
     bibs: bibs[0] ?? null,
+    away: notices.filter((n) => dayOf.has(n.session_id)).map((n) => ({ id: n.player_id, name: name.get(n.player_id) ?? "?", day: dayOf.get(n.session_id) ?? "", reason: reasonLabel(n.reason) }))
+      .sort((a, b) => a.day.localeCompare(b.day) || a.name.localeCompare(b.name, "ca")),
   };
 }
 
@@ -136,7 +147,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
       <CoachToday today={today} />
       {info?.next && <NextUp s={info.next} today={today} />}
 
-      {info && (alerts.length > 0 || info.injured.length > 0) && (
+      {info && (alerts.length > 0 || info.injured.length > 0 || info.away.length > 0) && (
         <section className="card sh-alerts">
           <h2>Avisos</h2>
           <ul>
@@ -145,6 +156,16 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
                 {a.href ? <Link href={a.href}>{a.body} ›</Link> : a.body}
               </li>
             ))}
+            {info.away.length > 0 && (
+              <li className="gold">
+                <Link href="/entrenador/assistencia"><b>{info.away.length} {info.away.length === 1 ? "baixa avisada" : "baixes avisades"}</b> els propers dies ›</Link>
+                <span className="sh-injured">
+                  {info.away.map((a) => (
+                    <span key={`${a.id}${a.day}`}><Shirt n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={22} />{a.name}<small> · {fmtShort(a.day)} · {a.reason}</small></span>
+                  ))}
+                </span>
+              </li>
+            )}
             {info.injured.length > 0 && (
               <li className="red">
                 <Link href="/entrenador/equip">

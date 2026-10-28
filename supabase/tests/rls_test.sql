@@ -733,3 +733,35 @@ select pg_temp.expect_error($$insert into public.staff_greetings (greeting) valu
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.staff_greetings$$, 'Anònim no hi té accés');
 reset role;
+
+-- =============== AVÍS DE BAIXA ===============
+reset role;
+insert into public.sessions (id, session_date, kind, name) values
+  ('22222222-0000-0000-0000-000000000001', (select today from vars) + 200, 'Entrenament', 'AV1'),
+  ('22222222-0000-0000-0000-000000000002', (select today from vars) + 200, 'Partit', 'AV2'),
+  ('22222222-0000-0000-0000-000000000003', (select today from vars) - 1, 'Entrenament', 'AV3');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+insert into public.absence_notices (session_id, reason, created_at) values ('22222222-0000-0000-0000-000000000001', 'estudis', '2000-01-01');
+select pg_temp.check((select reason = 'estudis' and created_at > now() - interval '1 minute' from public.absence_notices), 'La jugadora avisa que no vindrà a un entreno (l''hora la posa el servidor)');
+update public.absence_notices set reason = 'familia' where session_id = '22222222-0000-0000-0000-000000000001';
+select pg_temp.check((select reason from public.absence_notices where session_id = '22222222-0000-0000-0000-000000000001') = 'familia', 'Pot canviar el motiu');
+select pg_temp.expect_error($$insert into public.absence_notices (session_id, reason) values ('22222222-0000-0000-0000-000000000002', 'estudis')$$, 'Als partits no es pot avisar');
+select pg_temp.expect_error($$insert into public.absence_notices (session_id, reason) values ('22222222-0000-0000-0000-000000000003', 'estudis')$$, 'D''un entreno passat tampoc');
+select pg_temp.expect_error($$insert into public.absence_notices (session_id, player_id, reason) values ('22222222-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000e5', 'estudis')$$, 'No pot avisar per una altra');
+select pg_temp.expect_error($$insert into public.absence_notices (session_id, reason) values ('22222222-0000-0000-0000-000000000001', 'xxx')$$, 'Només els motius de la llista');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5', false); set role authenticated;
+select pg_temp.check((select count(*) from public.absence_notices) = 0, 'Les companyes no veuen els avisos (ni el motiu)');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.check((select count(*) from public.absence_notices where reason = 'familia') = 1, 'El staff veu qui ha avisat i per què');
+select pg_temp.expect_error($$insert into public.absence_notices (session_id, reason) values ('22222222-0000-0000-0000-000000000001', 'estudis')$$, 'El staff no avisa en nom d''una jugadora');
+-- Els petos se la salten el dia que ha avisat
+reset role;
+update public.bib_settings set start_date = (select today from vars) + 200, start_player = '00000000-0000-0000-0000-0000000000b2';
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.check((select player_id from public.bib_schedule((select today from vars) + 200, (select today from vars) + 200)) <> '00000000-0000-0000-0000-0000000000b2', 'Si ha avisat que no vindrà, els petos passen a la següent');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+delete from public.absence_notices where session_id = '22222222-0000-0000-0000-000000000001';
+select pg_temp.check((select count(*) from public.absence_notices) = 0, 'Pot desfer l''avís');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.absence_notices$$, 'Anònim no veu els avisos');
+reset role;

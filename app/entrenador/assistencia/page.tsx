@@ -7,6 +7,7 @@ import {
   type AbsenceReason, type Attendance,
 } from "@/lib/attendance";
 import { addDays } from "@/lib/dates";
+import { fetchNotices, type Notice } from "@/lib/absence";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, fmtSessionTime, todayMadrid, type Profile, type Session } from "@/lib/wellness";
 import { monthName } from "@/components/league";
@@ -21,7 +22,7 @@ export default function AttendancePage() {
   );
 }
 
-type Data = { players: Profile[]; sessions: Session[]; att: Attendance[] };
+type Data = { players: Profile[]; sessions: Session[]; att: Attendance[]; notices: Notice[]; well: { session_id: string; player_id: string }[] };
 
 async function fetchData(day: string): Promise<Data> {
   const sb = supabase();
@@ -30,8 +31,16 @@ async function fetchData(day: string): Promise<Data> {
     fetchAll<Profile>((f, t) => sb.from("profiles").select("id, role, display_name").eq("role", "player").order("display_name").order("id").range(f, t)),
     fetchSessionsBetween(from, to),
   ]);
-  const att = await fetchAttendance(sessions.map((s) => s.id));
-  return { players, sessions, att };
+  const ids = sessions.map((s) => s.id);
+  const chunks = Array.from({ length: Math.ceil(ids.length / 100) }, (_, i) => ids.slice(i * 100, i * 100 + 100));
+  const [att, notices, well] = await Promise.all([
+    fetchAttendance(ids),
+    fetchNotices(ids).catch(() => []),
+    // Qui ha fet el wellness (per proposar-la com a present)
+    Promise.all(chunks.map((c) => fetchAll<{ session_id: string; player_id: string }>((f, t) =>
+      sb.from("wellness").select("session_id, player_id").in("session_id", c).order("session_id").order("player_id").range(f, t)))).then((x) => x.flat()),
+  ]);
+  return { players, sessions, att, notices, well };
 }
 
 function Roll() {
@@ -93,6 +102,23 @@ function Roll() {
   const present = players.filter((p) => status.get(p.id) === true).length;
   const absent = players.filter((p) => status.get(p.id) === false).length;
   const unmarked = players.filter((p) => !status.has(p.id));
+  // Proposta: qui ha avisat que no vindrà → absent (amb el seu motiu); qui ha fet el wellness → present.
+  const noticeOf = new Map((data?.notices ?? []).filter((n) => n.session_id === selected).map((n) => [n.player_id, n]));
+  const wellDone = new Set((data?.well ?? []).filter((w) => w.session_id === selected).map((w) => w.player_id));
+  const proposeAbsent = unmarked.filter((p) => noticeOf.has(p.id));
+  const proposePresent = unmarked.filter((p) => !noticeOf.has(p.id) && wellDone.has(p.id));
+  const notNoticed = unmarked.filter((p) => !noticeOf.has(p.id));
+
+  async function confirmProposal() {
+    if (proposePresent.length && !(await mark(proposePresent.map((p) => p.id), true))) return;
+    const byReason = new Map<AbsenceReason, string[]>();
+    for (const p of proposeAbsent) {
+      const r = noticeOf.get(p.id)!.reason;
+      byReason.set(r, [...(byReason.get(r) ?? []), p.id]);
+    }
+    for (const [r, ids] of byReason) if (!(await mark(ids, false, r))) return;
+    setMsg({ ok: true, text: `Desat: ${proposePresent.length} presents i ${proposeAbsent.length} absents. Revisa la resta.` });
+  }
 
   return (
     <>
@@ -138,9 +164,18 @@ function Roll() {
             Presents <b>{present}</b> · Absents <b>{absent}</b> · Sense marcar <b>{unmarked.length}</b>
             {session.kind !== "Entrenament" && " · (no és entrenament: no compta per a la lliga)"}
           </p>
-          {unmarked.length > 0 && (
-            <button className="btn block" disabled={saving.size > 0} onClick={() => mark(unmarked.map((p) => p.id), true)}>
-              Marcar les {unmarked.length} que falten com a presents
+          {(proposePresent.length > 0 || proposeAbsent.length > 0) && (
+            <div className="roll-proposal">
+              <span>
+                <b>Proposta:</b> {proposePresent.length} {proposePresent.length === 1 ? "present" : "presents"} (han fet el wellness)
+                {proposeAbsent.length > 0 && <> i {proposeAbsent.length} {proposeAbsent.length === 1 ? "absent" : "absents"} (han avisat)</>}.
+              </span>
+              <button className="btn block" disabled={saving.size > 0} onClick={confirmProposal}>Confirmar la proposta</button>
+            </div>
+          )}
+          {notNoticed.length > 0 && (
+            <button className={`btn block${proposePresent.length || proposeAbsent.length ? " secondary" : ""}`} disabled={saving.size > 0} onClick={() => mark(notNoticed.map((p) => p.id), true)}>
+              Marcar les {notNoticed.length} que falten com a presents{proposeAbsent.length ? " (menys les que han avisat)" : ""}
             </button>
           )}
           {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
@@ -156,6 +191,8 @@ function Roll() {
                   <div className="row between">
                   <span className="pname">
                     {p.display_name}{busy && <span className="muted small"> · desant…</span>}
+                    {noticeOf.has(p.id) && <span className="roll-hint away" title={noticeOf.get(p.id)!.note ?? undefined}>🙋‍♀️ Ha avisat · {reasonLabel(noticeOf.get(p.id)!.reason)}</span>}
+                    {v === undefined && !noticeOf.has(p.id) && wellDone.has(p.id) && <span className="roll-hint ok">Wellness fet</span>}
                     {v === false && !asking && (
                       <button type="button" className={`reason-tag${why ? "" : " empty"}`} onClick={() => setAskReason(p.id)} title="Motiu de l'absència">
                         {why ? `${reasonLabel(why)} ✎` : "+ Motiu"}

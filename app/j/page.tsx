@@ -15,6 +15,7 @@ import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
+import { AbsenceButton } from "@/components/absence-button";
 import { SeasonFx } from "@/components/season";
 import { firstName, rememberSplashName } from "@/lib/first-name";
 import { MonthStories, MonthWrapBanner } from "@/components/month-wrap";
@@ -608,6 +609,7 @@ function Dashboard({
               <button className={`btn block${done ? " secondary" : ""}`} style={{ marginTop: 10 }} onClick={() => onOpenSession(s.id)}>
                 {done ? "Veure o editar" : "Omplir ara"}
               </button>
+              <AbsenceButton session={s} meId={me.id} />
             </div>
           );
         })}
@@ -835,6 +837,7 @@ function PlayerCalendar({ me, today, version, onOpenSession }: { me: Profile; to
                 {s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""}
                 {s.duration_min ? ` · ${s.duration_min} min` : ""}
               </div>
+              {s.session_date >= today && <AbsenceButton session={s} meId={me.id} />}
               {(m.w || m.r) && (
                 <div className="row" style={{ marginTop: 6 }}>
                   {m.w && <span className={`chip ${bandOf(Number(m.w.score)).cls}`}>Wellness {Number(m.w.score).toFixed(1)}</span>}

@@ -254,6 +254,19 @@ create table if not exists public.attendance (
   primary key (session_id, player_id)
 );
 create index if not exists attendance_player_idx on public.attendance (player_id);
+
+-- AVÍS DE BAIXA: la jugadora avisa des de l'app que no podrà venir a un entreno (als partits, no).
+-- Es pot avisar o desfer fins a l'hora de l'entreno. El motiu és una categoria (i una nota curta
+-- opcional); només el veuen ella i el staff. L'hora l'apunta el servidor.
+create table if not exists public.absence_notices (
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  player_id  uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  reason     text not null check (reason in ('estudis', 'malaltia', 'lesio', 'familia', 'viatge', 'altre_esport', 'altres')),
+  note       text check (note is null or (char_length(note) <= 120 and note = btrim(note) and note !~ '[[:cntrl:]<>]')),
+  created_at timestamptz not null default now(),
+  primary key (session_id, player_id)
+);
+create index if not exists absence_notices_player_idx on public.absence_notices (player_id);
 -- Motiu de l'absència (només una categoria, sense text lliure: dades mínimes).
 alter table public.attendance add column if not exists reason text;
 alter table public.attendance drop constraint if exists attendance_reason_check;
@@ -847,6 +860,9 @@ begin
                                         and r.submitted_at < (d.deadline at time zone 'Europe/Madrid')))
         -- Si a la llista consta com a absent, no hi ha multa de l'RPE (la del wellness, sí).
         and (k <> 'rpe' or not exists (select 1 from public.attendance a where a.session_id = d.sid and a.player_id = d.pid and not a.present))
+        -- Si ha avisat des de l'app que no vindria (abans del termini), cap de les dues.
+        and not exists (select 1 from public.absence_notices an where an.session_id = d.sid and an.player_id = d.pid
+                        and an.created_at < (d.deadline at time zone 'Europe/Madrid'))
     ), logged as (
       insert into public.auto_fine_log (session_id, person_id, kind)
       select sid, pid, k from missing
@@ -1134,6 +1150,27 @@ begin
     order by g.n, p.display_name nulls last, p.id;
 end $$;
 
+-- AVÍS DE BAIXA: es pot avisar (o desfer) d'un entreno no cancel·lat fins a l'hora que comença.
+create or replace function public.notice_is_open(sid uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.sessions s
+    where s.id = sid and s.kind = 'Entrenament' and not s.cancelled
+      and (s.session_date > (now() at time zone 'Europe/Madrid')::date
+           or (s.session_date = (now() at time zone 'Europe/Madrid')::date
+               and (s.start_time is null or s.start_time > (now() at time zone 'Europe/Madrid')::time))));
+$$;
+
+create or replace function public.stamp_absence_notice()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  new.created_at := now();
+  return new;
+end $$;
+drop trigger if exists absence_notices_stamp on public.absence_notices;
+create trigger absence_notices_stamp before insert or update on public.absence_notices
+  for each row execute function public.stamp_absence_notice();
+
 -- PETOS: qui els porta cada dia (de p_from a p_to). Ho poden veure el staff i les jugadores.
 create or replace function public.bib_schedule(p_from date, p_to date)
 returns table (day date, player_id uuid, display_name text, dorsal smallint, manual boolean)
@@ -1183,8 +1220,10 @@ begin
     else
       for k in 0 .. n - 1 loop
         c := ((nxt - 1 + k) % n) + 1;
-        -- Se la salta si està lesionada o si a la llista d'aquell dia consta absent (i no present).
+        -- Se la salta si està lesionada, si ha avisat que no vindrà o si a la llista d'aquell dia consta absent (i no present).
         if public.is_injured_on(ids[c], d) then continue; end if;
+        if exists (select 1 from public.absence_notices an join public.sessions s on s.id = an.session_id
+                   where an.player_id = ids[c] and s.session_date = d and not s.cancelled) then continue; end if;
         if exists (select 1 from public.attendance a join public.sessions s on s.id = a.session_id
                    where a.player_id = ids[c] and s.session_date = d and not a.present)
            and not exists (select 1 from public.attendance a join public.sessions s on s.id = a.session_id
@@ -1450,6 +1489,7 @@ alter table public.rehab_entries      enable row level security;
 alter table public.player_positions   enable row level security;
 alter table public.player_nicknames   enable row level security;
 alter table public.staff_greetings    enable row level security;
+alter table public.absence_notices    enable row level security;
 alter table public.training_plans     enable row level security;
 alter table public.analysis_matches   enable row level security;
 alter table public.analysis_events    enable row level security;
@@ -1475,7 +1515,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
-  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.training_plans,
+  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
   public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
@@ -1501,6 +1541,8 @@ grant all on public.convocation_guests to service_role;
 grant select, insert, update, delete on public.convocation_guests to authenticated;
 grant all on public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.training_plans to service_role;
 grant select, insert, update, delete on public.staff_greetings to authenticated;
+grant all on public.absence_notices to service_role;
+grant select, insert, update, delete on public.absence_notices to authenticated;
 grant select, insert, update, delete on public.injuries, public.player_positions, public.player_nicknames, public.training_plans to authenticated;
 grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to service_role;
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
@@ -1522,6 +1564,8 @@ revoke all on function public.duty_week(date) from public, anon;
 grant execute on function public.duty_week(date) to authenticated, service_role;
 revoke all on function public.bib_schedule(date, date) from public, anon;
 grant execute on function public.bib_schedule(date, date) to authenticated, service_role;
+revoke all on function public.notice_is_open(uuid) from public, anon;
+grant execute on function public.notice_is_open(uuid) to authenticated;
 revoke all on function public.team_dorsals() from public, anon;
 grant execute on function public.team_dorsals() to authenticated;
 revoke all on function public.convo_roster(uuid) from public, anon;
@@ -1696,6 +1740,20 @@ create policy rehab_update on public.rehab_entries for update to authenticated
 drop policy if exists player_positions_coach on public.player_positions;
 create policy player_positions_coach on public.player_positions for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
+-- AVÍS DE BAIXA: cadascuna veu i gestiona els seus (fins a l'hora de l'entreno); el staff els veu tots.
+drop policy if exists absence_select on public.absence_notices;
+create policy absence_select on public.absence_notices for select to authenticated
+  using (player_id = (select auth.uid()) or (select public.is_coach()));
+drop policy if exists absence_insert on public.absence_notices;
+create policy absence_insert on public.absence_notices for insert to authenticated
+  with check (player_id = (select auth.uid()) and (select public.is_player()) and public.notice_is_open(session_id));
+drop policy if exists absence_update on public.absence_notices;
+create policy absence_update on public.absence_notices for update to authenticated
+  using (player_id = (select auth.uid()) and public.notice_is_open(session_id))
+  with check (player_id = (select auth.uid()) and (select public.is_player()) and public.notice_is_open(session_id));
+drop policy if exists absence_delete on public.absence_notices;
+create policy absence_delete on public.absence_notices for delete to authenticated
+  using ((player_id = (select auth.uid()) and public.notice_is_open(session_id)) or (select public.is_coach()));
 drop policy if exists staff_greetings_own on public.staff_greetings;
 create policy staff_greetings_own on public.staff_greetings for all to authenticated
   using (profile_id = (select auth.uid()) and (select public.is_coach()))

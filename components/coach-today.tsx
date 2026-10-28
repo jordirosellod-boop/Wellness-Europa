@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Shirt, useDorsals } from "@/components/shirt";
+import { fetchNotices } from "@/lib/absence";
+import { reasonLabel } from "@/lib/attendance";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { alertsOf, bandOf, fmtSessionTime, SESSION_COLS, type Session, type Wellness } from "@/lib/wellness";
 
 type Alert = { id: string; name: string; pain: boolean; score: number; low: { label: string; value: number }[] };
-type Row = { s: Session; expected: number; w: number; r: number; alerts: Alert[] };
+type Away = { id: string; name: string; reason: string | null; note: string | null };
+type Row = { s: Session; expected: number; w: number; r: number; alerts: Alert[]; away: Away[] };
 
 async function loadToday(today: string): Promise<Row[]> {
   const sb = supabase();
@@ -17,7 +20,7 @@ async function loadToday(today: string): Promise<Row[]> {
   const sessions = (data ?? []) as Session[];
   if (!sessions.length) return [];
   const ids = sessions.map((s) => s.id);
-  const [players, well, rpe, att, inj] = await Promise.all([
+  const [players, well, rpe, att, inj, notices] = await Promise.all([
     fetchAll<{ id: string; display_name: string }>((f, t) => sb.from("profiles").select("id, display_name").eq("role", "player").order("id").range(f, t)),
     fetchAll<Wellness>((f, t) => sb.from("wellness").select("*").in("session_id", ids).order("id").range(f, t)),
     fetchAll<{ session_id: string }>((f, t) => sb.from("rpe").select("session_id").in("session_id", ids).order("id").range(f, t)),
@@ -25,18 +28,22 @@ async function loadToday(today: string): Promise<Row[]> {
       sb.from("attendance").select("session_id, player_id, present").in("session_id", ids).order("session_id").order("player_id").range(f, t)),
     fetchAll<{ player_id: string }>((f, t) =>
       sb.from("injuries").select("player_id").lte("start_date", today).or(`end_date.is.null,end_date.gte.${today}`).order("id").range(f, t)),
+    fetchNotices(ids).catch(() => []),
   ]);
   const name = new Map(players.map((p) => [p.id, p.display_name]));
   const injured = new Set(inj.map((i) => i.player_id));
   return sessions.map((s) => {
     const absent = new Set(att.filter((a) => a.session_id === s.id && !a.present).map((a) => a.player_id));
+    const mine = notices.filter((n) => n.session_id === s.id);
+    for (const n of mine) absent.add(n.player_id); // ha avisat que no vindrà: no li toca respondre
     const expected = players.filter((p) => !absent.has(p.id) && !injured.has(p.id)).length;
+    const away = mine.map((n) => ({ id: n.player_id, name: name.get(n.player_id) ?? "?", reason: reasonLabel(n.reason), note: n.note }));
     const ws = well.filter((w) => w.session_id === s.id);
     const alerts = ws
       .map((w) => ({ id: w.player_id, name: name.get(w.player_id) ?? "?", pain: w.has_pain, score: Number(w.score), low: alertsOf(w) }))
       .filter((a) => a.pain || a.low.length > 0)
       .sort((a, b) => Number(b.pain) - Number(a.pain) || a.score - b.score);
-    return { s, expected, w: ws.length, r: rpe.filter((x) => x.session_id === s.id).length, alerts };
+    return { s, expected, w: ws.length, r: rpe.filter((x) => x.session_id === s.id).length, alerts, away };
   });
 }
 
@@ -54,7 +61,7 @@ export function CoachToday({ today }: { today: string }) {
   if (!rows || rows.length === 0) return null;
   return (
     <>
-      {rows.map(({ s, expected, w, r, alerts }) => {
+      {rows.map(({ s, expected, w, r, alerts, away }) => {
         const pct = expected ? Math.min(100, Math.round((w / expected) * 100)) : 0;
         return (
           <section key={s.id} className="coach-today">
@@ -81,6 +88,17 @@ export function CoachToday({ today }: { today: string }) {
                       {a.pain && a.low.length > 0 && " · "}
                       {a.low.map((l) => `${l.label} ${l.value}`).join(" · ")}
                     </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {away.length > 0 && (
+              <ul className="ct-alerts ct-away" aria-label="Han avisat que no vindran">
+                {away.map((a) => (
+                  <li key={a.id}>
+                    <Shirt n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={26} />
+                    <b>{a.name}</b>
+                    <span>🙋‍♀️ No vindrà · {a.reason}{a.note ? ` · «${a.note}»` : ""}</span>
                   </li>
                 ))}
               </ul>

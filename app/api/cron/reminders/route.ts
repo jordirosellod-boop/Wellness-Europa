@@ -23,6 +23,9 @@ export async function POST(req: Request) {
   // Qui ja ha fet el wellness d'avui no rep l'avís.
   const { data: done } = await db.from("wellness").select("player_id").in("session_id", ids);
   const already = new Set((done ?? []).map((w) => w.player_id as string));
+  // Qui ha avisat que avui no vindrà tampoc.
+  const { data: away } = await db.from("absence_notices").select("player_id").in("session_id", ids);
+  for (const a of away ?? []) already.add(a.player_id as string);
 
   const { data: players, error: rErr } = await db.from("profiles").select("id").eq("role", "player");
   if (rErr) return Response.json({ error: rErr.message }, { status: 500 });
