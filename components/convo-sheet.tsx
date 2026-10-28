@@ -41,7 +41,7 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
         <i>vs</i>
         <span className={c.is_home ? "" : "us"}><Crest name={away} size={72} className="convo-crest" /><b>{away}</b></span>
       </div>
-      <p className="convo-date">{fmtDate(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""} · {c.is_home ? "Local" : "Visitant"}</p>
+      <p className="convo-date"><span>{fmtDate(c.match_date)}</span>{c.kickoff && <span>{hhmm(c.kickoff)} h</span>}<span className={c.is_home ? "home" : "away"}>{c.is_home ? "Local" : "Visitant"}</span></p>
 
       {me && (
         <p className={`convo-me ${me.called ? "yes" : "no"}`}>
@@ -50,16 +50,16 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
       )}
 
       <dl className="convo-info">
-        {c.meet_time && (<div><dt>Quedada</dt><dd>{hhmm(c.meet_time)} h</dd></div>)}
-        {c.kickoff && (<div><dt>Partit</dt><dd>{hhmm(c.kickoff)} h</dd></div>)}
-        {c.kit && !kit && (<div><dt>Equipació</dt><dd>{c.kit}</dd></div>)}
+        {c.meet_time && (<div className="i-meet"><dt>Quedada</dt><dd>{hhmm(c.meet_time)} h</dd></div>)}
+        {c.kickoff && (<div className="i-ko"><dt>Partit</dt><dd>{hhmm(c.kickoff)} h</dd></div>)}
+        {c.kit && !kit && (<div className="i-kit"><dt>Equipació</dt><dd>{c.kit}</dd></div>)}
         {place && (
-          <div className="wide">
+          <div className="wide i-place">
             <dt>Camp</dt>
             <dd><a href={mapsUrl(place)} target="_blank" rel="noreferrer">{place}</a></dd>
           </div>
         )}
-        {c.notes && (<div className="wide"><dt>Notes</dt><dd style={{ whiteSpace: "pre-line" }}>{c.notes}</dd></div>)}
+        {c.notes && (<div className="wide i-notes"><dt>Notes</dt><dd style={{ whiteSpace: "pre-line" }}>{c.notes}</dd></div>)}
       </dl>
 
       {kit && (
@@ -99,7 +99,7 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
       {notCalled.length > 0 && (
         <>
           <h3 className="convo-sub muted-sub">No convocades <span>{notCalled.length}</span></h3>
-          <p className="convo-out">{notCalled.map((r) => r.display_name).join(" · ")}</p>
+          <ul className="convo-out">{notCalled.map((r) => <li key={r.player_id}>{r.display_name}</li>)}</ul>
         </>
       )}
     </article>
