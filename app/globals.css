@@ -1522,3 +1522,37 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
 .pl.picking .pl-shirt { animation: shirt-pulse 1s ease-in-out infinite; }
 .picker-backdrop { animation: fade .2s var(--ease) both; }
 .picker { animation: sheet-up .35s var(--ease) both; }
+
+/* --- Pissarra tàctica ------------------------------------------------- */
+@keyframes tok-in { 0% { opacity: 0; transform: scale(.2); } 70% { opacity: 1; transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes shape-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sel-ring { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: .35; } }
+@keyframes caption-in { from { opacity: 0; transform: translateY(8px); letter-spacing: 2px; } to { opacity: 1; transform: none; } }
+@keyframes stage-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+.tb-stage { animation: stage-in .5s var(--ease) both; }
+/* Fitxes i pilota: entren amb un rebot (des del seu centre) */
+.tb-svg [data-tok] { transform-box: fill-box; transform-origin: center; animation: tok-in .5s var(--ease-back) both; }
+.tb-svg [data-tok]:nth-of-type(2n) { animation-delay: .04s; }
+.tb-svg [data-tok]:nth-of-type(3n) { animation-delay: .08s; }
+.tb-svg [data-tok]:nth-of-type(5n) { animation-delay: .12s; }
+/* La fitxa triada «respira» */
+.tb-svg [data-tok] circle[stroke="#ffd400"] { animation: sel-ring 1.1s ease-in-out infinite; }
+/* Fletxes i dibuixos: apareixen suaument (també en canviar de fotograma) */
+.tb-svg [data-shape] { animation: shape-in .4s var(--ease) both; }
+.tb-caption > span { display: inline-block; animation: caption-in .45s var(--ease) both; }
+/* Botons de la pissarra */
+.tb-tools button, .tb-frame-list button, .tb-scenes button {
+  transition: background-color .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease), transform .15s var(--ease), box-shadow .25s var(--ease);
+}
+.tb-tools button:active, .tb-frame-list button:active, .tb-scenes button:active { transform: scale(.92); }
+.tb-tools button[aria-pressed="true"], .tb-frame-list button[aria-selected="true"], .tb-scenes button[aria-selected="true"] {
+  animation: pop-in .25s var(--ease-back); box-shadow: 0 4px 12px rgba(11, 24, 70, .25);
+}
+.tb-tools button.col[aria-pressed="true"] { transform: scale(1.12); }
+@media (hover: hover) {
+  .tb-tools button:not([aria-pressed="true"]):hover, .tb-frame-list button:not([aria-selected="true"]):hover, .tb-scenes button:not([aria-selected="true"]):hover {
+    transform: translateY(-2px); border-color: var(--navy); box-shadow: 0 4px 10px rgba(11, 24, 70, .15);
+  }
+}
+.tb-frame-list button { animation: chip-in .3s var(--ease-back) both; }
+.tb-edit, .tb-frame-edit, .tb-scene-bar { animation: dd-in .3s var(--ease) both; }

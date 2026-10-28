@@ -335,7 +335,11 @@ export function TacticBoard({ scene, onChange, showNames, vertical }: {
             })}
           </g>
         </svg>
-        <div className="tb-caption tb-font" aria-live="polite">{(live ? scene.frames[live.moving ?? live.frame]?.note : frame.note) || "\u00a0"}</div>
+        {(() => {
+          const note = (live ? scene.frames[live.moving ?? live.frame]?.note : frame.note) || "\u00a0";
+          // (amb «key», el text nou entra animat cada cop que canvia)
+          return <div className="tb-caption tb-font" aria-live="polite"><span key={note}>{note}</span></div>;
+        })()}
       </div>
 
       {/* Edició de l'element triat */}
