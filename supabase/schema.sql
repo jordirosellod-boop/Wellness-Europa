@@ -367,6 +367,14 @@ create table if not exists public.player_nicknames (
   updated_at timestamptz not null default now()
 );
 
+-- COM VOL QUE LA SALUDI L'APP: cada persona del staff tria el nom («Rose», «Míster»...).
+-- Només ho veu i ho canvia ella mateixa.
+create table if not exists public.staff_greetings (
+  profile_id uuid primary key default auth.uid() references public.profiles(id) on delete cascade,
+  greeting   text not null check (char_length(btrim(greeting)) between 1 and 30 and greeting = btrim(greeting) and greeting !~ '[[:cntrl:]<>]'),
+  updated_at timestamptz not null default now()
+);
+
 -- PLANTILLA D'ENTRENAMENT: privada de qui la fa (ni la resta del staff la veu).
 -- "players" = estat de cada jugadora aquell dia; "tasks" = llista de tasques amb el seu dibuix.
 create table if not exists public.training_plans (
@@ -1441,6 +1449,7 @@ alter table public.injuries           enable row level security;
 alter table public.rehab_entries      enable row level security;
 alter table public.player_positions   enable row level security;
 alter table public.player_nicknames   enable row level security;
+alter table public.staff_greetings    enable row level security;
 alter table public.training_plans     enable row level security;
 alter table public.analysis_matches   enable row level security;
 alter table public.analysis_events    enable row level security;
@@ -1466,7 +1475,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
-  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.training_plans,
+  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
   public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
@@ -1490,7 +1499,8 @@ grant all on public.player_numbers, public.convocations, public.convocation_play
 grant select, insert, update, delete on public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups to authenticated;
 grant all on public.convocation_guests to service_role;
 grant select, insert, update, delete on public.convocation_guests to authenticated;
-grant all on public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.training_plans to service_role;
+grant all on public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.training_plans to service_role;
+grant select, insert, update, delete on public.staff_greetings to authenticated;
 grant select, insert, update, delete on public.injuries, public.player_positions, public.player_nicknames, public.training_plans to authenticated;
 grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to service_role;
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
@@ -1686,6 +1696,10 @@ create policy rehab_update on public.rehab_entries for update to authenticated
 drop policy if exists player_positions_coach on public.player_positions;
 create policy player_positions_coach on public.player_positions for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists staff_greetings_own on public.staff_greetings;
+create policy staff_greetings_own on public.staff_greetings for all to authenticated
+  using (profile_id = (select auth.uid()) and (select public.is_coach()))
+  with check (profile_id = (select auth.uid()) and (select public.is_coach()));
 drop policy if exists player_nicknames_coach on public.player_nicknames;
 create policy player_nicknames_coach on public.player_nicknames for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));

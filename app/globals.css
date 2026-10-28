@@ -2302,3 +2302,10 @@ a.tile { text-decoration: none; }
 .sh-cal-title { margin: 22px 0 10px; font-size: 1.6rem; }
 /* Entrada amb el nom: una mica més petit perquè hi càpiga */
 .splash b.named { font-size: 1.7rem; text-align: center; padding: 0 20px; }
+/* Salutació del staff: canviar com et saluda */
+.greet-pen { margin-left: 8px; border: 0; background: rgba(255,255,255,.18); border-radius: 999px; width: 34px; height: 34px; font-size: 1rem; cursor: pointer; vertical-align: middle; }
+.greet-edit { position: relative; display: grid; gap: 6px; margin-bottom: 6px; }
+.greet-edit label { font-family: var(--display); text-transform: uppercase; letter-spacing: .5px; font-size: 1.1rem; }
+.greet-edit input { flex: 1; min-width: 0; }
+.greet-edit .btn.secondary { background: transparent; color: #fff; border-color: rgba(255,255,255,.6); }
+.greet-err { color: #ffd2d2; }

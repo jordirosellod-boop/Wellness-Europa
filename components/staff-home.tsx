@@ -64,11 +64,35 @@ const TILES: { href: string; label: string; sub: string; icon: ReactNode; owner?
 ];
 
 /** Inici del staff: salutació, l'entreno d'avui (o el proper), avisos, el vestidor d'avui i accessos ràpids. */
-export function StaffHome({ name, today, owner }: { name: string; today: string; owner: boolean }) {
+export function StaffHome({ meId, name, today, owner }: { meId: string; name: string; today: string; owner: boolean }) {
   const [info, setInfo] = useState<Info | null>(null);
+  const [greeting, setGreeting] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [gMsg, setGMsg] = useState<string | null>(null);
+  const shown = greeting ?? firstName(name);
   const [part, hello] = GREET(nowMadridHHMM());
   const dorsals = useDorsals();
-  useEffect(() => rememberSplashName(name), [name]);
+  useEffect(() => {
+    let alive = true;
+    supabase().from("staff_greetings").select("greeting").eq("profile_id", meId).maybeSingle()
+      .then(({ data }) => alive && data?.greeting && setGreeting(data.greeting as string));
+    return () => { alive = false; };
+  }, [meId]);
+  useEffect(() => rememberSplashName(shown), [shown]);
+
+  /** Desa com vol que la saludi (buit = el seu nom). */
+  async function saveGreeting() {
+    const v = draft.replace(/[<>]/g, "").trim().slice(0, 30);
+    const sb = supabase();
+    const { data, error } = v
+      ? await sb.from("staff_greetings").upsert({ profile_id: meId, greeting: v, updated_at: new Date().toISOString() }).select("greeting").single()
+      : await sb.from("staff_greetings").delete().eq("profile_id", meId).select("profile_id");
+    if (error || (v && !data)) return setGMsg(`No s'ha pogut desar: ${error?.message ?? "torna-ho a provar"}`);
+    setGreeting(v || null);
+    setEditing(false);
+    setGMsg(null);
+  }
   useEffect(() => {
     let alive = true;
     loadInfo(today).then((x) => alive && setInfo(x), () => {});
@@ -87,7 +111,23 @@ export function StaffHome({ name, today, owner }: { name: string; today: string;
     <div className="staff-home">
       <header className={`greet ${part}`}>
         <span className="greet-sky" aria-hidden="true" />
-        <h1>{hello}, {firstName(name)}!</h1>
+        {editing ? (
+          <form className="greet-edit" onSubmit={(e) => { e.preventDefault(); saveGreeting(); }}>
+            <label htmlFor="greet-name">Com vols que et saludi?</label>
+            <div className="row" style={{ gap: 6 }}>
+              <input id="greet-name" type="text" maxLength={30} value={draft} placeholder={firstName(name)} onChange={(e) => setDraft(e.target.value)} autoFocus />
+              <button className="btn small" type="submit">Desar</button>
+              <button className="btn small secondary" type="button" onClick={() => { setEditing(false); setGMsg(null); }}>Cancel·lar</button>
+            </div>
+            <span className="small">Buit = el teu nom ({firstName(name)}).</span>
+            {gMsg && <span className="small greet-err">{gMsg}</span>}
+          </form>
+        ) : (
+          <h1>
+            {hello}, {shown}!
+            <button type="button" className="greet-pen" aria-label="Canviar com et saluda" onClick={() => { setDraft(greeting ?? ""); setEditing(true); }}>✏️</button>
+          </h1>
+        )}
         <p className="row" style={{ gap: 8, margin: 0 }}><span>{fmtDate(today)}</span></p>
       </header>
 

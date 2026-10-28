@@ -717,3 +717,19 @@ select pg_temp.check((select count(*) from public.team_dorsals()) = 0, 'Un compt
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.team_dorsals()$$, 'Anònim no veu els dorsals');
 reset role;
+
+-- =============== SALUTACIÓ DEL STAFF ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.staff_greetings (greeting) values ('Rose');
+select pg_temp.check((select greeting from public.staff_greetings) = 'Rose', 'El staff tria com el saluda l''app');
+update public.staff_greetings set greeting = 'Míster', updated_at = now();
+select pg_temp.check((select greeting from public.staff_greetings) = 'Míster', 'I ho pot canviar');
+select pg_temp.expect_error($$insert into public.staff_greetings (greeting) values ('')$$, 'No pot quedar buit');
+select pg_temp.expect_error($$insert into public.staff_greetings (greeting) values ('<b>x</b>')$$, 'Sense codi');
+select pg_temp.expect_error($$insert into public.staff_greetings (profile_id, greeting) values ('00000000-0000-0000-0000-0000000000b2', 'X')$$, 'No pot posar la salutació d''una altra persona');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.staff_greetings) = 0, 'Les jugadores no veuen la salutació del staff');
+select pg_temp.expect_error($$insert into public.staff_greetings (greeting) values ('Jo')$$, 'Les jugadores no en poden posar');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.staff_greetings$$, 'Anònim no hi té accés');
+reset role;

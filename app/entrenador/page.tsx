@@ -13,7 +13,7 @@ import { fmtDate, fmtSessionTime, friendlyError, SESSION_COLS, todayMadrid, type
 export default function CoachSessionsPage() {
   return (
     <>
-      <CoachShell>{(me) => <CoachCalendar name={me.display_name} />}</CoachShell>
+      <CoachShell>{(me) => <CoachCalendar meId={me.id} name={me.display_name} />}</CoachShell>
       <Footer />
     </>
   );
@@ -32,7 +32,7 @@ function coachStatus(s: Session, today: string, c: Counts, players: number): Cal
   return "pendent";
 }
 
-function CoachCalendar({ name }: { name: string }) {
+function CoachCalendar({ meId, name }: { meId: string; name: string }) {
   const today = todayMadrid();
   const owner = useIsOwner();
   const [view, setView] = useState<CalView>("mes");
@@ -66,7 +66,7 @@ function CoachCalendar({ name }: { name: string }) {
 
   return (
     <>
-      <StaffHome name={name} today={today} owner={!!owner} />
+      <StaffHome meId={meId} name={name} today={today} owner={!!owner} />
       <h2 className="sh-cal-title">Calendari</h2>
       {error && <p className="msg error">{friendlyError(error)}</p>}
       {data && (
