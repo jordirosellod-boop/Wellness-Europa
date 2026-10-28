@@ -1278,3 +1278,119 @@ body:has(.bd) main { max-width: 1240px; }
 .duties-labels { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
 .duties-labels label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
 .duties-labels input { width: 110px; padding: 6px 8px; }
+
+/* =====================================================================
+   DETALLS I ANIMACIONS (desplegables, targetes, botons)
+   Tot respecta «reduir el moviment» del mòbil.
+   ===================================================================== */
+:root { --ease: cubic-bezier(.2, .8, .2, 1); --ease-back: cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes dd-in { from { opacity: 0; transform: translateY(-8px) scaleY(.98); } to { opacity: 1; transform: none; } }
+@keyframes card-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { 0% { opacity: 0; transform: scale(.96); } 100% { opacity: 1; transform: none; } }
+@keyframes nav-bounce { 0% { transform: translateY(0); } 40% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
+@keyframes shine { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+
+/* --- Desplegables (selects) ------------------------------------------ */
+select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 2.4em !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230a2ea0' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .7em center; background-size: 1.05em;
+  transition: border-color .2s var(--ease), box-shadow .25s var(--ease), background-position .25s var(--ease);
+  cursor: pointer;
+}
+select:hover:not(:disabled) { border-color: var(--blau); }
+select:focus { outline: none; border-color: var(--blau); box-shadow: 0 0 0 3px rgba(219, 179, 77, .55); background-position: right .6em center; }
+select:disabled { opacity: .6; cursor: default; }
+/* Navegadors que ja deixen dissenyar la llista (Chrome / Android): llista arrodonida que s'obre amb animació. */
+@supports (appearance: base-select) {
+  select { appearance: base-select; }
+  select::picker-icon { display: none; }
+  select::picker(select) {
+    appearance: base-select;
+    border: 0; border-radius: 14px; padding: 6px; margin-top: 6px;
+    background: #fff; box-shadow: 0 14px 40px rgba(11, 24, 70, .22), 0 2px 6px rgba(11, 24, 70, .12);
+    opacity: 0; transform: translateY(-8px) scale(.97); transform-origin: top center;
+    transition: opacity .2s var(--ease), transform .25s var(--ease-back), overlay .25s allow-discrete, display .25s allow-discrete;
+  }
+  select:open::picker(select) { opacity: 1; transform: none; }
+  @starting-style { select:open::picker(select) { opacity: 0; transform: translateY(-8px) scale(.97); } }
+  select option {
+    padding: 10px 12px; border-radius: 9px; font-family: var(--cos); color: var(--text);
+    transition: background-color .15s var(--ease), color .15s var(--ease), padding-left .2s var(--ease);
+  }
+  select option:hover, select option:focus-visible { background: var(--blau-clar, #e6ecfb); padding-left: 16px; outline: none; }
+  select option:checked { background: var(--blau); color: #fff; font-weight: 600; }
+  select option::checkmark { content: "✓"; color: var(--or); margin-right: 4px; }
+}
+
+/* --- Desplegables (seccions que s'obren) ------------------------------- */
+details > summary { list-style: none; cursor: pointer; position: relative; padding-right: 1.8em; transition: color .2s var(--ease); }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::after {
+  content: ""; position: absolute; right: .3em; top: 50%; width: .55em; height: .55em; margin-top: -.4em;
+  border-right: 2.5px solid currentColor; border-bottom: 2.5px solid currentColor; transform: rotate(45deg);
+  transition: transform .3s var(--ease-back), margin-top .3s var(--ease);
+}
+details[open] > summary::after { transform: rotate(-135deg); margin-top: -.1em; }
+details > summary:hover { color: var(--blau); }
+details[open] > :not(summary) { animation: dd-in .32s var(--ease) both; }
+/* Navegadors que ho permeten: també s'anima l'alçada en obrir i tancar. */
+@supports (interpolate-size: allow-keywords) {
+  :root { interpolate-size: allow-keywords; }
+  details::details-content { height: 0; overflow: clip; transition: height .35s var(--ease), content-visibility .35s allow-discrete; }
+  details[open]::details-content { height: auto; }
+}
+/* Contingut que s'obre amb un botó (talls, llistes, avisos…) */
+.clip-list, .rival-prev, .plan-pdf-ready, .pos-edit, .an-detail, .bibs-week, .duties-rot, .msg, .wk-banner, .convo-banner { animation: dd-in .32s var(--ease) both; }
+
+/* --- Targetes ---------------------------------------------------------- */
+main > .card, main > section.card, .player-app > .card, .player-app > section, .tiles > .tile, .wk > .wk-day {
+  animation: card-in .45s var(--ease) both;
+}
+main > :nth-child(2), .tiles > :nth-child(2), .wk > :nth-child(2) { animation-delay: .04s; }
+main > :nth-child(3), .tiles > :nth-child(3), .wk > :nth-child(3) { animation-delay: .08s; }
+main > :nth-child(4), .tiles > :nth-child(4), .wk > :nth-child(4) { animation-delay: .12s; }
+main > :nth-child(5), .tiles > :nth-child(5), .wk > :nth-child(5) { animation-delay: .16s; }
+main > :nth-child(n+6), .tiles > :nth-child(n+6), .wk > :nth-child(n+6) { animation-delay: .2s; }
+.card { transition: box-shadow .25s var(--ease), transform .25s var(--ease); }
+
+/* Línia daurada sota la capçalera, que brilla una mica */
+.topbar { position: relative; }
+.topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--or), #fff3c4, var(--or), transparent);
+  background-size: 200% 100%; animation: shine 6s linear infinite; opacity: .9; pointer-events: none;
+}
+
+/* --- Botons, pestanyes i rajoles --------------------------------------- */
+.btn, .toggle button, .weekdays button, .tabs button, .scale button, .tile, .chip, .an-ic {
+  transition: background-color .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease), transform .15s var(--ease), box-shadow .25s var(--ease);
+}
+.btn:not(:disabled):active, .tabs button:active, .toggle button:active, .weekdays button:active, .scale button:active, .an-ic:active { transform: scale(.96); }
+.tile:active { transform: scale(.97); }
+.scale button[aria-pressed="true"], .tabs button[aria-pressed="true"], .weekdays button[aria-pressed="true"], .toggle button[aria-pressed="true"] { animation: pop-in .25s var(--ease-back); }
+@media (hover: hover) {
+  .btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(10, 46, 160, .22); }
+  .btn.secondary:not(:disabled):hover { background: var(--blau); color: #fff; }
+  .tile:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(11, 24, 70, .22); }
+  .tabs button:not([aria-pressed="true"]):hover, .toggle button:not([aria-pressed="true"]):hover, .weekdays button:not([aria-pressed="true"]):hover { background: var(--blau-clar, #e6ecfb); }
+}
+.bottom-nav button { transition: color .2s var(--ease); }
+.bottom-nav button[aria-current="page"] svg { animation: nav-bounce .45s var(--ease-back); }
+
+/* Caselles: la vora es posa blava i daurada suaument */
+input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="time"], input[type="number"], textarea {
+  transition: border-color .2s var(--ease), box-shadow .25s var(--ease);
+}
+input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, input[type="date"]:focus, input[type="time"]:focus, input[type="number"]:focus, textarea:focus {
+  outline: none; border-color: var(--blau); box-shadow: 0 0 0 3px rgba(219, 179, 77, .55);
+}
+input[type="checkbox"], input[type="radio"] { accent-color: var(--blau); transition: transform .15s var(--ease); }
+input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9); }
+
+::selection { background: rgba(219, 179, 77, .45); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, ::picker(select) { animation: none !important; transition: none !important; }
+}
