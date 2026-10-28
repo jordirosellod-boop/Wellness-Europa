@@ -1304,7 +1304,7 @@ select:focus { outline: none; border-color: var(--blau); box-shadow: 0 0 0 3px r
 select:disabled { opacity: .6; cursor: default; }
 /* Navegadors que ja deixen dissenyar la llista (Chrome / Android): llista arrodonida que s'obre amb animació. */
 @supports (appearance: base-select) {
-  select { appearance: base-select; }
+  select { appearance: base-select; display: inline-flex; align-items: center; }
   select::picker-icon { display: none; }
   select::picker(select) {
     appearance: base-select;
@@ -1556,3 +1556,114 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
 }
 .tb-frame-list button { animation: chip-in .3s var(--ease-back) both; }
 .tb-edit, .tb-frame-edit, .tb-scene-bar { animation: dd-in .3s var(--ease) both; }
+
+/* --- Anàlisi ---------------------------------------------------------- */
+@keyframes ripple { from { opacity: .55; transform: scale(0); } to { opacity: 0; transform: scale(2.6); } }
+@keyframes mk-up { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: .9; } }
+@keyframes ev-in { from { opacity: 0; transform: translateX(-14px); background: rgba(219, 179, 77, .35); } 60% { background: rgba(219, 179, 77, .25); } to { opacity: 1; transform: none; background: transparent; } }
+@keyframes badge-pop { 0% { opacity: 0; transform: scale(.2) rotate(-30deg); } 70% { opacity: 1; transform: scale(1.2); } 100% { transform: none; } }
+.an-video, .an-stage { animation: stage-in .45s var(--ease) both; }
+/* Botons d'etiquetar: entren en cascada i fan una ona en tocar-los */
+.tag-btn { position: relative; overflow: hidden; animation: chip-in .35s var(--ease-back) both; transition: transform .12s var(--ease), box-shadow .2s var(--ease), filter .2s var(--ease); }
+.tag-btn::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 80px; height: 80px; margin: -40px 0 0 -40px; border-radius: 50%;
+  background: rgba(255, 255, 255, .7); opacity: 0; transform: scale(0); pointer-events: none;
+}
+.tag-btn:active::after { animation: ripple .45s var(--ease) both; }
+.tag-btn:active { filter: brightness(1.12); }
+@media (hover: hover) { .tag-btn:hover { transform: translateY(-2px); box-shadow: inset 0 -4px 0 rgba(0,0,0,.18), 0 8px 16px rgba(0, 0, 0, .22); } }
+.tag-grid .tag-btn:nth-child(1) { animation-delay: 0.025s; }
+.tag-grid .tag-btn:nth-child(2) { animation-delay: 0.050s; }
+.tag-grid .tag-btn:nth-child(3) { animation-delay: 0.075s; }
+.tag-grid .tag-btn:nth-child(4) { animation-delay: 0.100s; }
+.tag-grid .tag-btn:nth-child(5) { animation-delay: 0.125s; }
+.tag-grid .tag-btn:nth-child(6) { animation-delay: 0.150s; }
+.tag-grid .tag-btn:nth-child(7) { animation-delay: 0.175s; }
+.tag-grid .tag-btn:nth-child(8) { animation-delay: 0.200s; }
+.tag-grid .tag-btn:nth-child(9) { animation-delay: 0.225s; }
+.tag-grid .tag-btn:nth-child(10) { animation-delay: 0.250s; }
+.tag-grid .tag-btn:nth-child(11) { animation-delay: 0.275s; }
+.tag-grid .tag-btn:nth-child(12) { animation-delay: 0.300s; }
+.tag-grid .tag-btn:nth-child(13) { animation-delay: 0.325s; }
+.tag-grid .tag-btn:nth-child(14) { animation-delay: 0.350s; }
+.tag-grid .tag-btn:nth-child(15) { animation-delay: 0.375s; }
+.tag-grid .tag-btn:nth-child(16) { animation-delay: 0.400s; }
+.tag-grid .tag-btn:nth-child(17) { animation-delay: 0.425s; }
+.tag-grid .tag-btn:nth-child(18) { animation-delay: 0.450s; }
+.tag-grid .tag-btn:nth-child(19) { animation-delay: 0.475s; }
+.tag-grid .tag-btn:nth-child(20) { animation-delay: 0.500s; }
+.tag-grid .tag-btn:nth-child(21) { animation-delay: 0.525s; }
+.tag-grid .tag-btn:nth-child(22) { animation-delay: 0.550s; }
+.tag-grid .tag-btn:nth-child(23) { animation-delay: 0.575s; }
+.tag-grid .tag-btn:nth-child(24) { animation-delay: 0.600s; }
+/* Llista d'accions: la nova entra amb un flaix daurat */
+.an-events li { animation: ev-in .5s var(--ease) both; }
+.an-ev { transition: background-color .2s var(--ease); border-radius: 8px; }
+@media (hover: hover) { .an-ev:hover { background: var(--blau-clar); } }
+/* Línia de temps: les marques creixen des de baix i el cursor es mou suau */
+.an-timeline .mk { transform-origin: bottom; animation: mk-up .35s var(--ease-back) both; transition: opacity .2s var(--ease), filter .2s var(--ease); }
+.an-timeline .mk:hover { filter: brightness(1.2); opacity: 1; }
+.an-timeline .now { transition: left .25s linear; box-shadow: 0 0 6px var(--or); }
+.an-playing, .an-clockbar { animation: dd-in .35s var(--ease) both; }
+/* Jugadores per triar */
+.an-players button { animation: chip-in .3s var(--ease-back) both; transition: background-color .2s var(--ease), color .2s var(--ease), transform .12s var(--ease); }
+.an-players button:active { transform: scale(.93); }
+.an-players button[aria-pressed="true"] { animation: pop-in .25s var(--ease-back); }
+.an-players button:nth-child(1) { animation-delay: 0.02s; }
+.an-players button:nth-child(2) { animation-delay: 0.04s; }
+.an-players button:nth-child(3) { animation-delay: 0.06s; }
+.an-players button:nth-child(4) { animation-delay: 0.08s; }
+.an-players button:nth-child(5) { animation-delay: 0.10s; }
+.an-players button:nth-child(6) { animation-delay: 0.12s; }
+.an-players button:nth-child(7) { animation-delay: 0.14s; }
+.an-players button:nth-child(8) { animation-delay: 0.16s; }
+.an-players button:nth-child(9) { animation-delay: 0.18s; }
+.an-players button:nth-child(10) { animation-delay: 0.20s; }
+.an-players button:nth-child(11) { animation-delay: 0.22s; }
+.an-players button:nth-child(12) { animation-delay: 0.24s; }
+.an-players button:nth-child(13) { animation-delay: 0.26s; }
+.an-players button:nth-child(14) { animation-delay: 0.28s; }
+.an-players button:nth-child(15) { animation-delay: 0.30s; }
+.an-players button:nth-child(16) { animation-delay: 0.32s; }
+.an-players button:nth-child(17) { animation-delay: 0.34s; }
+.an-players button:nth-child(18) { animation-delay: 0.36s; }
+.an-players button:nth-child(19) { animation-delay: 0.38s; }
+.an-players button:nth-child(20) { animation-delay: 0.40s; }
+.an-players button:nth-child(21) { animation-delay: 0.42s; }
+.an-players button:nth-child(22) { animation-delay: 0.44s; }
+.an-players button:nth-child(23) { animation-delay: 0.46s; }
+.an-players button:nth-child(24) { animation-delay: 0.48s; }
+/* Rival: xifres i ratxa apareixen una a una */
+.rival-hero { animation: card-in .45s var(--ease) both; }
+.rv-stats > div { animation: rise .4s var(--ease) both; }
+.rv-stats > div:nth-child(1) { animation-delay: 0.21s; }
+.rv-stats > div:nth-child(2) { animation-delay: 0.27s; }
+.rv-stats > div:nth-child(3) { animation-delay: 0.33s; }
+.rv-stats > div:nth-child(4) { animation-delay: 0.39s; }
+.rv-stats > div:nth-child(5) { animation-delay: 0.45s; }
+.rv-stats > div:nth-child(6) { animation-delay: 0.51s; }
+.rv-stats .form i, .rbadge { animation: badge-pop .4s var(--ease-back) both; }
+.rv-stats .form i:nth-of-type(1) { animation-delay: 0.58s; }
+.rv-stats .form i:nth-of-type(2) { animation-delay: 0.66s; }
+.rv-stats .form i:nth-of-type(3) { animation-delay: 0.74s; }
+.rv-stats .form i:nth-of-type(4) { animation-delay: 0.82s; }
+.rv-stats .form i:nth-of-type(5) { animation-delay: 0.90s; }
+.rival-grid > * { animation: card-in .45s var(--ease) both; }
+.rival-grid > :nth-child(2) { animation-delay: .06s; } .rival-grid > :nth-child(3) { animation-delay: .12s; } .rival-grid > :nth-child(4) { animation-delay: .18s; }
+.an-stats .card, .corrections .card, .corrections > section { animation: card-in .45s var(--ease) both; }
+.an-stats .card:nth-child(2), .corrections > :nth-child(2) { animation-delay: .06s; }
+.an-stats .card:nth-child(3), .corrections > :nth-child(3) { animation-delay: .12s; }
+.an-stats .card:nth-child(n+4), .corrections > :nth-child(n+4) { animation-delay: .18s; }
+.corr-clips li, .corr-add { animation: dd-in .3s var(--ease) both; }
+.zone-pitch { animation: fade .5s var(--ease) both; }
+/* Punts del mapa de zones: «cauen» al seu lloc */
+.zone-pitch circle[r="1.8"] { transform-box: fill-box; transform-origin: center; animation: tok-in .45s var(--ease-back) both; }
+.zone-pitch circle[r="1.8"]:nth-of-type(2n) { animation-delay: .05s; } .zone-pitch circle[r="1.8"]:nth-of-type(3n) { animation-delay: .1s; }
+@media print { .an-report, .an-report * { animation: none !important; } }
+
+/* Desplegables amb fons propi (controls del vídeo): també amb la fletxa */
+.an-controls select {
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230b1846' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .55em center; background-size: .95em; padding-right: 2em !important;
+}
