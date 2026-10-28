@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { addDays, fmtMonth, fmtShort, monthWeeks, moveAnchor, startOfWeek, WEEKDAYS_SHORT, type CalView } from "@/lib/dates";
 import { fmtDate, type Session } from "@/lib/wellness";
 
@@ -81,6 +81,13 @@ export function Calendar({
     );
   };
 
+  // Cap on s'ha mogut (per animar el canvi de mes, setmana o dia cap a un costat o l'altre).
+  const [dir, setDir] = useState<"next" | "prev">("next");
+  const go = (next: string) => {
+    if (next !== anchor) setDir(next > anchor ? "next" : "prev");
+    onAnchor(next);
+  };
+
   return (
     <section className="card cal">
       <div className="toggle three" role="group" aria-label="Vista">
@@ -92,24 +99,24 @@ export function Calendar({
       </div>
 
       <div className="cal-nav">
-        <button type="button" className="btn small secondary" aria-label="Anterior" onClick={() => onAnchor(moveAnchor(view, anchor, -1))}>‹</button>
-        <div className="cal-title">
+        <button type="button" className="btn small secondary" aria-label="Anterior" onClick={() => go(moveAnchor(view, anchor, -1))}>‹</button>
+        <div className={`cal-title slide-${dir}`} key={`${view}-${title}`}>
           <b>{title}</b>
           {loading && <span className="muted small"> · carregant…</span>}
         </div>
-        <button type="button" className="btn small secondary" aria-label="Següent" onClick={() => onAnchor(moveAnchor(view, anchor, 1))}>›</button>
+        <button type="button" className="btn small secondary" aria-label="Següent" onClick={() => go(moveAnchor(view, anchor, 1))}>›</button>
       </div>
       {anchor !== today && (
-        <button type="button" className="linkbtn" onClick={() => onAnchor(today)}>Tornar a avui</button>
+        <button type="button" className="linkbtn" onClick={() => go(today)}>Tornar a avui</button>
       )}
 
       {view === "mes" && (
         <>
-          <div className="cal-grid">
+          <div className={`cal-grid slide-${dir}`} key={anchor.slice(0, 7)}>
             {WEEKDAYS_SHORT.map((d) => (
               <div key={d} className="cal-wd">{d}</div>
             ))}
-            {monthWeeks(anchor).flat().map((day) => {
+            {monthWeeks(anchor).flat().map((day, idx) => {
               const list = byDay.get(day) ?? [];
               const out = day.slice(0, 7) !== anchor.slice(0, 7);
               return (
@@ -118,8 +125,9 @@ export function Calendar({
                   type="button"
                   className={`cal-day${out ? " out" : ""}${day === today ? " today" : ""}`}
                   aria-pressed={day === anchor}
+                  style={{ ["--i" as string]: idx }}
                   aria-label={`${fmtDate(day)}: ${list.length ? list.map((i) => `${i.session.name} (${STATUS_LABEL[i.status]})`).join(", ") : "cap sessió"}`}
-                  onClick={() => onAnchor(day)}
+                  onClick={() => go(day)}
                 >
                   <span>{Number(day.slice(8))}</span>
                   <span className="dots">
@@ -132,7 +140,7 @@ export function Calendar({
             })}
           </div>
           <Legend />
-          <div className="cal-daypanel">
+          <div className="cal-daypanel" key={anchor}>
             <h3>{fmtDate(anchor)}</h3>
             {dayList(anchor)}
           </div>
@@ -140,7 +148,7 @@ export function Calendar({
       )}
 
       {view === "setmana" && (
-        <div className="cal-week">
+        <div className={`cal-week slide-${dir}`} key={startOfWeek(anchor)}>
           {Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i)).map((day) => (
             <div key={day} className={`cal-weekday${day === today ? " today" : ""}`}>
               <button type="button" className="linkbtn cal-weeklabel" onClick={() => { onAnchor(day); onView("dia"); }}>
@@ -152,7 +160,7 @@ export function Calendar({
         </div>
       )}
 
-      {view === "dia" && <div className="cal-daypanel">{dayList(anchor)}</div>}
+      {view === "dia" && <div className={`cal-daypanel slide-${dir}`} key={anchor}>{dayList(anchor)}</div>}
     </section>
   );
 }

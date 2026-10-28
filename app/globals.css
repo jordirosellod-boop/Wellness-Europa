@@ -1394,3 +1394,56 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, ::picker(select) { animation: none !important; transition: none !important; }
 }
+
+/* --- Pestanyes: el color s'omple des del centre i el contingut entra suau --- */
+.tabs button, .toggle button, .weekdays button {
+  background-color: #fff;
+  background-image: linear-gradient(var(--blau), var(--blau));
+  background-repeat: no-repeat; background-position: center; background-size: 0% 100%;
+  transition: background-size .38s var(--ease), color .25s var(--ease), border-color .25s var(--ease), transform .15s var(--ease), box-shadow .25s var(--ease);
+}
+.tabs button[aria-pressed="true"], .toggle button[aria-pressed="true"], .weekdays button[aria-pressed="true"] {
+  background-color: #fff; background-image: linear-gradient(var(--blau), var(--blau)); background-repeat: no-repeat; background-position: center;
+  background-size: 100% 100%; color: #fff; animation: none;
+  box-shadow: 0 4px 12px rgba(10, 46, 160, .22);
+}
+.tabs button:disabled, .toggle button:disabled { opacity: .55; }
+@media (hover: hover) {
+  .tabs button:not([aria-pressed="true"]):hover, .toggle button:not([aria-pressed="true"]):hover, .weekdays button:not([aria-pressed="true"]):hover {
+    background-color: var(--blau-clar); background-size: 12% 100%;
+  }
+}
+/* El que hi ha sota les pestanyes torna a entrar quan es canvia de pestanya */
+.tabs ~ section, .tabs ~ .card, .tabs ~ div:not(.tabs) { animation: card-in .4s var(--ease) both; }
+
+/* --- Calendari ------------------------------------------------------- */
+@keyframes cal-next { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+@keyframes cal-prev { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+@keyframes cell-in { from { opacity: 0; transform: translateY(6px) scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes today-ring { 0%, 100% { box-shadow: 0 0 0 0 rgba(219, 179, 77, .55); } 50% { box-shadow: 0 0 0 5px rgba(219, 179, 77, 0); } }
+@keyframes dot-pop { from { transform: scale(0); } to { transform: scale(1); } }
+.cal-title.slide-next, .cal-week.slide-next, .cal-daypanel.slide-next { animation: cal-next .35s var(--ease) both; }
+.cal-title.slide-prev, .cal-week.slide-prev, .cal-daypanel.slide-prev { animation: cal-prev .35s var(--ease) both; }
+.cal-daypanel { animation: dd-in .3s var(--ease) both; }
+.cal-grid .cal-day { animation: cell-in .32s var(--ease) both; animation-delay: calc(var(--i, 0) * 9ms); }
+.cal-grid.slide-prev .cal-day { animation-delay: calc((41 - var(--i, 0)) * 9ms); }
+.cal-day { transition: background-color .22s var(--ease), color .22s var(--ease), border-color .22s var(--ease), transform .15s var(--ease), box-shadow .25s var(--ease); }
+.cal-day:active { transform: scale(.93); }
+.cal-day[aria-pressed="true"] { box-shadow: 0 6px 14px rgba(10, 46, 160, .28); transform: translateY(-1px); }
+.cal-day.today:not([aria-pressed="true"]) { animation: cell-in .32s var(--ease) both, today-ring 2.4s ease-in-out .6s infinite; animation-delay: calc(var(--i, 0) * 9ms), .6s; }
+.cal-day .dot { animation: dot-pop .35s var(--ease-back) both; animation-delay: calc(var(--i, 0) * 9ms + .15s); }
+@media (hover: hover) {
+  .cal-day:not([aria-pressed="true"]):hover { transform: translateY(-2px); border-color: var(--blau); box-shadow: 0 4px 10px rgba(11, 24, 70, .12); }
+}
+.cal-weekday { animation: card-in .35s var(--ease) both; }
+.cal-weekday:nth-child(2) { animation-delay: .03s; } .cal-weekday:nth-child(3) { animation-delay: .06s; }
+.cal-weekday:nth-child(4) { animation-delay: .09s; } .cal-weekday:nth-child(5) { animation-delay: .12s; }
+.cal-weekday:nth-child(6) { animation-delay: .15s; } .cal-weekday:nth-child(7) { animation-delay: .18s; }
+@media (prefers-reduced-motion: reduce) {
+  .tabs button, .toggle button, .weekdays button { transition: none; }
+}
+.seg-toggle button {
+  background-color: #fff; background-image: linear-gradient(var(--navy), var(--navy)); background-repeat: no-repeat; background-position: center; background-size: 0% 100%;
+  transition: background-size .35s var(--ease), color .25s var(--ease);
+}
+.seg-toggle button[aria-pressed="true"] { background-color: #fff; background-image: linear-gradient(var(--navy), var(--navy)); background-repeat: no-repeat; background-position: center; background-size: 100% 100%; }
