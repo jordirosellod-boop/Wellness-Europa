@@ -2195,7 +2195,7 @@ html[data-vt="back"]::view-transition-new(root) { animation: vt-in-left .28s cub
 /* Portera: la samarreta groga */
 .shirt-ico.gk .sh-body { fill: #f7d417; stroke: #1b3a8f; }
 .shirt-ico.gk .sh-v, .shirt-ico.gk .sh-sleeve, .shirt-ico.gk .sh-esc { fill: #1b3a8f; }
-.shirt-ico.gk text { fill: #1b3a8f; }
+.shirt-ico.gk text { fill: #111; }
 .shirt-ico.gold .sh-body { fill: #f3dc9a; stroke: #a37a1c; }
 .shirt-ico.gold .sh-v, .shirt-ico.gold .sh-sleeve { fill: var(--navy); }
 .shirt-ico.gold text { fill: var(--navy); }
