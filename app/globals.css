@@ -1865,7 +1865,7 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
 /* Avís a l'inici */
 .convo-banner {
   position: relative; overflow: hidden;
-  background: var(--escapulat) center top / 100% auto no-repeat, linear-gradient(135deg, #061847, var(--navy) 45%, var(--blau));
+  background: var(--escapulat-net) center top / 100% auto no-repeat, linear-gradient(135deg, #061847, var(--navy) 45%, var(--blau));
   box-shadow: 0 10px 24px rgba(1,20,70,.3);
 }
 .convo-banner::after {
@@ -1920,7 +1920,7 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
   position: relative; overflow: hidden; color: #fff; border-radius: 20px; padding: 16px 14px 16px; margin-bottom: 14px; text-align: center;
   background:
     radial-gradient(110% 60% at 50% -10%, rgba(219,179,77,.28), transparent 60%),
-    var(--escapulat) center top / 100% auto no-repeat,
+    var(--escapulat-net) center top / 100% auto no-repeat,
     linear-gradient(165deg, #061847, var(--navy) 45%, var(--blau));
   box-shadow: 0 16px 34px rgba(1,20,70,.35), inset 0 0 0 2px rgba(219,179,77,.55);
   animation: card-in .5s var(--ease) both;
@@ -2018,7 +2018,7 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
     linear-gradient(115deg, transparent 20%, rgba(255,0,170,.25) 35%, rgba(0,220,255,.25) 50%, rgba(255,230,0,.25) 65%, transparent 80%);
   background-size: 100% 100%, 250% 250%; animation: pcard-holo 6s ease-in-out infinite;
 }
-.pcard::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: var(--escapulat) center top / 100% auto no-repeat; }
+.pcard::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: var(--escapulat-net) center top / 100% auto no-repeat; }
 .pcard.gold::before, .pcard.silver::before { background: var(--escapulat-fosc) center top / 100% auto no-repeat; }
 .pcard > * { position: relative; }
 .pcard-top { display: flex; justify-content: space-between; align-items: flex-start; }
@@ -2126,7 +2126,7 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
 .mw.s-esf { background: linear-gradient(160deg, #1e293b, #b91c1c 70%, #f97316); }
 .mw.s-par { background: linear-gradient(160deg, #022e91, #0b1846 60%, #000); }
 .mw.s-lli { background: linear-gradient(160deg, #7a5a12, #c79a2e 55%, #f6e3a8); color: #1d1503; }
-.mw.s-fi { background: var(--escapulat) center top / 100% auto no-repeat, linear-gradient(165deg, #061847, var(--navy) 50%, var(--blau)); }
+.mw.s-fi { background: var(--escapulat-net) center top / 100% auto no-repeat, linear-gradient(165deg, #061847, var(--navy) 50%, var(--blau)); }
 .mw-bars { display: flex; gap: 4px; margin-bottom: 10px; }
 .mw-bars span { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); overflow: hidden; }
 .mw.s-lli .mw-bars span { background: rgba(0,0,0,.2); }
@@ -2238,7 +2238,7 @@ html[data-vt="back"]::view-transition-new(root) { animation: vt-in-left .28s cub
 /* --- L'«avui» del staff --- */
 .coach-today {
   border-radius: 18px; padding: 14px; margin: 0 0 14px; color: #fff; position: relative; overflow: hidden;
-  background: var(--escapulat) center top / 100% auto no-repeat, linear-gradient(160deg, #061847, var(--navy) 50%, var(--blau));
+  background: var(--escapulat-net) center top / 100% auto no-repeat, linear-gradient(160deg, #061847, var(--navy) 50%, var(--blau));
   box-shadow: 0 12px 28px rgba(1,20,70,.3); animation: card-in .45s var(--ease) both;
 }
 .ct-top { display: flex; align-items: center; gap: 14px; }
@@ -2408,4 +2408,4 @@ a.tile { text-decoration: none; }
 .lib-picker input[type="search"] { padding: 10px 12px; border: 1px solid var(--vora); border-radius: 10px; font: inherit; background: #fff; color: var(--text); -webkit-appearance: none; appearance: none; }
 
 /* Escapulat de l'Europa (la V de la samarreta) com a fons subtil de les targetes fosques */
-:root { --escapulat: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 120'%3E%3Cpath d='M0 0 L100 62 L200 0 L200 22 L100 84 L0 22 Z' fill='white' fill-opacity='.06'/%3E%3Cpath d='M0 30 L100 92 L200 30' fill='none' stroke='%23dbb34d' stroke-opacity='.28' stroke-width='1.1'/%3E%3C/svg%3E"); --escapulat-fosc: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 120'%3E%3Cpath d='M0 0 L100 62 L200 0 L200 22 L100 84 L0 22 Z' fill='black' fill-opacity='.07'/%3E%3Cpath d='M0 30 L100 92 L200 30' fill='none' stroke='white' stroke-opacity='.35' stroke-width='1.1'/%3E%3C/svg%3E"); }
+:root { --escapulat-net: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 120'%3E%3Cpath d='M0 0 L100 62 L200 0 L200 22 L100 84 L0 22 Z' fill='white' fill-opacity='.06'/%3E%3C/svg%3E"); --escapulat: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 120'%3E%3Cpath d='M0 0 L100 62 L200 0 L200 22 L100 84 L0 22 Z' fill='white' fill-opacity='.06'/%3E%3Cpath d='M0 30 L100 92 L200 30' fill='none' stroke='%23dbb34d' stroke-opacity='.28' stroke-width='1.1'/%3E%3C/svg%3E"); --escapulat-fosc: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 120'%3E%3Cpath d='M0 0 L100 62 L200 0 L200 22 L100 84 L0 22 Z' fill='black' fill-opacity='.07'/%3E%3C/svg%3E"); }
