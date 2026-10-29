@@ -36,7 +36,7 @@ function FitSheet({ data }: { data: PublishedData }) {
 }
 
 /** Pantalla de la jugadora: els entrenos que el cos tècnic ha penjat (el d'avui primer). */
-export function PlayerTraining() {
+export function PlayerTraining({ staff = false }: { staff?: boolean } = {}) {
   const today = todayMadrid();
   const [list, setList] = useState<PublishedRow[] | null>(null);
   const [sel, setSel] = useState<string | null>(null);
@@ -88,7 +88,7 @@ export function PlayerTraining() {
       <h1>Entreno</h1>
       {error && <p className="msg error">{error}</p>}
       {!list && !error && <Loading />}
-      {list?.length === 0 && <Empty art="board" title="Encara no hi ha cap entreno penjat" hint="Quan el cos tècnic el pengi, el veuràs aquí amb les tasques i els equips." />}
+      {list?.length === 0 && <Empty art="board" title="Encara no hi ha cap entreno penjat" hint={staff ? "Quan el responsable el pengi des de Plantilles («Penjar a l'app»), el veureu aquí tot el staff." : "Quan el cos tècnic el pengi, el veuràs aquí amb les tasques i els equips."} />}
       {list && list.length > 1 && (
         <div className="tabs convo-tabs" style={{ marginBottom: 10 }}>
           {list.map((x) => (

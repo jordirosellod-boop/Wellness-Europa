@@ -2470,3 +2470,4 @@ a.tile { text-decoration: none; }
 .photo-stage { flex: none; width: 150px; height: 200px; border-radius: 12px; display: grid; place-items: end center; overflow: hidden; background: linear-gradient(170deg, #061847, var(--blau)); }
 .photo-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .convo-grid li.mine.has-photo::after { display: none; } /* la targeta daurada ja diu que és la seva; així no tapa la cara */
+a.wk-banner { text-decoration: none; color: #fff; }

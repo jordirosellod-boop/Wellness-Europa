@@ -23,11 +23,12 @@ type Info = {
   planPublished: boolean | null;
   bibs: { player_id: string; display_name: string; dorsal: number | null } | null;
   away: { id: string; name: string; day: string; reason: string | null }[];
+  trainingToday: boolean;
 };
 
 async function loadInfo(today: string): Promise<Info> {
   const sb = supabase();
-  const [next, inj, players, convos, plan, bibs, week] = await Promise.all([
+  const [next, inj, players, convos, plan, bibs, week, pub] = await Promise.all([
     sb.from("sessions").select(SESSION_COLS).gt("session_date", today).eq("cancelled", false)
       .order("session_date").order("start_time", { nullsFirst: true }).order("id").range(0, 0),
     fetchAll<{ player_id: string; start_date: string }>((f, t) =>
@@ -40,6 +41,7 @@ async function loadInfo(today: string): Promise<Info> {
     fetchAll<{ id: string; session_date: string }>((f, t) =>
       sb.from("sessions").select("id, session_date").gt("session_date", today).lte("session_date", addDays(today, 7))
         .eq("cancelled", false).eq("kind", "Entrenament").order("session_date").order("id").range(f, t)),
+    sb.from("published_trainings").select("plan_id").eq("plan_date", today).range(0, 0),
   ]);
   const notices = await fetchNotices(week.map((w) => w.id)).catch(() => []);
   const dayOf = new Map(week.map((w) => [w.id, w.session_date]));
@@ -53,6 +55,7 @@ async function loadInfo(today: string): Promise<Info> {
     bibs: bibs[0] ?? null,
     away: notices.filter((n) => dayOf.has(n.session_id)).map((n) => ({ id: n.player_id, name: name.get(n.player_id) ?? "?", day: dayOf.get(n.session_id) ?? "", reason: reasonLabel(n.reason) }))
       .sort((a, b) => a.day.localeCompare(b.day) || a.name.localeCompare(b.name, "ca")),
+    trainingToday: !pub.error && (pub.data ?? []).length > 0,
   };
 }
 
@@ -64,6 +67,7 @@ const svg = (d: string) => (
 const TILES: { href: string; label: string; sub: string; icon: ReactNode; owner?: boolean }[] = [
   { href: "/entrenador/convocatoria", label: "Convocatòria", sub: "Llista, onze i amistosos", icon: svg("M9 3h6l1 3h4v15H4V6h4zM9 12l2 2 4-4") },
   { href: "/entrenador/assistencia", label: "Llista", sub: "Passar llista", icon: svg("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M16 11l2 2 4-4") },
+  { href: "/entrenador/entreno", label: "Entreno", sub: "Els entrenos penjats", icon: svg("M9 3h6v4H9zM5 5h4M15 5h4v16H5V5M8 12h8M8 16h5") },
   { href: "/entrenador/planning", label: "Planning", sub: "La setmana i petos", icon: svg("M7 3v4M17 3v4M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z") },
   { href: "/entrenador/carrega", label: "Càrrega", sub: "ACWR i RPE", icon: svg("M3 12h4l3-8 4 16 3-8h4") },
   { href: "/entrenador/estadistiques", label: "Stats", sub: "Partits, gols i targetes", icon: svg("M4 20V10M10 20V4M16 20v-7M22 20H2") },
@@ -145,6 +149,13 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
       </header>
 
       <CoachToday today={today} />
+      {info?.trainingToday && (
+        <Link href="/entrenador/entreno" className="wk-banner train">
+          <span className="wk-banner-k">📋 Entreno d&apos;avui</span>
+          <b>Ja està penjat. Mira les tasques i els equips!</b>
+          <span className="wk-banner-more">Veure l&apos;entreno ›</span>
+        </Link>
+      )}
       {info?.next && <NextUp s={info.next} today={today} />}
 
       {info && (alerts.length > 0 || info.injured.length > 0 || info.away.length > 0) && (
