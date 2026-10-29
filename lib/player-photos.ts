@@ -12,7 +12,29 @@ export function fetchThumbs(): Promise<Map<string, string>> {
   return thumbsCache;
 }
 const cutouts = new Map<string, Promise<string | null>>();
-export const forgetThumbs = () => { thumbsCache = null; cutouts.clear(); };
+let avatarsCache: Promise<Map<string, string>> | null = null;
+export const forgetThumbs = () => { thumbsCache = null; avatarsCache = null; cutouts.clear(); };
+
+/** Els avatars (cap i espatlles) de tot l'equip. Si no n'hi ha cap de col·locat, la foto petita. */
+export function fetchAvatars(): Promise<Map<string, string>> {
+  avatarsCache ??= (async () => {
+    const sb = supabase();
+    const [set, unset] = await Promise.all([
+      fetchAll<{ profile_id: string; avatar: string }>((f, t) =>
+        sb.from("player_photos").select("profile_id, avatar").not("avatar", "is", null).order("profile_id").range(f, t)),
+      fetchAll<{ profile_id: string }>((f, t) =>
+        sb.from("player_photos").select("profile_id").is("avatar", null).order("profile_id").range(f, t)),
+    ]);
+    const m = new Map(set.map((r) => [r.profile_id, r.avatar]));
+    if (unset.length) {
+      const thumbs = await fetchAll<{ profile_id: string; thumb: string }>((f, t) =>
+        sb.from("player_photos").select("profile_id, thumb").in("profile_id", unset.map((r) => r.profile_id)).order("profile_id").range(f, t));
+      for (const r of thumbs) m.set(r.profile_id, r.thumb);
+    }
+    return m;
+  })().catch((e) => { avatarsCache = null; throw e; });
+  return avatarsCache;
+}
 
 /** La foto gran (sencera) d'una jugadora, o null si no en té. */
 export function fetchCutout(profileId: string): Promise<string | null> {

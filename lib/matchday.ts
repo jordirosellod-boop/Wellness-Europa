@@ -1,5 +1,7 @@
 // Dia de partit: compte enrere fins a la quedada i el resultat quan s'acaba.
 
+import { firstName } from "@/lib/first-name";
+import { fetchAvatars } from "@/lib/player-photos";
 import { addDays } from "@/lib/dates";
 import { supabase } from "@/lib/supabase";
 import { TZ } from "@/lib/wellness";
@@ -51,4 +53,31 @@ export function outcome(r: Pick<FcfResult, "home_goals" | "away_goals" | "is_hom
   const us = r.is_home ? r.home_goals : r.away_goals;
   const them = r.is_home ? r.away_goals : r.home_goals;
   return us > them ? "G" : us === them ? "E" : "P";
+}
+
+export type Scorer = { name: string; goals: number; avatar: string | null };
+
+/** Les nostres golejadores d'un partit (de l'acta oficial), amb el nom de l'app i l'avatar si en tenen. */
+export async function fetchScorers(actaId: string): Promise<Scorer[]> {
+  const sb = supabase();
+  const { data: apps, error } = await sb.from("fcf_appearances").select("fcf_id, goals").eq("acta_id", actaId).gt("goals", 0).order("fcf_id").range(0, 49);
+  if (error) throw new Error(error.message);
+  const rows = (apps ?? []) as { fcf_id: string; goals: number }[];
+  if (!rows.length) return [];
+  const [fcf, roster, avatars] = await Promise.all([
+    sb.from("fcf_players").select("fcf_id, full_name, profile_id").in("fcf_id", rows.map((r) => r.fcf_id)).order("fcf_id").range(0, 49),
+    sb.rpc("team_roster").range(0, 199),
+    fetchAvatars().catch(() => new Map<string, string>()),
+  ]);
+  const who = new Map(((fcf.data ?? []) as { fcf_id: string; full_name: string; profile_id: string | null }[]).map((p) => [p.fcf_id, p]));
+  const names = new Map(((roster.data ?? []) as { player_id: string; display_name: string }[]).map((r) => [r.player_id, r.display_name]));
+  // A la FCF: «COGNOMS, NOM» → «Nom»
+  const given = (full: string) => (full.split(",")[1] ?? full).trim().split(/\s+/)[0].toLowerCase().replace(/^\p{L}/u, (c) => c.toUpperCase());
+  return rows
+    .map((r) => {
+      const p = who.get(r.fcf_id);
+      const app = p?.profile_id ? names.get(p.profile_id) : undefined;
+      return { name: app ? firstName(app) : p ? given(p.full_name) : "?", goals: r.goals, avatar: p?.profile_id ? avatars.get(p.profile_id) ?? null : null };
+    })
+    .sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name, "ca"));
 }

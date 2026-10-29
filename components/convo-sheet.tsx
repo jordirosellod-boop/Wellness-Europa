@@ -1,20 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { flushSync } from "react-dom";
-import { PlayerZoom, type Zoomed } from "@/components/player-zoom";
-import { Shirt, useDorsals } from "@/components/shirt";
-import { fetchCutout, fetchThumbs } from "@/lib/player-photos";
-import { transition } from "@/lib/vt";
+import { KitNumber, PlayerGrid } from "@/components/player-grid";
 import { Crest } from "@/components/crest";
 import { hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { kitFont } from "@/lib/fonts";
 import { fmtDate } from "@/lib/wellness";
 
-/** Dorsal amb la tipografia de samarreta (les fletxes ja formen part de la lletra). */
-export function KitNumber({ n }: { n: number | null }) {
-  return <span className="kit-number" aria-label={n == null ? "Sense dorsal" : `Dorsal ${n}`}>{n == null ? "–" : n}</span>;
-}
+export { KitNumber };
 
 function mapsUrl(q: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
@@ -30,41 +22,6 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
   const place = [c.venue, c.address].filter(Boolean).join(", ");
   const kitKey = kitOf(c.kit);
   const kit = kitKey ? KITS.find((k) => k.key === kitKey)! : null;
-  const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
-  const dorsals = useDorsals();
-  useEffect(() => {
-    let alive = true;
-    fetchThumbs().then((m) => alive && setThumbs(m), () => {});
-    return () => { alive = false; };
-  }, []);
-
-  // Tocar una convocada amb foto: la foto creix des del quadradet fins a la fitxa gran (i hi torna en tancar).
-  const [zoom, setZoom] = useState<Zoomed | null>(null);
-  const grid = useRef<HTMLUListElement>(null);
-  const tileImg = (id: string) => grid.current?.querySelector<HTMLElement>(`li[data-id="${CSS.escape(id)}"] .cv-photo img`) ?? null;
-  async function open(r: RosterRow) {
-    const thumb = thumbs.get(r.player_id);
-    if (!thumb) return;
-    const photo = await fetchCutout(r.player_id).catch(() => null) ?? thumb;
-    const img = tileImg(r.player_id);
-    if (img) img.style.viewTransitionName = "pz-photo";
-    transition("zoom", () => {
-      if (img) img.style.viewTransitionName = "";
-      flushSync(() => setZoom({ row: r, photo }));
-    });
-  }
-  const shut = useCallback(() => {
-    const img = zoom ? tileImg(zoom.row.player_id) : null;
-    transition("zoom", () => {
-      flushSync(() => setZoom(null));
-      if (img) img.style.viewTransitionName = "pz-photo";
-    }, () => { if (img) img.style.viewTransitionName = ""; });
-  }, [zoom]);
-  const tap = (r: RosterRow) => thumbs.has(r.player_id) ? {
-    role: "button", tabIndex: 0, "aria-label": `Veure ${r.display_name}`,
-    onClick: (e: MouseEvent) => { e.preventDefault(); open(r); },
-    onKeyDown: (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(r); } },
-  } : {};
 
   return (
     <article className={`convo ${kitFont.variable}`}>
@@ -126,23 +83,7 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
       {called.length === 0 ? (
         <p className="muted small">Encara no hi ha cap jugadora convocada.</p>
       ) : (
-        <ul className="convo-grid" ref={grid}>
-          {called.map((r) => (
-            <li key={r.player_id} data-id={r.player_id} className={`${r.player_id === meId ? "mine" : ""}${thumbs.has(r.player_id) ? " has-photo" : ""}`} {...tap(r)}>
-              <div className="cv-photo">
-                {thumbs.has(r.player_id) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={thumbs.get(r.player_id)} alt="" loading="lazy" />
-                ) : <Shirt n={null} gk={dorsals.get(r.player_id)?.gk} size={58} />}
-              </div>
-              <div className="cv-foot">
-                <KitNumber n={r.dorsal} />
-                <span className="kit-name">{r.display_name}</span>
-              </div>
-              {r.origin && <span className="kit-origin">{r.origin}</span>}
-            </li>
-          ))}
-        </ul>
+        <PlayerGrid rows={called} meId={meId} />
       )}
 
       {notCalled.length > 0 && (
@@ -151,7 +92,6 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
           <ul className="convo-out">{notCalled.map((r) => <li key={r.player_id}>{r.display_name}</li>)}</ul>
         </>
       )}
-      {zoom && <PlayerZoom z={zoom} gk={dorsals.get(zoom.row.player_id)?.gk} onClose={shut} />}
     </article>
   );
 }

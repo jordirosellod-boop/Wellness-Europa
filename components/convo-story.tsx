@@ -5,7 +5,7 @@ import { crestFor, useCrests } from "@/components/crest";
 import { prettyTeam } from "@/lib/analysis";
 import { drawConvoStory, drawResultStory, shareOrDownload } from "@/lib/convo-story";
 import type { Convocation, RosterRow } from "@/lib/convo";
-import { outcome, type FcfResult } from "@/lib/matchday";
+import { fetchScorers, outcome, type FcfResult } from "@/lib/matchday";
 import { fetchCutout } from "@/lib/player-photos";
 
 /** Botó que fa la story al moment (al mòbil), l'ensenya i la deixa compartir o baixar. */
@@ -59,16 +59,17 @@ export function ConvoStoryButton({ c, me }: { c: Convocation; me: RosterRow }) {
   );
 }
 
-/** «📸 Story del resultat»: els dos escuts i el marcador, per compartir en acabar el partit. */
+/** «📸 Story del resultat»: els dos escuts, el marcador i les nostres golejadores, per compartir en acabar el partit. */
 export function ResultStoryButton({ r }: { r: FcfResult }) {
   const teams = useCrests();
   const home = prettyTeam(r.home), away = prettyTeam(r.away);
   return (
     <StoryCard label="📸 Story del resultat" busyLabel="Preparant la story…" alt={`Story del resultat: ${home} ${r.home_goals} – ${away} ${r.away_goals}`}
       fname={`resultat-${r.kickoff?.slice(0, 10) ?? r.acta_id}.png`}
-      make={() => drawResultStory({
+      make={async () => drawResultStory({
         home, away, homeGoals: r.home_goals, awayGoals: r.away_goals, isHome: r.is_home, outcome: outcome(r),
         date: r.kickoff?.slice(0, 10) ?? null, homeCrest: crestFor(teams, home), awayCrest: crestFor(teams, away),
+        scorers: await fetchScorers(r.acta_id).catch(() => []),
       })} />
   );
 }

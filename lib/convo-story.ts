@@ -102,11 +102,13 @@ const RESULT_TITLE = { G: "VICTÒRIA!", E: "EMPAT", P: "SEGUIM ENDAVANT" } as co
 export async function drawResultStory(o: {
   home: string; away: string; homeGoals: number; awayGoals: number; isHome: boolean;
   outcome: "G" | "E" | "P"; date: string | null; homeCrest: string | null; awayCrest: string | null;
+  scorers?: { name: string; goals: number; avatar: string | null }[];
 }): Promise<Blob> {
   const ESC = family("--font-escapulada", "Impact, sans-serif");
   await document.fonts.load(`100px ${ESC}`).catch(() => {});
   const soft = (src: string | null) => (src ? img(src).catch(() => null) : Promise.resolve(null));
-  const [club, hc, ac] = await Promise.all([img("/escut.png"), soft(o.homeCrest), soft(o.awayCrest)]);
+  const scorers = (o.scorers ?? []).slice(0, 6);
+  const [club, hc, ac, faces] = await Promise.all([img("/escut.png"), soft(o.homeCrest), soft(o.awayCrest), Promise.all(scorers.map((x) => soft(x.avatar)))]);
 
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
@@ -132,11 +134,12 @@ export async function drawResultStory(o: {
   // Títol
   x.textAlign = "center"; x.textBaseline = "alphabetic";
   x.fillStyle = win ? ORL : "#fff"; fit(RESULT_TITLE[o.outcome], 150, W - 112);
-  x.fillText(RESULT_TITLE[o.outcome], W / 2, 390);
+  const up = scorers.length ? 50 : 0; // amb golejadores, tot una mica més amunt
+  x.fillText(RESULT_TITLE[o.outcome], W / 2, 390 - up);
 
   // Els dos escuts amb el nom a sota
   const crest = (im: HTMLImageElement | null, name: string, cx: number, us: boolean) => {
-    const box = 280, top = 470;
+    const box = 280 - up, top = 470 - up * 1.4;
     x.save(); x.shadowColor = "rgba(0,0,20,.5)"; x.shadowBlur = 30; x.shadowOffsetY = 12;
     if (im) {
       const k = Math.min(box / im.width, box / im.height), w = im.width * k, h = im.height * k;
@@ -159,7 +162,44 @@ export async function drawResultStory(o: {
   const sc = `${o.homeGoals}–${o.awayGoals}`;
   fit(sc, 260, W - 160);
   x.save(); x.shadowColor = "rgba(0,0,20,.45)"; x.shadowBlur = 24; x.shadowOffsetY = 10;
-  x.fillText(sc, W / 2, 1140); x.restore();
+  x.fillText(sc, W / 2, 1140 - up * 4.1); x.restore();
+
+  // Golejadores: «⚽ Laia ×2», amb la seva cara si en té (fins a dues files)
+  if (scorers.length) {
+    x.font = `40px ${ESC}`; x.textBaseline = "middle"; x.textAlign = "left";
+    const chips = scorers.map((g, i) => {
+      const label = `${g.name.toUpperCase()}${g.goals > 1 ? ` · ${g.goals}` : ""}`;
+      return { label, face: faces[i], w: 64 + 14 + x.measureText(label).width + 30 };
+    });
+    const rows: (typeof chips)[] = [[]];
+    let width = 0;
+    for (const c of chips) {
+      if (width + c.w > W - 140 && rows[rows.length - 1].length) { if (rows.length === 2) break; rows.push([]); width = 0; }
+      rows[rows.length - 1].push(c); width += c.w + 18;
+    }
+    rows.forEach((row, ri) => {
+      const total = row.reduce((a, c) => a + c.w, 0) + 18 * (row.length - 1);
+      let cx = W / 2 - total / 2;
+      const cy = 1062 + ri * 80;
+      for (const c of row) {
+        x.fillStyle = "rgba(255,255,255,.12)"; x.beginPath(); x.roundRect(cx, cy - 38, c.w, 76, 38); x.fill();
+        x.save(); x.beginPath(); x.arc(cx + 38, cy, 30, 0, Math.PI * 2); x.clip();
+        if (c.face) {
+          const k = 60 / Math.min(c.face.width, c.face.height);
+          x.fillStyle = "#2a5bd7"; x.fillRect(cx + 8, cy - 30, 60, 60);
+          x.drawImage(c.face, cx + 38 - (c.face.width * k) / 2, cy - 30, c.face.width * k, c.face.height * k);
+        } else {
+          x.fillStyle = "#fff"; x.fillRect(cx + 8, cy - 30, 60, 60);
+          x.font = `38px sans-serif`; x.textAlign = "center"; x.fillText("⚽", cx + 38, cy + 2); x.textAlign = "left";
+        }
+        x.restore();
+        x.strokeStyle = "#fff"; x.lineWidth = 3; x.beginPath(); x.arc(cx + 38, cy, 30, 0, Math.PI * 2); x.stroke();
+        x.fillStyle = "#fff"; x.font = `40px ${ESC}`; x.fillText(c.label, cx + 82, cy + 3);
+        cx += c.w + 18;
+      }
+    });
+    x.textAlign = "center";
+  }
 
   // Peu
   x.fillStyle = OR; x.beginPath(); x.roundRect(W / 2 - 200, H - 150, 400, 56, 28); x.fill();

@@ -15,6 +15,7 @@ import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
+import { Squad } from "@/components/squad";
 import { Shirt, useDorsals } from "@/components/shirt";
 import { fetchAvatar } from "@/lib/player-photos";
 import { AbsenceButton } from "@/components/absence-button";
@@ -151,8 +152,8 @@ function PasteLink() {
   );
 }
 
-type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning" | "entreno" | "cromo";
-const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo", "planning", "entreno", "cromo"];
+type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning" | "entreno" | "cromo" | "plantilla";
+const SECTIONS: Section[] = ["inici", "avui", "calendari", "multes", "normes", "avisos", "stats", "lliga", "assistencia", "convo", "planning", "entreno", "cromo", "plantilla"];
 
 function sectionFromUrl(): Section {
   const s = new URLSearchParams(window.location.search).get("s") as Section | null;
@@ -287,6 +288,7 @@ function PlayerHome({ me }: { me: Profile }) {
       {sessions !== null && section === "convo" && <PlayerConvo meId={me.id} />}
       {sessions !== null && section === "planning" && <PlayerPlanning meId={me.id} />}
       {sessions !== null && section === "entreno" && <PlayerTraining />}
+      {sessions !== null && section === "plantilla" && <Squad meId={me.id} />}
       {sessions !== null && section === "cromo" && (
         <>
           <h1>El meu cromo</h1>
@@ -697,6 +699,11 @@ function Dashboard({
           {svg("M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM9 7h6M8 17h8M12 10l1.2 2.4 2.6.4-1.9 1.8.5 2.6L12 16l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z")}
           <b>El meu cromo</b>
           <span>La teva carta de jugadora</span>
+        </button>
+        <button type="button" className="tile" onClick={(e) => go("plantilla", e.currentTarget)}>
+          {svg("M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6")}
+          <b>La plantilla</b>
+          <span>Totes les companyes</span>
         </button>
         <button type="button" className="tile" onClick={(e) => go("stats", e.currentTarget)}>
           {svg("M4 20V10M10 20V4M16 20v-7M22 20H2")}

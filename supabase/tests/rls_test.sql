@@ -718,6 +718,21 @@ reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.team_dorsals()$$, 'Anònim no veu els dorsals');
 reset role;
 
+-- =============== PLANTILLA (nom i dorsal de les companyes) ===============
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.team_roster()) = (select count(*) from public.team_dorsals())
+  and (select display_name is not null from public.team_roster() where player_id = '00000000-0000-0000-0000-0000000000e5'), 'La jugadora veu la plantilla (nom i dorsal)');
+select pg_temp.check((select goalkeeper from public.team_roster() where player_id = '00000000-0000-0000-0000-0000000000e5'), 'A la plantilla, la portera surt marcada');
+select pg_temp.check((select count(*) from public.team_roster() where player_id = '00000000-0000-0000-0000-00000000000a') = 0, 'El staff no surt a la plantilla');
+select pg_temp.check((select count(*) from public.profiles) = 1, 'Però continua sense poder llegir els perfils de les altres');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.check((select count(*) from public.team_roster()) >= 2, 'El staff veu la plantilla');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000cc', false); set role authenticated;
+select pg_temp.check((select count(*) from public.team_roster()) = 0, 'Un compte sense perfil no veu la plantilla');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.team_roster()$$, 'Anònim no veu la plantilla');
+reset role;
+
 -- =============== SALUTACIÓ DEL STAFF ===============
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 insert into public.staff_greetings (greeting) values ('Rose');

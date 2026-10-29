@@ -2,11 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { KitNumber } from "@/components/convo-sheet";
-import type { RosterRow } from "@/lib/convo";
+import { KitNumber } from "@/components/player-grid";
 import { kitFont } from "@/lib/fonts";
 
-export type Zoomed = { row: RosterRow; photo: string };
+export type Zoomed = { row: { player_id: string; display_name: string; dorsal: number | null; origin?: string | null }; photo: string };
 
 /** La fitxa gran d'una convocada: la foto ve creixent des del seu quadradet (veure convo-sheet). */
 export function PlayerZoom({ z, gk, onClose }: { z: Zoomed; gk?: boolean; onClose: () => void }) {

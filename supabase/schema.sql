@@ -1326,6 +1326,21 @@ language sql stable security definer set search_path = '' as $$
   order by p.id;
 $$;
 
+-- La plantilla: nom, dorsal i si és portera de cada jugadora (res més). La veu l'equip.
+create or replace function public.team_roster()
+returns table (player_id uuid, display_name text, dorsal smallint, goalkeeper boolean)
+language sql stable security definer set search_path = '' as $$
+  select p.id, p.display_name,
+         coalesce(n.dorsal, (select case when f.dorsal ~ '^[0-9]{1,2}$' then f.dorsal::smallint end
+                             from public.fcf_players f where f.profile_id = p.id limit 1)),
+         coalesce(pp.position = 'PO', false)
+  from public.profiles p
+  left join public.player_numbers n on n.profile_id = p.id
+  left join public.player_positions pp on pp.profile_id = p.id
+  where p.role = 'player' and ((select public.is_coach()) or (select public.is_player()))
+  order by 3 nulls last, p.display_name, p.id;
+$$;
+
 -- Llista de la convocatòria: totes les jugadores, amb el dorsal i si estan convocades.
 -- El staff la veu sempre; una jugadora, només si la convocatòria està publicada.
 create or replace function public.convo_roster(cid uuid)
@@ -1662,8 +1677,8 @@ revoke all on function public.bib_schedule(date, date) from public, anon;
 grant execute on function public.bib_schedule(date, date) to authenticated, service_role;
 revoke all on function public.notice_is_open(uuid) from public, anon;
 grant execute on function public.notice_is_open(uuid) to authenticated;
-revoke all on function public.team_dorsals() from public, anon;
-grant execute on function public.team_dorsals() to authenticated;
+revoke all on function public.team_dorsals(), public.team_roster() from public, anon;
+grant execute on function public.team_dorsals(), public.team_roster() to authenticated;
 revoke all on function public.convo_roster(uuid) from public, anon;
 grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
