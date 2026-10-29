@@ -5,8 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CoachToday } from "@/components/coach-today";
 import { DutiesCard } from "@/components/duties";
 import { SeasonFx } from "@/components/season";
-import { Avatar, useAvatars } from "@/components/avatar";
-import { useDorsals } from "@/components/shirt";
+import { Shirt, useDorsals } from "@/components/shirt";
 import { fetchBibs } from "@/lib/bibs";
 import { fetchNotices } from "@/lib/absence";
 import { reasonLabel } from "@/lib/attendance";
@@ -90,7 +89,6 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
   const shown = greeting ?? firstName(name);
   const [part, hello] = GREET(nowMadridHHMM());
   const dorsals = useDorsals();
-  const avatars = useAvatars();
   useEffect(() => {
     let alive = true;
     supabase().from("staff_greetings").select("greeting").eq("profile_id", meId).maybeSingle()
@@ -174,7 +172,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
                 <Link href="/entrenador/assistencia"><b>{info.away.length} {info.away.length === 1 ? "baixa avisada" : "baixes avisades"}</b> els propers dies ›</Link>
                 <span className="sh-injured">
                   {info.away.map((a) => (
-                    <span key={`${a.id}${a.day}`}><Avatar src={avatars.get(a.id)} n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={22} />{a.name}<small> · {fmtShort(a.day)} · {a.reason}</small></span>
+                    <span key={`${a.id}${a.day}`}><Shirt n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={22} />{a.name}<small> · {fmtShort(a.day)} · {a.reason}</small></span>
                   ))}
                 </span>
               </li>
@@ -186,7 +184,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
                 </Link>
                 <span className="sh-injured">
                   {info.injured.map((i) => (
-                    <span key={i.id}><Avatar src={avatars.get(i.id)} n={dorsals.get(i.id)?.n} gk={dorsals.get(i.id)?.gk} size={22} />{i.name}<small> · des del {fmtShort(i.since)}</small></span>
+                    <span key={i.id}><Shirt n={dorsals.get(i.id)?.n} gk={dorsals.get(i.id)?.gk} size={22} />{i.name}<small> · des del {fmtShort(i.since)}</small></span>
                   ))}
                 </span>
               </li>
@@ -200,7 +198,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
           {info.bibs && (
             <section className="card sh-bibs">
               <h2>🦺 Petos avui</h2>
-              <p><Avatar src={avatars.get(info.bibs.player_id)} n={info.bibs.dorsal} gk={dorsals.get(info.bibs.player_id)?.gk} size={34} /><b>{info.bibs.display_name}</b></p>
+              <p><Shirt n={info.bibs.dorsal} gk={dorsals.get(info.bibs.player_id)?.gk} size={34} /><b>{info.bibs.display_name}</b></p>
             </section>
           )}
           <DutiesCard title="Material i porteria" />
