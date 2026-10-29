@@ -2483,8 +2483,7 @@ a.wk-banner { text-decoration: none; color: #fff; }
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--blau), 0 6px 14px rgba(0,0,20,.3);
   animation: pop-in .45s var(--ease-back) .15s both;
 }
-.greet-me.photo { place-items: end center; }
-.greet-me.photo img { width: 100%; height: 90%; object-fit: contain; object-position: center bottom; transform: scale(1.04); transform-origin: center bottom; }
+.greet-me.photo img { width: 100%; height: 100%; object-fit: cover; object-position: center top; } /* la part de dalt de la foto petita: cap i espatlles */
 .greet-me:not(.photo) { background: #fff; }
 .greet-me.gk { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #111, 0 6px 14px rgba(0,0,20,.3); }
 .greet-me:focus-visible { outline: 3px solid var(--or); outline-offset: 4px; }
@@ -2530,3 +2529,42 @@ html[data-vt="zoom"]::view-transition-old(root) { animation: vt-out .25s ease bo
 html[data-vt="zoom"]::view-transition-new(root) { animation: vt-in .25s ease both; }
 /* A la fitxa, la barra de dalt i la de baix van amb la resta (si no, quedarien per sobre del fons fosc) */
 html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition-name: none; }
+
+/* --- Retallar i col·locar les fotos (staff) --- */
+.photo-edit { display: grid; gap: 8px; padding: 12px; margin: 8px 0; border-radius: 14px; background: #eef4ff; border: 1px solid #c9d7f7; }
+.photo-edit p { margin: 0; }
+.crop-box { position: relative; justify-self: center; max-width: 100%; touch-action: none; user-select: none; line-height: 0; }
+.crop-box img { display: block; max-width: 100%; max-height: 62vh; border-radius: 8px; }
+.crop-rect {
+  position: absolute; cursor: move; border: 2px solid #fff; border-radius: 4px; outline: 1px solid rgba(0,0,0,.35);
+  box-shadow: 0 0 0 9999px rgba(6,24,71,.55);
+}
+.crop-box { overflow: hidden; border-radius: 8px; }
+.crop-rect:focus-visible { outline: 3px solid var(--or); }
+.crop-h { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 3px solid var(--blau); box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.crop-h.nw { left: -4px; top: -4px; cursor: nwse-resize; }
+.crop-h.ne { right: -4px; top: -4px; cursor: nesw-resize; }
+.crop-h.sw { left: -4px; bottom: -4px; cursor: nesw-resize; }
+.crop-h.se { right: -4px; bottom: -4px; cursor: nwse-resize; }
+.framed { position: relative; display: block; overflow: hidden; flex: none; }
+.framed img { position: absolute; max-width: none; pointer-events: none; user-select: none; }
+.place-row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.place-box {
+  flex: none; overflow: hidden; border-radius: 12px; cursor: grab; touch-action: none; user-select: none;
+  background: var(--escapulat-net) center top / 100% auto no-repeat, linear-gradient(170deg, #061847, var(--blau));
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
+}
+.place-box:active { cursor: grabbing; }
+.place-box:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
+.place-previews { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.place-k { font-family: var(--display); text-transform: uppercase; letter-spacing: .5px; font-size: .72rem; color: var(--blau); }
+.place-tile { display: flex; flex-direction: column; align-items: center; width: 92px; padding: 6px 6px 4px; border-radius: 12px; background: #fff; box-shadow: 0 4px 12px rgba(1,20,70,.15); margin-bottom: 8px; }
+.place-tile .framed { border-radius: 8px; background: linear-gradient(170deg, #061847, var(--blau)); }
+.place-tile-foot { font-family: var(--font-kit), var(--display); color: var(--navy); font-size: 1.3rem; line-height: 1.1; }
+.place-avatar {
+  width: 56px; height: 56px; border-radius: 50%; overflow: hidden; display: grid; place-items: start center;
+  background: radial-gradient(circle at 50% 30%, #5a8cff, var(--blau) 70%); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--blau);
+}
+.place-avatar.gk { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #111; }
+.place-zoom { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: .9rem; }
+.place-zoom input { flex: 1; min-width: 0; accent-color: var(--blau); }

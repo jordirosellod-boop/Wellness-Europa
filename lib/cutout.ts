@@ -54,17 +54,33 @@ const toData = (c: HTMLCanvasElement) => {
   return webp.startsWith("data:image/webp") ? webp : c.toDataURL("image/png");
 };
 
-/** De la foto original treu: la jugadora sencera sense fons (fins a 900 px d'alt) i la petita, del cap a la cintura. */
-export async function cutoutFromFile(file: File, onStep?: (s: string) => void): Promise<{ cutout: string; thumb: string }> {
+/** Tros de la foto original (de 0 a 1) que s'ha triat abans de treure el fons. */
+export type Crop = { x: number; y: number; w: number; h: number };
+export const FULL_CROP: Crop = { x: 0, y: 0, w: 1, h: 1 };
+
+/** On queda la jugadora a la foto petita: finestra de proporció 4:5 sobre la foto retallada (en píxels d'aquesta). */
+export type Place = { x: number; y: number; h: number };
+export const THUMB_RATIO = 0.8; // amplada / alçada
+const THUMB_H = 500;
+
+/** Per defecte: del cap a la cintura (el 60 % de dalt), centrada. */
+export function defaultPlace(cw: number, ch: number): Place {
+  const h = ch * 0.6;
+  return { x: cw / 2 - (h * THUMB_RATIO) / 2, y: -h * 0.03, h };
+}
+
+/** De la foto original treu la jugadora sencera sense fons (fins a 900 px d'alt), només del tros triat. */
+export async function cutoutFromFile(file: File, crop: Crop = FULL_CROP, onStep?: (s: string) => void): Promise<string> {
   onStep?.("Preparant la foto…");
   const url = URL.createObjectURL(file);
   try {
     const img = await loadImage(url);
+    const sx = img.width * crop.x, sy = img.height * crop.y, sw = Math.max(1, img.width * crop.w), sh = Math.max(1, img.height * crop.h);
     // Màxim 1600 px: prou qualitat i va ràpid.
-    const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const k = Math.min(1, 1600 / Math.max(sw, sh));
     const base = document.createElement("canvas");
-    base.width = Math.round(img.width * k); base.height = Math.round(img.height * k);
-    base.getContext("2d")!.drawImage(img, 0, 0, base.width, base.height);
+    base.width = Math.round(sw * k); base.height = Math.round(sh * k);
+    base.getContext("2d")!.drawImage(img, sx, sy, sw, sh, 0, 0, base.width, base.height);
     onStep?.("Carregant l'eina per retallar (la primera vegada tarda una mica)…");
     const seg = await segmenter();
     onStep?.("Retallant el fons…");
@@ -75,10 +91,20 @@ export async function cutoutFromFile(file: File, onStep?: (s: string) => void): 
     c.width = rc.width; c.height = rc.height;
     c.getContext("2d")!.drawImage(rc as CanvasImageSource, 0, 0);
     const t = trim(c);
-    const cutout = scaled(t, 0, 0, t.width, t.height, 900);
-    const thumb = scaled(t, 0, 0, t.width, Math.round(t.height * 0.6), 420);
-    return { cutout: toData(cutout), thumb: toData(thumb) };
+    return toData(scaled(t, 0, 0, t.width, t.height, 900));
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/** La foto petita (4:5) a partir de la gran i d'on s'ha col·locat. El que queda fora de la foto, transparent. */
+export async function thumbFrom(cutout: string, p: Place): Promise<string> {
+  const img = await loadImage(cutout);
+  const c = document.createElement("canvas");
+  c.height = Math.round(Math.min(THUMB_H, p.h)); c.width = Math.round(c.height * THUMB_RATIO);
+  const k = c.height / p.h;
+  const ctx = c.getContext("2d")!;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, -p.x * k, -p.y * k, img.width * k, img.height * k);
+  return toData(c);
 }
