@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { InjuriesAdmin } from "@/components/injuries-admin";
+import { PhotosAdmin } from "@/components/photos-admin";
 import { LeagueEditor, LevelEditor } from "@/components/league-admin";
 import { CoachShell, Footer } from "@/components/ui";
 import { adminAction, fetchAll, supabase } from "@/lib/supabase";
@@ -71,6 +72,7 @@ function Team({ me }: { me: Profile }) {
       <LevelEditor />
       <LeagueEditor />
       <AddPlayer onDone={load} />
+      <PhotosAdmin players={players} />
       <section className="card">
         <h2>Jugadores ({players.length})</h2>
         <p className="muted small" style={{ marginTop: 0 }}>

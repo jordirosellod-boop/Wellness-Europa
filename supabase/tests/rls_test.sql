@@ -805,3 +805,21 @@ select pg_temp.expect_error($$insert into public.task_library (title, task) valu
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.task_library$$, 'Anònim tampoc');
 reset role;
+
+-- =============== FOTOS DE LES JUGADORES ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.player_photos (profile_id, cutout, thumb) values ('00000000-0000-0000-0000-0000000000b2', 'data:image/webp;base64,AAA', 'data:image/webp;base64,BBB');
+select pg_temp.check((select updated_by = '00000000-0000-0000-0000-00000000000a' from public.player_photos), 'El staff puja la foto d''una jugadora');
+select pg_temp.expect_error($$insert into public.player_photos (profile_id, cutout, thumb) values ('00000000-0000-0000-0000-00000000000a', 'data:image/webp;base64,A', 'data:image/webp;base64,B')$$, 'Només fotos de jugadores');
+select pg_temp.expect_error($$insert into public.player_photos (profile_id, cutout, thumb) values ('00000000-0000-0000-0000-0000000000e5', 'javascript:alert(1)', 'data:image/webp;base64,B')$$, 'Només imatges');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000e5', false); set role authenticated;
+select pg_temp.check((select count(*) from public.player_photos) = 1, 'Les companyes veuen les fotos de l''equip');
+select pg_temp.expect_error($$insert into public.player_photos (profile_id, cutout, thumb) values ('00000000-0000-0000-0000-0000000000e5', 'data:image/webp;base64,A', 'data:image/webp;base64,B')$$, 'Una jugadora no pot pujar fotos');
+with u as (delete from public.player_photos returning 1) select pg_temp.check(count(*) = 0, 'Ni esborrar-ne') from u;
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000cc', false); set role authenticated;
+select pg_temp.check((select count(*) from public.player_photos) = 0, 'Un compte sense perfil no les veu');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.player_photos$$, 'Anònim tampoc');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+with u as (delete from public.player_photos returning 1) select pg_temp.check(count(*) = 1, 'El staff la pot treure quan es demani') from u;
+reset role;

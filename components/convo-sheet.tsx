@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { Shirt, useDorsals } from "@/components/shirt";
+import { fetchThumbs } from "@/lib/player-photos";
 import { Crest } from "@/components/crest";
 import { hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { kitFont } from "@/lib/fonts";
@@ -24,6 +27,13 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
   const place = [c.venue, c.address].filter(Boolean).join(", ");
   const kitKey = kitOf(c.kit);
   const kit = kitKey ? KITS.find((k) => k.key === kitKey)! : null;
+  const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
+  const dorsals = useDorsals();
+  useEffect(() => {
+    let alive = true;
+    fetchThumbs().then((m) => alive && setThumbs(m), () => {});
+    return () => { alive = false; };
+  }, []);
 
   return (
     <article className={`convo ${kitFont.variable}`}>
@@ -87,9 +97,17 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
       ) : (
         <ul className="convo-grid">
           {called.map((r) => (
-            <li key={r.player_id} className={r.player_id === meId ? "mine" : ""}>
-              <KitNumber n={r.dorsal} />
-              <span className="kit-name">{r.display_name}</span>
+            <li key={r.player_id} className={`${r.player_id === meId ? "mine" : ""}${thumbs.has(r.player_id) ? " has-photo" : ""}`}>
+              <div className="cv-photo">
+                {thumbs.has(r.player_id) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={thumbs.get(r.player_id)} alt="" loading="lazy" />
+                ) : <Shirt n={null} gk={dorsals.get(r.player_id)?.gk} size={58} />}
+              </div>
+              <div className="cv-foot">
+                <KitNumber n={r.dorsal} />
+                <span className="kit-name">{r.display_name}</span>
+              </div>
               {r.origin && <span className="kit-origin">{r.origin}</span>}
             </li>
           ))}

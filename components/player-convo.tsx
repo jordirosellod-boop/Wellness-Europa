@@ -3,6 +3,7 @@
 import { Crest } from "@/components/crest";
 import { useEffect, useState } from "react";
 import { ConvoSheet } from "@/components/convo-sheet";
+import { ConvoStoryButton } from "@/components/convo-story";
 import { fetchConvocations, fetchRoster, type Convocation, type RosterRow } from "@/lib/convo";
 import { addDays } from "@/lib/dates";
 import { todayMadrid } from "@/lib/wellness";
@@ -56,6 +57,10 @@ export function PlayerConvo({ meId }: { meId: string }) {
           ))}
         </div>
       )}
+      {c && roster?.id === c.id && (() => {
+        const me = roster.rows.find((r) => r.player_id === meId);
+        return me && c.match_date >= today ? <ConvoStoryButton c={c} me={me} /> : null;
+      })()}
       {c && roster?.id === c.id && <ConvoSheet c={c} roster={roster.rows} meId={meId} />}
       {c && roster?.id !== c.id && !error && <Loading />}
     </>

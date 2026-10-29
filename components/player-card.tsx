@@ -8,6 +8,7 @@ import { addDays } from "@/lib/dates";
 import { kitFont } from "@/lib/fonts";
 import { fetchStreak } from "@/lib/streak";
 import { supabase } from "@/lib/supabase";
+import { fetchCutout } from "@/lib/player-photos";
 
 type CardData = {
   dorsal: string | null;
@@ -57,6 +58,12 @@ async function loadCard(meId: string, today: string): Promise<CardData> {
 
 /** El cromo de la jugadora, estil FIFA. Només el veu ella. Es pot inclinar amb el dit. */
 export function PlayerCard({ meId, name, today }: { meId: string; name: string; today: string }) {
+  const [cutout, setCutout] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchCutout(meId).then((x) => alive && setCutout(x), () => {});
+    return () => { alive = false; };
+  }, [meId]);
   const [d, setD] = useState<CardData | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -90,6 +97,29 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
   const [first, ...rest] = name.trim().split(/\s+/);
 
   return (
+    <>
+    {cutout && (
+      <section className={`p-hero ${kitFont.variable}`} aria-label="El meu perfil">
+        <div className="p-hero-text">
+          <span className="p-hero-k">El meu perfil{d?.dorsal ? ` · Dorsal ${d.dorsal}` : ""}</span>
+          <b className="p-hero-name">{first}</b>
+          {rest.length > 0 && <span className="p-hero-surname">{rest.join(" ")}</span>}
+          <span className="p-hero-team">Juvenil C · {season(today)}</span>
+          {d && (
+            <dl className="p-hero-stats">
+              {([["PJ", d.matches], ["TIT", d.starts], ["GOL", d.goals], ["ENT", d.attendance == null ? "–" : `${d.attendance}%`]] as [string, string | number][]).map(([k, v]) => (
+                <div key={k}><dd>{v}</dd><dt>{k}</dt></div>
+              ))}
+            </dl>
+          )}
+        </div>
+        <div className="p-hero-photo">
+          {d?.dorsal && <span className="p-hero-num" aria-hidden="true">{d.dorsal}</span>}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={cutout} alt="" />
+        </div>
+      </section>
+    )}
     <div className="pcard-wrap">
       <div ref={ref} className={`pcard ${tier} ${kitFont.variable}${d ? "" : " loading"}`} onPointerMove={tilt} onPointerLeave={reset} onPointerUp={reset} onPointerCancel={reset}>
         <div className="pcard-holo" aria-hidden="true" />
@@ -113,5 +143,6 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
         {d && !d.linked && " Els números de partit sortiran quan el staff et relacioni amb la fitxa de la FCF."}
       </p>
     </div>
+    </>
   );
 }

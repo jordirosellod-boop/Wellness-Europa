@@ -2409,3 +2409,64 @@ a.tile { text-decoration: none; }
 
 /* Escapulat de l'Europa (la V de la samarreta) com a fons subtil de les targetes fosques */
 :root { --escapulat-net: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 120'%3E%3Cpath d='M0 0 L100 62 L200 0 L200 22 L100 84 L0 22 Z' fill='white' fill-opacity='.06'/%3E%3C/svg%3E"); --escapulat: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 120'%3E%3Cpath d='M0 0 L100 62 L200 0 L200 22 L100 84 L0 22 Z' fill='white' fill-opacity='.06'/%3E%3Cpath d='M0 30 L100 92 L200 30' fill='none' stroke='%23dbb34d' stroke-opacity='.28' stroke-width='1.1'/%3E%3C/svg%3E"); --escapulat-fosc: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 120'%3E%3Cpath d='M0 0 L100 62 L200 0 L200 22 L100 84 L0 22 Z' fill='black' fill-opacity='.07'/%3E%3C/svg%3E"); }
+
+/* =====================================================================
+   Fotos de les jugadores: convocatòria, perfil, story i pujar-les
+   ===================================================================== */
+/* Convocatòria: foto (o samarreta) a dalt, dorsal i nom a sota */
+.convo-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
+.convo-grid li { padding: 6px 6px 8px; gap: 6px; }
+.convo-grid li::before { display: none; }
+.cv-photo {
+  width: 100%; aspect-ratio: 1 / 1.05; border-radius: 10px; overflow: hidden; display: grid; place-items: end center;
+  background: var(--escapulat-net) center top / 100% auto no-repeat, linear-gradient(170deg, #061847, var(--blau));
+}
+.cv-photo img { display: block; max-width: 100%; height: 98%; object-fit: contain; object-position: center bottom; }
+.cv-photo .shirt-ico { place-self: center; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
+.cv-foot { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 2px; }
+.cv-foot .kit-number { font-size: 1.9rem; flex: none; }
+.cv-foot .kit-name { font-size: .78rem; text-align: right; line-height: 1.05; min-width: 0; }
+.convo-grid li.mine::after { top: 10px; right: 10px; }
+
+/* Perfil amb foto */
+.p-hero {
+  position: relative; overflow: hidden; display: grid; grid-template-columns: 1.15fr 1fr; min-height: 300px; margin: 0 0 16px;
+  border-radius: 20px; color: #fff;
+  background:
+    radial-gradient(60% 60% at 78% 58%, rgba(90,140,255,.45), transparent 70%),
+    var(--escapulat-net) center top / 100% auto no-repeat,
+    linear-gradient(170deg, #061847, var(--blau));
+  box-shadow: 0 16px 34px rgba(1,20,70,.3); animation: card-in .5s var(--ease) both;
+}
+.p-hero-text { position: relative; z-index: 1; display: flex; flex-direction: column; padding: 18px 0 16px 16px; min-width: 0; }
+.p-hero-k { font-family: var(--display); text-transform: uppercase; letter-spacing: 1px; font-size: .78rem; color: var(--or); }
+.p-hero-name { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: 2.6rem; line-height: .95; margin-top: 14px; overflow-wrap: anywhere; }
+.p-hero-surname { font-family: var(--display); text-transform: uppercase; font-size: 1.4rem; color: #f3dc9a; line-height: 1.05; overflow-wrap: anywhere; }
+.p-hero-team { font-family: var(--display); text-transform: uppercase; font-size: .8rem; letter-spacing: .5px; margin-top: 6px; opacity: .9; }
+.p-hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: auto 0 0; padding-top: 14px; }
+.p-hero-stats div { display: flex; flex-direction: column; align-items: center; padding: 6px 2px 5px; border-radius: 10px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); }
+.p-hero-stats dd { margin: 0; font-family: var(--display); font-size: 1.25rem; line-height: 1; }
+.p-hero-stats dt { font-family: var(--display); font-size: .62rem; color: var(--or); letter-spacing: .5px; margin-top: 2px; }
+.p-hero-photo { position: relative; display: flex; align-items: flex-end; justify-content: center; padding-top: 34px; }
+.p-hero-num {
+  position: absolute; left: -6%; top: 28%; font-family: var(--font-kit), var(--display); font-size: 9rem; line-height: 1;
+  color: rgba(255,255,255,.08); -webkit-text-stroke: 2px rgba(255,255,255,.35); pointer-events: none;
+}
+.p-hero-photo img { position: relative; display: block; max-width: 115%; height: 280px; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 0 3px rgba(255,255,255,.55)) drop-shadow(10px 10px 16px rgba(0,0,20,.5)); animation: rise .6s var(--ease) .1s both; }
+
+/* Story */
+.story-card { padding: 12px; }
+.story-preview { display: block; width: 100%; max-width: 360px; margin: 0 auto; border-radius: 12px; box-shadow: 0 10px 26px rgba(1,20,70,.35); animation: pop-in .4s var(--ease-back) both; }
+
+/* Pujar fotos (staff) */
+.photo-grid { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+.photo-grid li { display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
+.photo-tile { position: relative; width: 100%; aspect-ratio: 1 / 1.05; border-radius: 12px; overflow: hidden; display: grid; place-items: end center; background: var(--escapulat-net) center top / 100% auto no-repeat, linear-gradient(170deg, #061847, var(--blau)); }
+.photo-tile img { display: block; max-width: 100%; height: 98%; object-fit: contain; object-position: center bottom; }
+.photo-tile .shirt-ico { place-self: center; }
+.photo-busy { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px; background: rgba(6,24,71,.82); color: #fff; font-size: .72rem; font-weight: 700; }
+.photo-name { font-weight: 600; font-size: .85rem; line-height: 1.1; }
+.photo-draft { display: flex; gap: 14px; align-items: flex-end; padding: 12px; margin: 8px 0; border-radius: 14px; background: #eef4ff; border: 1px solid #c9d7f7; }
+.photo-stage { flex: none; width: 150px; height: 200px; border-radius: 12px; display: grid; place-items: end center; overflow: hidden; background: linear-gradient(170deg, #061847, var(--blau)); }
+.photo-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.convo-grid li.mine.has-photo::after { display: none; } /* la targeta daurada ja diu que és la seva; així no tapa la cara */
