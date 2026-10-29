@@ -162,8 +162,10 @@ export function ResultCard({ today, meId, name }: { today: string; meId?: string
         </span>
         {outcome(r) === "G" && <span className="rc-more">Toca per tornar a celebrar-ho 🎉</span>}
       </button>
-      <ResultStoryButton r={r} />
-      {meId && name && <GoalStoryButton r={r} meId={meId} name={name} />}
+      <div className="card story-row">
+        <ResultStoryButton r={r} />
+        {meId && name && <GoalStoryButton r={r} meId={meId} name={name} />}
+      </div>
     </>
   );
 }

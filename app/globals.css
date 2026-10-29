@@ -2625,3 +2625,10 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .cal-match.win small { background: #d9f5e6; color: #0b6b3f; }
 .cal-match.loss small { background: #fde2e2; color: #9b1c1c; }
 .cal-day[aria-pressed="true"] .cal-match small { background: rgba(255,255,255,.9); }
+
+/* --- Repassada de coherència --- */
+/* Dia de partit: els botons en una sola línia cadascun (si no hi caben, un a sota de l'altre) */
+.md-actions .btn { white-space: nowrap; flex: 1 1 auto; max-width: none; }
+/* Les stories del resultat (del partit i la de gol) juntes en una sola targeta */
+.story-row { display: grid; gap: 8px; padding: 12px; margin: 0 0 14px; }
+.story-row .story-card { padding: 0; margin: 0; background: none; box-shadow: none; border: 0; }
