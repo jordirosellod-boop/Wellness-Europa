@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Crest } from "@/components/crest";
+import { prettyTeam } from "@/lib/analysis";
+import { fetchOurMatches, type OurMatch } from "@/lib/matchday";
 import { addDays, fmtMonth, fmtShort, monthWeeks, moveAnchor, startOfWeek, WEEKDAYS_SHORT, type CalView } from "@/lib/dates";
 import { fmtDate, type Session } from "@/lib/wellness";
 
@@ -49,6 +52,13 @@ export function Calendar({
   renderItem: (item: CalItem) => ReactNode;
   dayFooter?: (day: string) => ReactNode;
 }) {
+  // Dies de partit: l'escut del rival (i el resultat, si ja s'ha jugat) en lloc dels punts
+  const [matches, setMatches] = useState<Map<string, OurMatch>>(new Map());
+  useEffect(() => {
+    let alive = true;
+    fetchOurMatches().then((m) => alive && setMatches(m), () => {});
+    return () => { alive = false; };
+  }, []);
   const byDay = new Map<string, CalItem[]>();
   for (const it of items) {
     const list = byDay.get(it.session.session_date) ?? [];
@@ -119,6 +129,7 @@ export function Calendar({
             {monthWeeks(anchor).flat().map((day, idx) => {
               const list = byDay.get(day) ?? [];
               const out = day.slice(0, 7) !== anchor.slice(0, 7);
+              const match = matches.get(day);
               return (
                 <button
                   key={day}
@@ -126,15 +137,22 @@ export function Calendar({
                   className={`cal-day${out ? " out" : ""}${day === today ? " today" : ""}`}
                   aria-pressed={day === anchor}
                   style={{ ["--i" as string]: idx }}
-                  aria-label={`${fmtDate(day)}: ${list.length ? list.map((i) => `${i.session.name} (${STATUS_LABEL[i.status]})`).join(", ") : "cap sessió"}`}
+                  aria-label={`${fmtDate(day)}: ${match ? `partit contra ${prettyTeam(match.rival)}${match.us != null && match.them != null ? ` (${match.us}-${match.them})` : ""}. ` : ""}${list.length ? list.map((i) => `${i.session.name} (${STATUS_LABEL[i.status]})`).join(", ") : match ? "" : "cap sessió"}`}
                   onClick={() => go(day)}
                 >
                   <span>{Number(day.slice(8))}</span>
-                  <span className="dots">
-                    {list.slice(0, 3).map((i) => (
-                      <i key={i.session.id} className={`dot st-${i.status}`} />
-                    ))}
-                  </span>
+                  {match ? (
+                    <span className={`cal-match${match.us == null || match.them == null ? "" : match.us > match.them ? " win" : match.us === match.them ? " draw" : " loss"}`}>
+                      <Crest name={prettyTeam(match.rival)} size={20} />
+                      {match.us != null && match.them != null && <small>{match.us}-{match.them}</small>}
+                    </span>
+                  ) : (
+                    <span className="dots">
+                      {list.slice(0, 3).map((i) => (
+                        <i key={i.session.id} className={`dot st-${i.status}`} />
+                      ))}
+                    </span>
+                  )}
                 </button>
               );
             })}

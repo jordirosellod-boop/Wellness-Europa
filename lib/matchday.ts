@@ -81,3 +81,24 @@ export async function fetchScorers(actaId: string): Promise<Scorer[]> {
     })
     .sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name, "ca"));
 }
+
+export type OurMatch = { day: string; rival: string; us: number | null; them: number | null };
+let oursCache: Promise<Map<string, OurMatch>> | null = null;
+
+/** Els nostres partits de lliga (de la FCF), per dia: el rival i, si ja s'ha jugat, el resultat. */
+export function fetchOurMatches(): Promise<Map<string, OurMatch>> {
+  oursCache ??= (async () => {
+    const { data, error } = await supabase().from("fcf_matches")
+      .select("acta_id, kickoff, home, away, home_goals, away_goals, is_home").not("kickoff", "is", null)
+      .order("kickoff").order("acta_id").range(0, 199);
+    if (error) throw new Error(error.message);
+    const m = new Map<string, OurMatch>();
+    for (const r of (data ?? []) as (FcfResult & { home_goals: number | null; away_goals: number | null })[]) {
+      const day = r.kickoff!.slice(0, 10);
+      const us = r.is_home ? r.home_goals : r.away_goals, them = r.is_home ? r.away_goals : r.home_goals;
+      m.set(day, { day, rival: r.is_home ? r.away : r.home, us, them });
+    }
+    return m;
+  })().catch((e) => { oursCache = null; throw e; });
+  return oursCache;
+}

@@ -2617,3 +2617,11 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .mw-crest.small { width: 56px; }
 
 .pcard .pcard-holo { position: absolute; z-index: 3; } /* la brillantor, per sobre de tot (també de la foto) */
+
+/* --- Calendari: escut del rival els dies de partit --- */
+.cal-match { display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1; }
+.cal-match .crest { filter: drop-shadow(0 1px 2px rgba(1,20,70,.3)); }
+.cal-match small { font-family: var(--display); font-size: .72rem; letter-spacing: .3px; padding: 1px 4px; border-radius: 6px; background: var(--blau-clar); color: var(--blau); }
+.cal-match.win small { background: #d9f5e6; color: #0b6b3f; }
+.cal-match.loss small { background: #fde2e2; color: #9b1c1c; }
+.cal-day[aria-pressed="true"] .cal-match small { background: rgba(255,255,255,.9); }
