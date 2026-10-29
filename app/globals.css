@@ -2368,3 +2368,13 @@ a.tile { text-decoration: none; }
 .roll-hint { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; vertical-align: middle; }
 .roll-hint.ok { background: #e6f6ec; color: #146c3a; }
 .roll-hint.away { background: #fff1d6; color: #8a5a00; }
+
+/* Multes: termini abans de duplicar-se */
+.fine-due { margin-top: 6px; padding: 7px 10px; border-radius: 10px; font-size: .86rem; display: grid; gap: 5px; }
+.fine-due.ok { background: #eef4ff; color: var(--navy); }
+.fine-due.warm { background: #fff4dc; color: #7a4f00; }
+.fine-due.hot { background: #ffe9e9; color: #9b1c1c; }
+.fine-due.doubled { background: #ffe1e1; color: #9b1c1c; }
+.fine-bar { display: block; height: 5px; border-radius: 999px; background: rgba(0,0,0,.08); overflow: hidden; }
+.fine-bar > i { display: block; height: 100%; border-radius: inherit; background: currentColor; opacity: .6; transition: width .6s var(--ease); }
+.fine-due.hot b { animation: pop-in .5s var(--ease-back) both; }

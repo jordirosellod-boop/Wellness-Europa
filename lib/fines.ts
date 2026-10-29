@@ -10,11 +10,21 @@ export type Fine = {
   notes: string | null;
   paid: boolean;
   paid_at: string | null;
+  due_date: string | null;     // fins quan es pot pagar sense que es dupliqui
+  doubled_at: string | null;   // quan s'ha duplicat (si s'ha duplicat)
+  base_cents: number | null;   // l'import d'abans de duplicar
 };
 
 export type FinesSummary = { total_cents: number; paid_cents: number; pending_cents: number; fines_count: number };
 
-export const FINE_COLS = "id, person_id, rule_id, reason, amount_cents, fine_date, notes, paid, paid_at";
+export const FINE_COLS = "id, person_id, rule_id, reason, amount_cents, fine_date, notes, paid, paid_at, due_date, doubled_at, base_cents";
+
+/** Dies que queden per pagar-la abans que es dupliqui (0 = avui és l'últim dia). null si ja està pagada o duplicada. */
+export function daysToPay(f: Pick<Fine, "paid" | "doubled_at" | "due_date">, today: string): number | null {
+  if (f.paid || f.doubled_at || !f.due_date) return null;
+  const ms = Date.parse(`${f.due_date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`);
+  return Math.max(0, Math.round(ms / 86_400_000));
+}
 
 const EUR = new Intl.NumberFormat("ca-ES", { style: "currency", currency: "EUR" });
 

@@ -26,7 +26,7 @@ import { hhmm } from "@/lib/convo";
 import { PlayerFines } from "@/components/player-fines";
 import { fetchAttendance, fetchSessionsBetween, monthBounds, summarize } from "@/lib/attendance";
 import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
-import { fmtEuros } from "@/lib/fines";
+import { daysToPay, fmtEuros } from "@/lib/fines";
 import { Brand, Footer } from "@/components/ui";
 import { fmtShort, isoDow, startOfWeek, viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -363,6 +363,7 @@ type DashData = {
   plan: WeeklyPlan | null;
   trainingToday: boolean;
   streak: number | null;
+  fineDays: number | null; // dies que queden per pagar la multa que caduca abans
 };
 
 async function loadMonthAttendance(playerId: string, today: string) {
@@ -376,8 +377,8 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
   const [w, r, fines, next, reminders, level, league, attendance, convo, plan, pub, streak] = await Promise.all([
     ids.length ? sb.from("wellness").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
     ids.length ? sb.from("rpe").select("session_id").eq("player_id", playerId).in("session_id", ids) : Promise.resolve({ data: [], error: null }),
-    fetchAll<{ amount_cents: number; paid: boolean }>((f, t) =>
-      sb.from("fines").select("amount_cents, paid").eq("person_id", playerId).order("id").range(f, t),
+    fetchAll<{ amount_cents: number; paid: boolean; due_date: string | null; doubled_at: string | null }>((f, t) =>
+      sb.from("fines").select("amount_cents, paid, due_date, doubled_at").eq("person_id", playerId).order("id").range(f, t),
     ),
     sb.from("sessions").select(SESSION_COLS).gt("session_date", today)
       .order("session_date").order("start_time", { nullsFirst: true }).order("id").range(0, 0),
@@ -404,6 +405,7 @@ async function loadDashboard(playerId: string, today: string, sessions: Session[
       : null,
     mine,
     pending: fines.filter((f) => !f.paid).reduce((a, f) => a + f.amount_cents, 0),
+    fineDays: fines.map((f) => daysToPay(f, today)).reduce<number | null>((m, d) => (d == null ? m : m == null ? d : Math.min(m, d)), null),
     next: ((next.data ?? []) as Session[])[0] ?? null,
     reminders,
     attendance,
@@ -642,7 +644,10 @@ function Dashboard({
         <button type="button" className="tile" onClick={(e) => go("multes", e.currentTarget)}>
           {ICONS.multes}
           <b>Multes</b>
-          <span>{data ? (data.pending ? `Deus ${fmtEuros(data.pending)}` : "Estàs al dia") : "…"}</span>
+          <span>
+            {data ? (data.pending ? `Deus ${fmtEuros(data.pending)}` : "Estàs al dia") : "…"}
+            {data?.fineDays != null && <><br />{data.fineDays === 0 ? "⏳ Avui últim dia!" : `⏳ ${data.fineDays} ${data.fineDays === 1 ? "dia" : "dies"} per pagar`}</>}
+          </span>
         </button>
         <button type="button" className={`tile${data && data.reminders !== "on" ? " tile-alert" : ""}`} onClick={(e) => go("avisos", e.currentTarget)}>
           {svg("M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0")}

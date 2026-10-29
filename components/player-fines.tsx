@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { FINE_COLS, fmtEuros, type Fine, type FineRule, type FinesSummary } from "@/lib/fines";
 import { fetchAll, supabase } from "@/lib/supabase";
-import { fmtDate, friendlyError } from "@/lib/wellness";
+import { fmtDate, friendlyError, todayMadrid } from "@/lib/wellness";
+import { FineDeadline } from "@/components/fine-deadline";
 
 type Data = { mine: Fine[]; pot: FinesSummary | null; rules: FineRule[] };
 
@@ -65,6 +66,7 @@ export function PlayerFines({ playerId, rulesOpen = false }: { playerId: string;
                   {fmtDate(f.fine_date)}
                   {f.notes ? ` · ${f.notes}` : ""}
                 </div>
+                <FineDeadline f={f} today={todayMadrid()} />
               </li>
             ))}
           </ul>

@@ -159,6 +159,15 @@ from public.auto_fine_log l join public.sessions s on s.id = l.session_id
 where f.auto_session_id is null and f.person_id = l.person_id and f.fine_date = s.session_date
   and f.notes = 'Automàtica · ' || case l.kind when 'wellness' then 'wellness' else 'RPE' end || ' no fet · ' || s.name;
 
+-- Termini per pagar: 2 setmanes. Si no s'ha pagat, es duplica (un sol cop). base_cents = l'import abans de duplicar.
+alter table public.fines add column if not exists due_date date;
+alter table public.fines add column if not exists doubled_at timestamptz;
+alter table public.fines add column if not exists base_cents integer check (base_cents is null or base_cents between 1 and 100000);
+-- Les multes que ja hi havia tenen 2 setmanes a partir d'ara (cap es duplica de cop en activar-ho).
+select set_config('app.doubling', 'on', false);
+update public.fines set due_date = greatest(fine_date, (now() at time zone 'Europe/Madrid')::date) + 14 where due_date is null;
+select set_config('app.doubling', 'off', false);
+
 -- Secrets interns (clau de les tasques programades i claus de les notificacions).
 -- Ningú hi té accés des del navegador; només el servidor de l'app i la base de dades.
 create table if not exists public.app_secrets (
@@ -679,18 +688,45 @@ create trigger rpe_stamp before insert or update on public.rpe
   for each row execute function public.stamp_submission();
 
 -- Multes: l'hora de pagament la posa el servidor quan es marca com a pagada.
+-- El termini (2 setmanes des de la multa, o des d'avui si té data antiga) i el duplicat també
+-- els posa el servidor: només la funció de duplicar els pot canviar.
 create or replace function public.stamp_fine()
 returns trigger language plpgsql set search_path = '' as $$
 begin
   if tg_op = 'INSERT' then
     new.created_at := now();
     new.paid_at := case when new.paid then now() end;
-  elsif new.paid is distinct from old.paid then
-    new.paid_at := case when new.paid then now() end;
+    new.due_date := greatest(new.fine_date, (now() at time zone 'Europe/Madrid')::date) + 14;
+    new.doubled_at := null;
+    new.base_cents := null;
   else
-    new.paid_at := old.paid_at;
+    if new.paid is distinct from old.paid then
+      new.paid_at := case when new.paid then now() end;
+    else
+      new.paid_at := old.paid_at;
+    end if;
+    if coalesce(current_setting('app.doubling', true), '') <> 'on' then
+      new.due_date := old.due_date;
+      new.doubled_at := old.doubled_at;
+      new.base_cents := old.base_cents;
+    end if;
   end if;
   return new;
+end $$;
+
+-- Duplica les multes no pagades que han passat el termini (un sol cop). La crida la base de dades cada hora.
+create or replace function public.double_overdue_fines()
+returns integer language plpgsql security definer set search_path = '' as $$
+declare
+  n integer;
+begin
+  perform set_config('app.doubling', 'on', true);
+  update public.fines
+     set base_cents = amount_cents, amount_cents = least(amount_cents * 2, 100000), doubled_at = now()
+   where not paid and doubled_at is null and due_date < (now() at time zone 'Europe/Madrid')::date;
+  get diagnostics n = row_count;
+  perform set_config('app.doubling', 'off', true);
+  return n;
 end $$;
 
 drop trigger if exists fines_stamp on public.fines;
@@ -1572,7 +1608,7 @@ revoke all on function public.convo_roster(uuid) from public, anon;
 grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
 revoke all on function public.wellness_open_at(uuid, timestamp), public.rpe_open_at(uuid, timestamp), public.generate_rule_sessions_internal(),
-  public.apply_auto_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync(), public.trigger_auto_push(), public.attendance_to_league(), public.session_delete_attendance(), public.attendance_rpe_fine() from public, anon, authenticated;
+  public.apply_auto_fines(), public.double_overdue_fines(), public.send_wellness_reminder(), public.trigger_fcf_sync(), public.trigger_auto_push(), public.attendance_to_league(), public.session_delete_attendance(), public.attendance_rpe_fine() from public, anon, authenticated;
 revoke all on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() from public, anon;
 grant execute on function public.generate_rule_sessions(), public.refresh_rule(uuid, boolean), public.fines_summary() to authenticated;
 revoke all on function public.league_table(date), public.league_winners(), public.league_change(uuid, text, integer),
@@ -1871,6 +1907,7 @@ create policy rpe_update on public.rpe for update to authenticated
 
 -- =====================================================================
 -- 6. TASQUES PROGRAMADES (dins la mateixa base de dades)
+--    · cada hora: multes no pagades al cap de 2 setmanes es dupliquen
 --    · cada 15 minuts: multes automàtiques
 --    · 5:30 i 6:30 UTC: recordatori de les 7:30 (només actua a les 7 de Barcelona)
 --    · cada 6 hores: estadístiques de la Federació
@@ -1880,6 +1917,7 @@ create policy rpe_update on public.rpe for update to authenticated
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 select cron.schedule('multes-automatiques', '*/15 * * * *', 'select public.apply_auto_fines()');
+select cron.schedule('multes-duplicades', '7 * * * *', 'select public.double_overdue_fines()');
 select cron.schedule('recordatori-wellness', '30 5,6 * * *', 'select public.send_wellness_reminder()');
 select cron.schedule('estadistiques-fcf', '20 */6 * * *', 'select public.trigger_fcf_sync()');
 select cron.schedule('avisos-automatics', '*/15 * * * *', 'select public.trigger_auto_push()');

@@ -7,6 +7,7 @@ import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, friendlyError, todayMadrid, type Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
+import { FineDeadline } from "@/components/fine-deadline";
 
 export default function FinesPage() {
   return (
@@ -243,6 +244,7 @@ function PersonFines({ person, fines, onChange }: { person: Profile; fines: Fine
                 {fmtDate(f.fine_date)}
                 {f.notes ? ` · ${f.notes}` : ""}
               </div>
+              <FineDeadline f={f} today={todayMadrid()} who="staff" />
               <div className="row" style={{ marginTop: 6 }}>
                 {f.paid ? (
                   <button className="btn small secondary" disabled={busy === f.id} onClick={() => setPaid(f, false)}>Desfer pagament</button>
