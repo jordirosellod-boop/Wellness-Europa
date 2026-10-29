@@ -15,6 +15,19 @@ function img(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/** La V de la samarreta a dalt de tot. El filet daurat només a la convocatòria. */
+function escapulat(x: CanvasRenderingContext2D, gold: boolean) {
+  const ky = 230 / 92, kx = W / 200;
+  x.fillStyle = "rgba(255,255,255,.07)";
+  x.beginPath(); x.moveTo(0, 0); x.lineTo(100 * kx, 62 * ky); x.lineTo(W, 0); x.lineTo(W, 22 * ky); x.lineTo(100 * kx, 84 * ky); x.lineTo(0, 22 * ky); x.closePath(); x.fill();
+  if (!gold) return;
+  x.strokeStyle = "rgba(219,179,77,.45)"; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(0, 30 * ky); x.lineTo(100 * kx, 92 * ky); x.lineTo(W, 30 * ky); x.stroke();
+}
+
+const toBlob = (cv: HTMLCanvasElement) =>
+  new Promise<Blob>((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error("No s'ha pogut fer la imatge."))), "image/png"));
+
 /** Nom de la família de lletra que Next ha posat a la variable CSS (amb les alternatives). */
 const family = (v: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fallback;
 
@@ -37,11 +50,7 @@ export async function drawConvoStory(o: { c: Convocation; name: string; dorsal: 
   sp.addColorStop(0, "rgba(90,140,255,.45)"); sp.addColorStop(1, "rgba(90,140,255,0)");
   x.fillStyle = sp; x.fillRect(0, 0, W, H);
   // Escapulat petit a dalt (la V de la samarreta) amb el filet daurat
-  const ky = 230 / 92, kx = W / 200;
-  x.fillStyle = "rgba(255,255,255,.07)";
-  x.beginPath(); x.moveTo(0, 0); x.lineTo(100 * kx, 62 * ky); x.lineTo(W, 0); x.lineTo(W, 22 * ky); x.lineTo(100 * kx, 84 * ky); x.lineTo(0, 22 * ky); x.closePath(); x.fill();
-  x.strokeStyle = "rgba(219,179,77,.45)"; x.lineWidth = 3;
-  x.beginPath(); x.moveTo(0, 30 * ky); x.lineTo(100 * kx, 92 * ky); x.lineTo(W, 30 * ky); x.stroke();
+  escapulat(x, true);
 
   // Dorsal gran, sota l'escapulat i al costat de la jugadora
   if (o.dorsal != null) {
@@ -84,7 +93,80 @@ export async function drawConvoStory(o: { c: Convocation; name: string; dorsal: 
   const when = `${fmtDate(o.c.match_date).toUpperCase()}${o.c.kickoff ? ` · ${hhmm(o.c.kickoff)} H` : ""} · VS ${o.c.rival.toUpperCase()}`;
   fit(when, 28, W - 112); x.fillText(when, 56, H - 40);
 
-  return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error("No s'ha pogut fer la imatge."))), "image/png"));
+  return toBlob(cv);
+}
+
+const RESULT_TITLE = { G: "VICTÒRIA!", E: "EMPAT", P: "SEGUIM ENDAVANT" } as const;
+
+/** La story del resultat (1080×1350): els dos escuts, el marcador gran i la data. */
+export async function drawResultStory(o: {
+  home: string; away: string; homeGoals: number; awayGoals: number; isHome: boolean;
+  outcome: "G" | "E" | "P"; date: string | null; homeCrest: string | null; awayCrest: string | null;
+}): Promise<Blob> {
+  const ESC = family("--font-escapulada", "Impact, sans-serif");
+  await document.fonts.load(`100px ${ESC}`).catch(() => {});
+  const soft = (src: string | null) => (src ? img(src).catch(() => null) : Promise.resolve(null));
+  const [club, hc, ac] = await Promise.all([img("/escut.png"), soft(o.homeCrest), soft(o.awayCrest)]);
+
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const x = cv.getContext("2d")!;
+  const win = o.outcome === "G";
+
+  const g = x.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#061847"); g.addColorStop(1, "#022e91");
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const sp = x.createRadialGradient(W / 2, H * 0.5, 30, W / 2, H * 0.5, 600);
+  sp.addColorStop(0, win ? "rgba(219,179,77,.32)" : "rgba(90,140,255,.38)"); sp.addColorStop(1, "rgba(90,140,255,0)");
+  x.fillStyle = sp; x.fillRect(0, 0, W, H);
+  escapulat(x, false);
+
+  const fit = (t: string, size: number, max: number) => { let s = size; do { x.font = `${s}px ${ESC}`; s -= 4; } while (x.measureText(t).width > max && s > 24); };
+
+  // Capçalera
+  x.drawImage(club, 56, 48, 96, 96);
+  x.textBaseline = "top"; x.textAlign = "left";
+  x.fillStyle = OR; x.font = `32px ${ESC}`; x.fillText("JUVENIL C · RESULTAT FINAL", 170, 56);
+  x.fillStyle = "#fff"; x.font = `66px ${ESC}`; x.fillText("CE EUROPA", 170, 90);
+
+  // Títol
+  x.textAlign = "center"; x.textBaseline = "alphabetic";
+  x.fillStyle = win ? ORL : "#fff"; fit(RESULT_TITLE[o.outcome], 150, W - 112);
+  x.fillText(RESULT_TITLE[o.outcome], W / 2, 390);
+
+  // Els dos escuts amb el nom a sota
+  const crest = (im: HTMLImageElement | null, name: string, cx: number, us: boolean) => {
+    const box = 280, top = 470;
+    x.save(); x.shadowColor = "rgba(0,0,20,.5)"; x.shadowBlur = 30; x.shadowOffsetY = 12;
+    if (im) {
+      const k = Math.min(box / im.width, box / im.height), w = im.width * k, h = im.height * k;
+      x.drawImage(im, cx - w / 2, top + (box - h) / 2, w, h);
+    } else {
+      x.fillStyle = "rgba(255,255,255,.12)"; x.beginPath(); x.arc(cx, top + box / 2, box / 2.2, 0, Math.PI * 2); x.fill();
+      x.shadowColor = "transparent"; x.fillStyle = "#fff"; x.font = `110px ${ESC}`; x.textBaseline = "middle";
+      x.fillText(name.split(/\s+/).filter((w) => w.length > 1).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?", cx, top + box / 2 + 6);
+      x.textBaseline = "alphabetic";
+    }
+    x.restore();
+    x.fillStyle = us ? OR : "#fff"; fit(name.toUpperCase(), 40, 400);
+    x.fillText(name.toUpperCase(), cx, top + box + 70);
+  };
+  crest(hc, o.home, W * 0.27, o.isHome);
+  crest(ac, o.away, W * 0.73, !o.isHome);
+
+  // Marcador
+  x.fillStyle = "#fff"; x.font = `260px ${ESC}`; x.textBaseline = "alphabetic";
+  const sc = `${o.homeGoals}–${o.awayGoals}`;
+  fit(sc, 260, W - 160);
+  x.save(); x.shadowColor = "rgba(0,0,20,.45)"; x.shadowBlur = 24; x.shadowOffsetY = 10;
+  x.fillText(sc, W / 2, 1140); x.restore();
+
+  // Peu
+  x.fillStyle = OR; x.beginPath(); x.roundRect(W / 2 - 200, H - 150, 400, 56, 28); x.fill();
+  x.fillStyle = NAVY; x.font = `36px ${ESC}`; x.textBaseline = "middle"; x.fillText("FORÇA EUROPA", W / 2, H - 121);
+  if (o.date) { x.fillStyle = "rgba(255,255,255,.85)"; x.font = `28px ${ESC}`; x.fillText(fmtDate(o.date).toUpperCase(), W / 2, H - 52); }
+
+  return toBlob(cv);
 }
 
 /** Comparteix la imatge (WhatsApp, Instagram…) o, si no es pot, la baixa. */

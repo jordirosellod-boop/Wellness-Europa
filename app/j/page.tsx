@@ -15,6 +15,8 @@ import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
+import { Shirt, useDorsals } from "@/components/shirt";
+import { fetchThumbs } from "@/lib/player-photos";
 import { AbsenceButton } from "@/components/absence-button";
 import { SeasonFx } from "@/components/season";
 import { firstName, rememberSplashName } from "@/lib/first-name";
@@ -30,6 +32,7 @@ import { daysToPay, fmtEuros } from "@/lib/fines";
 import { Brand, Footer } from "@/components/ui";
 import { fmtShort, isoDow, startOfWeek, viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
+import { transition } from "@/lib/vt";
 import {
   bandOf,
   fmtDate,
@@ -146,25 +149,6 @@ function PasteLink() {
       {error && <p className="msg error">{error}</p>}
     </div>
   );
-}
-
-type VtKind = "grow" | "slide" | "back";
-type Vt = { finished: Promise<void> };
-
-/** Transició entre pantalles amb la View Transitions API. Sense suport o amb «menys moviment», canvia directament. */
-function transition(kind: VtKind, update: () => void, done?: () => void) {
-  const doc = document as Document & { startViewTransition?: (cb: () => void) => Vt };
-  if (!doc.startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    update();
-    done?.();
-    return;
-  }
-  const root = document.documentElement;
-  root.dataset.vt = kind;
-  doc.startViewTransition(update).finished.finally(() => {
-    delete root.dataset.vt;
-    done?.();
-  });
 }
 
 type Section = "inici" | "avui" | "calendari" | "multes" | "normes" | "avisos" | "stats" | "lliga" | "assistencia" | "convo" | "planning" | "entreno" | "cromo";
@@ -468,7 +452,7 @@ const GREET = { mati: "Bon dia", tarda: "Bona tarda", nit: "Bona nit" } as const
 const dayPart = (hhmm: string): keyof typeof GREET => (hhmm >= "06:00" && hhmm < "13:00" ? "mati" : hhmm >= "13:00" && hhmm < "20:00" ? "tarda" : "nit");
 
 /** Salutació segons l'hora, amb el cel de fons: sol al matí, posta a la tarda i estrelles a la nit. */
-function Greeting({ name, today, level }: { name: string; today: string; level: number | null }) {
+function Greeting({ name, today, level, meId, onMe }: { name: string; today: string; level: number | null; meId: string; onMe: (el: HTMLElement) => void }) {
   const [part, setPart] = useState<keyof typeof GREET>(() => dayPart(nowMadridHHMM()));
   useEffect(() => {
     const id = setInterval(() => setPart(dayPart(nowMadridHHMM())), 60_000);
@@ -477,6 +461,7 @@ function Greeting({ name, today, level }: { name: string; today: string; level: 
   return (
     <header className={`greet ${part}`}>
       <span className="greet-sky" aria-hidden="true" />
+      <MeAvatar meId={meId} onClick={onMe} />
       <h1>{GREET[part]}, {name}!</h1>
       <p className="row" style={{ gap: 8, margin: 0 }}>
         <span>{fmtDate(today)}</span>
@@ -484,6 +469,23 @@ function Greeting({ name, today, level }: { name: string; today: string; level: 
       </p>
       <SeasonFx today={today} />
     </header>
+  );
+}
+
+/** La seva foto (o la samarreta amb el dorsal) a la salutació. Porta al seu cromo. */
+function MeAvatar({ meId, onClick }: { meId: string; onClick: (el: HTMLElement) => void }) {
+  const [thumb, setThumb] = useState<string | null>(null);
+  const me = useDorsals().get(meId);
+  useEffect(() => {
+    let alive = true;
+    fetchThumbs().then((m) => alive && setThumb(m.get(meId) ?? null), () => {});
+    return () => { alive = false; };
+  }, [meId]);
+  return (
+    <button type="button" className={`greet-me${thumb ? " photo" : ""}${me?.gk ? " gk" : ""}`} onClick={(e) => onClick(e.currentTarget)} aria-label="El meu cromo">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {thumb ? <img src={thumb} alt="" /> : <Shirt n={me?.n} gk={me?.gk} size={40} />}
+    </button>
   );
 }
 
@@ -535,7 +537,7 @@ function Dashboard({
 
   return (
     <>
-      <Greeting name={firstName(me.display_name)} today={today} level={data?.level ?? null} />
+      <Greeting name={firstName(me.display_name)} today={today} level={data?.level ?? null} meId={me.id} onMe={(el) => go("cromo", el)} />
       {error && <p className="msg error">{error}</p>}
 
       <MonthWrapBanner meId={me.id} name={me.display_name} today={today} />

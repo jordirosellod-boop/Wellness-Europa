@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { flushSync } from "react-dom";
+import { PlayerZoom, type Zoomed } from "@/components/player-zoom";
 import { Shirt, useDorsals } from "@/components/shirt";
-import { fetchThumbs } from "@/lib/player-photos";
+import { fetchCutout, fetchThumbs } from "@/lib/player-photos";
+import { transition } from "@/lib/vt";
 import { Crest } from "@/components/crest";
 import { hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { kitFont } from "@/lib/fonts";
@@ -34,6 +37,34 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
     fetchThumbs().then((m) => alive && setThumbs(m), () => {});
     return () => { alive = false; };
   }, []);
+
+  // Tocar una convocada amb foto: la foto creix des del quadradet fins a la fitxa gran (i hi torna en tancar).
+  const [zoom, setZoom] = useState<Zoomed | null>(null);
+  const grid = useRef<HTMLUListElement>(null);
+  const tileImg = (id: string) => grid.current?.querySelector<HTMLElement>(`li[data-id="${CSS.escape(id)}"] .cv-photo img`) ?? null;
+  async function open(r: RosterRow) {
+    const thumb = thumbs.get(r.player_id);
+    if (!thumb) return;
+    const photo = await fetchCutout(r.player_id).catch(() => null) ?? thumb;
+    const img = tileImg(r.player_id);
+    if (img) img.style.viewTransitionName = "pz-photo";
+    transition("zoom", () => {
+      if (img) img.style.viewTransitionName = "";
+      flushSync(() => setZoom({ row: r, photo }));
+    });
+  }
+  const shut = useCallback(() => {
+    const img = zoom ? tileImg(zoom.row.player_id) : null;
+    transition("zoom", () => {
+      flushSync(() => setZoom(null));
+      if (img) img.style.viewTransitionName = "pz-photo";
+    }, () => { if (img) img.style.viewTransitionName = ""; });
+  }, [zoom]);
+  const tap = (r: RosterRow) => thumbs.has(r.player_id) ? {
+    role: "button", tabIndex: 0, "aria-label": `Veure ${r.display_name}`,
+    onClick: (e: MouseEvent) => { e.preventDefault(); open(r); },
+    onKeyDown: (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(r); } },
+  } : {};
 
   return (
     <article className={`convo ${kitFont.variable}`}>
@@ -95,9 +126,9 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
       {called.length === 0 ? (
         <p className="muted small">Encara no hi ha cap jugadora convocada.</p>
       ) : (
-        <ul className="convo-grid">
+        <ul className="convo-grid" ref={grid}>
           {called.map((r) => (
-            <li key={r.player_id} className={`${r.player_id === meId ? "mine" : ""}${thumbs.has(r.player_id) ? " has-photo" : ""}`}>
+            <li key={r.player_id} data-id={r.player_id} className={`${r.player_id === meId ? "mine" : ""}${thumbs.has(r.player_id) ? " has-photo" : ""}`} {...tap(r)}>
               <div className="cv-photo">
                 {thumbs.has(r.player_id) ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -120,6 +151,7 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
           <ul className="convo-out">{notCalled.map((r) => <li key={r.player_id}>{r.display_name}</li>)}</ul>
         </>
       )}
+      {zoom && <PlayerZoom z={zoom} gk={dorsals.get(zoom.row.player_id)?.gk} onClose={shut} />}
     </article>
   );
 }

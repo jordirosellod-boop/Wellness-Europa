@@ -11,13 +11,21 @@ export function fetchThumbs(): Promise<Map<string, string>> {
     .catch((e) => { thumbsCache = null; throw e; });
   return thumbsCache;
 }
-export const forgetThumbs = () => { thumbsCache = null; };
+const cutouts = new Map<string, Promise<string | null>>();
+export const forgetThumbs = () => { thumbsCache = null; cutouts.clear(); };
 
 /** La foto gran (sencera) d'una jugadora, o null si no en té. */
-export async function fetchCutout(profileId: string): Promise<string | null> {
-  const { data, error } = await supabase().from("player_photos").select("cutout").eq("profile_id", profileId).maybeSingle();
-  if (error) throw new Error(error.message);
-  return (data?.cutout as string | undefined) ?? null;
+export function fetchCutout(profileId: string): Promise<string | null> {
+  let p = cutouts.get(profileId);
+  if (!p) {
+    p = Promise.resolve(supabase().from("player_photos").select("cutout").eq("profile_id", profileId).maybeSingle()).then(({ data, error }) => {
+      if (error) throw new Error(error.message);
+      return (data?.cutout as string | undefined) ?? null;
+    });
+    p.catch(() => cutouts.delete(profileId));
+    cutouts.set(profileId, p);
+  }
+  return p;
 }
 
 export async function savePhoto(profileId: string, cutout: string, thumb: string): Promise<void> {

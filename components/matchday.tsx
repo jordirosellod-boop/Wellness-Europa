@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Crest } from "@/components/crest";
+import { ResultStoryButton } from "@/components/convo-story";
 import { prettyTeam } from "@/lib/analysis";
 import { hhmm, KITS, kitOf, type Convocation } from "@/lib/convo";
 import { madridEpoch, outcome, phaseOf, recentResult, split, type FcfResult } from "@/lib/matchday";
@@ -161,6 +162,7 @@ export function ResultCard({ today }: { today: string }) {
         </span>
         {outcome(r) === "G" && <span className="rc-more">Toca per tornar a celebrar-ho 🎉</span>}
       </button>
+      <ResultStoryButton r={r} />
     </>
   );
 }

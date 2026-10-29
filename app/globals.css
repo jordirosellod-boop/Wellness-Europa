@@ -2471,3 +2471,62 @@ a.tile { text-decoration: none; }
 .photo-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .convo-grid li.mine.has-photo::after { display: none; } /* la targeta daurada ja diu que és la seva; així no tapa la cara */
 a.wk-banner { text-decoration: none; color: #fff; }
+
+/* =====================================================================
+   Avatar a la salutació i fitxa gran de les convocades
+   ===================================================================== */
+.greet h1, .greet > p { padding-right: 66px; }
+.greet-me {
+  position: absolute; top: 12px; right: 12px; z-index: 1; width: 56px; height: 56px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(circle at 50% 30%, #5a8cff, var(--blau) 70%);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--blau), 0 6px 14px rgba(0,0,20,.3);
+  animation: pop-in .45s var(--ease-back) .15s both;
+}
+.greet-me.photo { place-items: end center; }
+.greet-me.photo img { width: 100%; height: 90%; object-fit: contain; object-position: center bottom; transform: scale(1.04); transform-origin: center bottom; }
+.greet-me:not(.photo) { background: #fff; }
+.greet-me.gk { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #111, 0 6px 14px rgba(0,0,20,.3); }
+.greet-me:focus-visible { outline: 3px solid var(--or); outline-offset: 4px; }
+
+.convo-grid li.has-photo[role="button"] { cursor: pointer; }
+.convo-grid li.has-photo[role="button"]:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
+.pz {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px;
+  background: rgba(3,10,40,.78); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.pz-card {
+  position: relative; margin: 0; width: min(400px, 100%); height: min(560px, calc(100dvh - 48px)); overflow: hidden; border-radius: 22px; color: #fff;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: var(--escapulat-net) center top / 100% auto no-repeat, radial-gradient(70% 55% at 55% 55%, rgba(90,140,255,.45), transparent 70%), linear-gradient(170deg, #061847, var(--navy) 50%, var(--blau));
+  box-shadow: 0 24px 60px rgba(0,0,20,.55), inset 0 0 0 1px rgba(255,255,255,.14);
+}
+.pz-num {
+  position: absolute; left: 7%; top: 30%; font-family: var(--font-kit), var(--display); font-size: 12rem; line-height: 1;
+  color: rgba(255,255,255,.07); -webkit-text-stroke: 2px rgba(255,255,255,.35); pointer-events: none;
+}
+.pz-card.gk .pz-num { -webkit-text-stroke-color: rgba(247,212,23,.55); }
+.pz-photo {
+  view-transition-name: pz-photo; position: relative; display: block; max-width: 100%; height: 86%; object-fit: contain; object-position: center bottom;
+  filter: drop-shadow(0 0 3px rgba(255,255,255,.5)) drop-shadow(10px 12px 18px rgba(0,0,20,.5));
+}
+.pz-card figcaption {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; gap: 10px; padding: 46px 18px 16px;
+  background: linear-gradient(transparent, rgba(5,18,58,.95));
+}
+.pz-card figcaption .kit-number { color: #fff; font-size: 3.6rem; }
+.pz-card.gk figcaption .kit-number { color: #f7d417; }
+.pz-name { display: flex; flex-direction: column; min-width: 0; font-family: var(--display); text-transform: uppercase; line-height: 1; padding-bottom: 4px; }
+.pz-name b { font-weight: 400; font-size: 2rem; overflow-wrap: anywhere; }
+.pz-name span { font-size: 1.15rem; color: #f3dc9a; overflow-wrap: anywhere; }
+.pz-card figcaption small { margin-left: auto; padding-bottom: 6px; font-size: .78rem; opacity: .85; }
+.pz-close {
+  position: absolute; top: 10px; right: 10px; z-index: 2; width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(255,255,255,.16); color: #fff; font-size: 1.1rem;
+}
+.pz-close:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
+::view-transition-group(pz-photo) { animation-duration: .45s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+html[data-vt="zoom"]::view-transition-old(root) { animation: vt-out .25s ease both; }
+html[data-vt="zoom"]::view-transition-new(root) { animation: vt-in .25s ease both; }
+/* A la fitxa, la barra de dalt i la de baix van amb la resta (si no, quedarien per sobre del fons fosc) */
+html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition-name: none; }
