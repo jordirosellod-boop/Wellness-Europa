@@ -49,10 +49,27 @@ function scaled(src: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: 
   return c;
 }
 
-const toData = (c: HTMLCanvasElement) => {
+const encode = (c: HTMLCanvasElement) => {
   const webp = c.toDataURL("image/webp", 0.86);
-  return webp.startsWith("data:image/webp") ? webp : c.toDataURL("image/png");
+  return webp.startsWith("data:image/webp") ? webp : c.toDataURL("image/png"); // Safari no fa webp: png, que pesa més
 };
+
+/** La imatge com a text, prou petita per a la base de dades (si no hi cap, la va reduint). */
+function toData(c: HTMLCanvasElement, max: number): string {
+  let out = encode(c);
+  for (let k = 0.85; out.length > max && k > 0.2; k *= 0.85) {
+    const s = document.createElement("canvas");
+    s.width = Math.max(1, Math.round(c.width * k)); s.height = Math.max(1, Math.round(c.height * k));
+    const ctx = s.getContext("2d")!;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(c, 0, 0, s.width, s.height);
+    out = encode(s);
+  }
+  if (out.length > max) throw new Error("La foto pesa massa. Prova de retallar-la més.");
+  return out;
+}
+// Límits de la base de dades (player_photos), amb una mica de marge
+const MAX_CUTOUT = 880_000, MAX_THUMB = 240_000;
 
 /** Tros de la foto original (de 0 a 1) que s'ha triat abans de treure el fons. */
 export type Crop = { x: number; y: number; w: number; h: number };
@@ -91,7 +108,7 @@ export async function cutoutFromFile(file: File, crop: Crop = FULL_CROP, onStep?
     c.width = rc.width; c.height = rc.height;
     c.getContext("2d")!.drawImage(rc as CanvasImageSource, 0, 0);
     const t = trim(c);
-    return toData(scaled(t, 0, 0, t.width, t.height, 900));
+    return toData(scaled(t, 0, 0, t.width, t.height, 900), MAX_CUTOUT);
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -106,5 +123,5 @@ export async function thumbFrom(cutout: string, p: Place): Promise<string> {
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, -p.x * k, -p.y * k, img.width * k, img.height * k);
-  return toData(c);
+  return toData(c, MAX_THUMB);
 }
