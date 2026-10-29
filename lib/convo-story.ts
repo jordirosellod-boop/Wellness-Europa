@@ -3,10 +3,10 @@
 import { hhmm, type Convocation } from "@/lib/convo";
 import { fmtDate } from "@/lib/wellness";
 
-const W = 1080, H = 1350;
-const NAVY = "#0b1846", OR = "#dbb34d", ORL = "#f3dc9a";
+export const W = 1080, H = 1350;
+export const NAVY = "#0b1846", OR = "#dbb34d", ORL = "#f3dc9a";
 
-function img(src: string): Promise<HTMLImageElement> {
+export function img(src: string): Promise<HTMLImageElement> {
   return new Promise((res, rej) => {
     const i = new Image();
     i.onload = () => res(i);
@@ -16,20 +16,21 @@ function img(src: string): Promise<HTMLImageElement> {
 }
 
 /** La V de la samarreta a dalt de tot. El filet daurat només a la convocatòria. */
-function escapulat(x: CanvasRenderingContext2D, gold: boolean) {
-  const ky = 230 / 92, kx = W / 200;
-  x.fillStyle = "rgba(255,255,255,.07)";
-  x.beginPath(); x.moveTo(0, 0); x.lineTo(100 * kx, 62 * ky); x.lineTo(W, 0); x.lineTo(W, 22 * ky); x.lineTo(100 * kx, 84 * ky); x.lineTo(0, 22 * ky); x.closePath(); x.fill();
+export function escapulat(x: CanvasRenderingContext2D, gold: boolean, b = { x: 0, y: 0, w: W }, fill = "rgba(255,255,255,.07)") {
+  const ky = (b.w * 230) / 92 / W, kx = b.w / 200;
+  x.fillStyle = fill;
+  x.beginPath(); x.moveTo(b.x, b.y); x.lineTo(b.x + 100 * kx, b.y + 62 * ky); x.lineTo(b.x + b.w, b.y); x.lineTo(b.x + b.w, b.y + 22 * ky);
+  x.lineTo(b.x + 100 * kx, b.y + 84 * ky); x.lineTo(b.x, b.y + 22 * ky); x.closePath(); x.fill();
   if (!gold) return;
   x.strokeStyle = "rgba(219,179,77,.45)"; x.lineWidth = 3;
-  x.beginPath(); x.moveTo(0, 30 * ky); x.lineTo(100 * kx, 92 * ky); x.lineTo(W, 30 * ky); x.stroke();
+  x.beginPath(); x.moveTo(b.x, b.y + 30 * ky); x.lineTo(b.x + 100 * kx, b.y + 92 * ky); x.lineTo(b.x + b.w, b.y + 30 * ky); x.stroke();
 }
 
-const toBlob = (cv: HTMLCanvasElement) =>
+export const toBlob = (cv: HTMLCanvasElement) =>
   new Promise<Blob>((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error("No s'ha pogut fer la imatge."))), "image/png"));
 
 /** Nom de la família de lletra que Next ha posat a la variable CSS (amb les alternatives). */
-const family = (v: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fallback;
+export const family = (v: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fallback;
 
 export async function drawConvoStory(o: { c: Convocation; name: string; dorsal: number | null; cutout: string }): Promise<Blob> {
   const ESC = family("--font-escapulada", "Impact, sans-serif");

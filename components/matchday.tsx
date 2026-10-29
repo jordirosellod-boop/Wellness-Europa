@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Crest } from "@/components/crest";
-import { ResultStoryButton } from "@/components/convo-story";
+import { GoalStoryButton, ResultStoryButton } from "@/components/convo-story";
 import { prettyTeam } from "@/lib/analysis";
 import { hhmm, KITS, kitOf, type Convocation } from "@/lib/convo";
 import { madridEpoch, outcome, phaseOf, recentResult, split, type FcfResult } from "@/lib/matchday";
@@ -129,7 +129,7 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
 const RES = { G: { k: "Victòria!", cls: "win" }, E: { k: "Empat", cls: "draw" }, P: { k: "Derrota", cls: "loss" } } as const;
 
 /** Resultat oficial del darrer partit (dels últims dos dies). Si hem guanyat, confeti (un cop per partit). */
-export function ResultCard({ today }: { today: string }) {
+export function ResultCard({ today, meId, name }: { today: string; meId?: string; name?: string }) {
   const [r, setR] = useState<FcfResult | null>(null);
   const [party, setParty] = useState(false);
   useEffect(() => {
@@ -163,6 +163,7 @@ export function ResultCard({ today }: { today: string }) {
         {outcome(r) === "G" && <span className="rc-more">Toca per tornar a celebrar-ho 🎉</span>}
       </button>
       <ResultStoryButton r={r} />
+      {meId && name && <GoalStoryButton r={r} meId={meId} name={name} />}
     </>
   );
 }

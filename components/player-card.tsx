@@ -9,6 +9,8 @@ import { kitFont } from "@/lib/fonts";
 import { fetchStreak } from "@/lib/streak";
 import { supabase } from "@/lib/supabase";
 import { fetchCutout } from "@/lib/player-photos";
+import { drawCardStory } from "@/lib/player-stories";
+import { StoryCard } from "@/components/convo-story";
 
 type CardData = {
   dorsal: string | null;
@@ -143,6 +145,10 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
           {stats.map(([k, v]) => (<div key={k}><dd>{v}</dd><dt>{k}</dt></div>))}
         </dl>
       </div>
+      {d && (
+        <StoryCard label="📸 Compartir el meu cromo" busyLabel="Preparant el cromo…" alt="El teu cromo per compartir" fname={`cromo-${season(today).replace("/", "-")}.png`}
+          make={() => drawCardStory({ tier: tier as "gold" | "silver" | "blue", dorsal: d.dorsal, name, season: season(today), stats, photo: cutout })} />
+      )}
       <p className="muted small pcard-legend">
         PJ partits · TIT titular · GOL gols · ENT entrenaments aquesta temporada · 🔥 wellness seguits · LLI lliga interna.
         {d && !d.linked && " Els números de partit sortiran quan el staff et relacioni amb la fitxa de la FCF."}

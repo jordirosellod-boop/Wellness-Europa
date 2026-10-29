@@ -7,9 +7,11 @@ import { drawConvoStory, drawResultStory, shareOrDownload } from "@/lib/convo-st
 import type { Convocation, RosterRow } from "@/lib/convo";
 import { fetchScorers, outcome, type FcfResult } from "@/lib/matchday";
 import { fetchCutout } from "@/lib/player-photos";
+import { drawGoalStory } from "@/lib/player-stories";
+import { supabase } from "@/lib/supabase";
 
 /** Botó que fa la story al moment (al mòbil), l'ensenya i la deixa compartir o baixar. */
-function StoryCard({ label, busyLabel, alt, fname, make }: { label: string; busyLabel: string; alt: string; fname: string; make: () => Promise<Blob> }) {
+export function StoryCard({ label, busyLabel, alt, fname, make }: { label: string; busyLabel: string; alt: string; fname: string; make: () => Promise<Blob> }) {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ url: string; blob: Blob } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -71,5 +73,31 @@ export function ResultStoryButton({ r }: { r: FcfResult }) {
         date: r.kickoff?.slice(0, 10) ?? null, homeCrest: crestFor(teams, home), awayCrest: crestFor(teams, away),
         scorers: await fetchScorers(r.acta_id).catch(() => []),
       })} />
+  );
+}
+
+/** «⚽ La meva story de gol»: només si ha marcat en aquest partit (segons l'acta) i té foto. */
+export function GoalStoryButton({ r, meId, name }: { r: FcfResult; meId: string; name: string }) {
+  const [mine, setMine] = useState<{ goals: number; dorsal: string | null; cutout: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const sb = supabase();
+      const { data: me } = await sb.from("fcf_players").select("fcf_id, dorsal").eq("profile_id", meId).maybeSingle();
+      if (!me) return;
+      const { data: app } = await sb.from("fcf_appearances").select("goals").eq("acta_id", r.acta_id).eq("fcf_id", me.fcf_id).maybeSingle();
+      const goals = (app?.goals as number | undefined) ?? 0;
+      if (goals < 1) return;
+      const cutout = await fetchCutout(meId);
+      if (alive && cutout) setMine({ goals, dorsal: /^\d{1,2}$/.test(me.dorsal ?? "") ? me.dorsal : null, cutout });
+    })().catch(() => {});
+    return () => { alive = false; };
+  }, [r.acta_id, meId]);
+  if (!mine) return null;
+  const rival = prettyTeam(r.is_home ? r.away : r.home);
+  return (
+    <StoryCard label={mine.goals > 1 ? `⚽ La meva story dels ${mine.goals} gols` : "⚽ La meva story del gol"} busyLabel="Preparant la teva story…" alt="La teva story de gol"
+      fname={`gol-${r.kickoff?.slice(0, 10) ?? r.acta_id}.png`}
+      make={() => drawGoalStory({ name, goals: mine.goals, rival, score: `${r.home_goals}–${r.away_goals}`, date: r.kickoff?.slice(0, 10) ?? null, dorsal: mine.dorsal, cutout: mine.cutout })} />
   );
 }

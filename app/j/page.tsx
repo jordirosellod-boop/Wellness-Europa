@@ -544,7 +544,7 @@ function Dashboard({
 
       <MonthWrapBanner meId={me.id} name={me.display_name} today={today} />
 
-      <ResultCard today={today} />
+      <ResultCard today={today} meId={me.id} name={me.display_name} />
 
       {data?.convo && data.convo.c.match_date === today && (
         <MatchdayHero c={data.convo.c} called={data.convo.called} onOpen={() => go("convo")} />
