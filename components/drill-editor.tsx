@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
+import { DRILL_TEMPLATES } from "@/lib/drill-templates";
 import { uid, type ArrowKind, type Diagram, type El, type Field, type Team } from "@/lib/plan";
 
 const W = 100;
@@ -370,6 +371,20 @@ export function DrillEditor({ value, onChange }: { value: Diagram; onChange: (d:
         })()}
       </svg>
       <div className="row" style={{ gap: 6, marginTop: 6 }}>
+        <select
+          aria-label="Començar amb una pissarra feta"
+          value=""
+          style={{ width: "auto" }}
+          onChange={(e) => {
+            const tpl = DRILL_TEMPLATES.find((x) => x.key === e.target.value);
+            if (!tpl || (value.els.length > 0 && !window.confirm(`Canviar el dibuix per «${tpl.label}»? Es perdrà el que hi ha.`))) return;
+            onChange(tpl.make());
+            setSel(null);
+          }}
+        >
+          <option value="">📋 Començar amb…</option>
+          {DRILL_TEMPLATES.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+        </select>
         <select aria-label="Tipus de camp" value={value.field} onChange={(e) => onChange({ ...value, field: e.target.value as Field })} style={{ width: "auto" }}>
           <option value="full">Camp sencer</option>
           <option value="half">Mig camp</option>

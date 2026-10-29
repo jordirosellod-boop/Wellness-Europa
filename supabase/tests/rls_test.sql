@@ -790,3 +790,18 @@ select pg_temp.check((select amount_cents = 400 from public.fines where id = '33
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
 select pg_temp.check((select base_cents = 200 and due_date is not null from public.fines where id = '33333333-0000-0000-0000-000000000001'), 'La jugadora veu el termini i l''import d''abans');
 reset role;
+
+-- =============== BIBLIOTECA DE TASQUES ===============
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.task_library (id, title, type, contents, task) values ('44444444-0000-0000-0000-000000000001', 'Rondo 4x2', 'Rondo', '{Transicions}', '{"description":"x"}');
+select pg_temp.check((select count(*) from public.task_library) = 1, 'El responsable guarda una tasca a la biblioteca');
+update public.task_library set uses = uses + 1, owner_id = '00000000-0000-0000-0000-0000000000b2' where id = '44444444-0000-0000-0000-000000000001';
+select pg_temp.check((select uses = 1 and owner_id = '00000000-0000-0000-0000-00000000000a' from public.task_library), 'Compta els usos i no canvia de propietari');
+select pg_temp.expect_error($$insert into public.task_library (title, task) values ('', '{}')$$, 'Cal un nom');
+select pg_temp.expect_error($$insert into public.task_library (title, task) values ('x', '[]')$$, 'La tasca ha de ser un objecte');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.task_library) = 0, 'Les jugadores no la veuen');
+select pg_temp.expect_error($$insert into public.task_library (title, task) values ('x', '{}')$$, 'Ni hi poden guardar res');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.task_library$$, 'Anònim tampoc');
+reset role;

@@ -420,6 +420,22 @@ create table if not exists public.training_plans (
   updated_at   timestamptz not null default now()
 );
 create index if not exists training_plans_owner_idx on public.training_plans (owner_id, plan_date desc);
+
+-- BIBLIOTECA DE TASQUES: les tasques que el responsable guarda per reutilitzar-les (dibuix, normes...).
+-- Privada de qui la fa, com les plantilles. «uses» compta quantes vegades s'ha fet servir.
+create table if not exists public.task_library (
+  id           uuid primary key default gen_random_uuid(),
+  owner_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  title        text not null check (char_length(btrim(title)) between 1 and 80),
+  type         text not null default '' check (char_length(type) <= 60),
+  contents     text[] not null default '{}' check (cardinality(contents) <= 10),
+  task         jsonb not null check (jsonb_typeof(task) = 'object' and octet_length(task::text) < 1500000),
+  uses         integer not null default 0 check (uses >= 0),
+  last_used_at timestamptz,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists task_library_owner_idx on public.task_library (owner_id, uses desc);
 -- Motiu de les baixes de la plantilla: {id_jugadora: motiu}
 alter table public.training_plans add column if not exists reasons jsonb not null default '{}'::jsonb;
 alter table public.training_plans drop constraint if exists training_plans_reasons_check;
@@ -1415,6 +1431,18 @@ begin
   if tg_op = 'UPDATE' then new.owner_id := old.owner_id; new.created_at := old.created_at; end if;
   return new;
 end $$;
+-- Biblioteca: les dates les posa el servidor.
+create or replace function public.stamp_task_library()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then new.created_at := now(); else new.created_at := old.created_at; new.owner_id := old.owner_id; end if;
+  new.updated_at := now();
+  return new;
+end $$;
+drop trigger if exists task_library_stamp on public.task_library;
+create trigger task_library_stamp before insert or update on public.task_library
+  for each row execute function public.stamp_task_library();
+
 drop trigger if exists training_plans_stamp on public.training_plans;
 create trigger training_plans_stamp before insert or update on public.training_plans
   for each row execute function public.stamp_training_plan();
@@ -1526,6 +1554,7 @@ alter table public.player_positions   enable row level security;
 alter table public.player_nicknames   enable row level security;
 alter table public.staff_greetings    enable row level security;
 alter table public.absence_notices    enable row level security;
+alter table public.task_library       enable row level security;
 alter table public.training_plans     enable row level security;
 alter table public.analysis_matches   enable row level security;
 alter table public.analysis_events    enable row level security;
@@ -1551,7 +1580,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
-  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.training_plans,
+  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
   public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
@@ -1579,6 +1608,8 @@ grant all on public.injuries, public.rehab_entries, public.player_positions, pub
 grant select, insert, update, delete on public.staff_greetings to authenticated;
 grant all on public.absence_notices to service_role;
 grant select, insert, update, delete on public.absence_notices to authenticated;
+grant all on public.task_library to service_role;
+grant select, insert, update, delete on public.task_library to authenticated;
 grant select, insert, update, delete on public.injuries, public.player_positions, public.player_nicknames, public.training_plans to authenticated;
 grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to service_role;
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
@@ -1869,6 +1900,10 @@ create policy corrections_owner on public.corrections for all to authenticated
 -- PLANTILLES D'ENTRENAMENT: només qui l'ha feta (i ha de ser staff).
 drop policy if exists training_plans_owner on public.training_plans;
 create policy training_plans_owner on public.training_plans for all to authenticated
+  using (owner_id = (select auth.uid()) and (select public.is_owner()))
+  with check (owner_id = (select auth.uid()) and (select public.is_owner()));
+drop policy if exists task_library_owner on public.task_library;
+create policy task_library_owner on public.task_library for all to authenticated
   using (owner_id = (select auth.uid()) and (select public.is_owner()))
   with check (owner_id = (select auth.uid()) and (select public.is_owner()));
 

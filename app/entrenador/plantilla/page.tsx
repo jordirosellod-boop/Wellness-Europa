@@ -18,6 +18,8 @@ import { activeOn, fetchInjuries } from "@/lib/rehab";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { LibraryPicker, SaveToLibrary } from "@/components/task-library";
+import { taskMinutes } from "@/lib/task-library";
 
 export default function PlansPage() {
   return (
@@ -186,6 +188,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
     supabase().from("published_trainings").select("plan_id").eq("plan_id", id).maybeSingle().then(({ data }) => setPublished(!!data));
   }, [id]);
   const [pdf, setPdf] = useState<File | null>(null);
+  const [libOpen, setLibOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -363,6 +366,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
   if (!plan || !roster) return <Loading />;
 
   const statusOf = (pid: string): PlayerStatus => plan.players[pid] ?? "disp";
+  const slots = taskSlots(plan);
   const available = roster.players.filter((p) => statusOf(p.id) === "disp").length + plan.guests.filter((g) => g.status === "disp").length;
   // Jugadores que es poden posar als equips: les disponibles (de l'app i afegides a mà).
   const pool: PoolPlayer[] = [
@@ -496,12 +500,16 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
           <AddGuest onAdd={(g) => upd({ guests: [...plan.guests, g] })} full={plan.guests.length >= 40} />
         </section>
 
+        <TimeBar plan={plan} />
         {plan.tasks.map((t, i) => (
           <TaskEditor
             key={t.id}
             pool={pool}
             n={i + 1}
             t={t}
+            prev={i > 0 ? plan.tasks[i - 1] : null}
+            slot={slots[i] ?? null}
+            planContents={plan.contents}
             last={i === plan.tasks.length - 1}
             onChange={(patch) => updTask(i, patch)}
             onMove={(d) => {
@@ -513,12 +521,56 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
             onRemove={() => window.confirm(`Esborrar la tasca ${i + 1}?`) && upd({ tasks: plan.tasks.filter((_, j) => j !== i) })}
           />
         ))}
-        <button className="btn block" onClick={() => upd({ tasks: [...plan.tasks, newTask()] })}>+ Afegir tasca</button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" style={{ flex: 1 }} onClick={() => upd({ tasks: [...plan.tasks, newTask()] })}>+ Afegir tasca</button>
+          <button className="btn secondary" style={{ flex: 1 }} onClick={() => setLibOpen((v) => !v)}>📚 Des de la biblioteca</button>
+        </div>
+        {libOpen && <LibraryPicker onPick={(t) => upd({ tasks: [...plan.tasks, t] })} onClose={() => setLibOpen(false)} />}
       </div>
 
       {/* ---------- Full per imprimir / PDF ---------- */}
       <PlanSheet plan={plan} roster={roster} />
     </div>
+  );
+}
+
+const hm = (min: number) => `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+/** Hora d'inici i final de cada tasca, a partir de l'hora de la sessió i dels minuts de cada una. */
+function taskSlots(plan: Plan): ({ from: string; to: string } | null)[] {
+  if (!plan.start_time) return plan.tasks.map(() => null);
+  const [h, m] = plan.start_time.split(":").map(Number);
+  let at = h * 60 + m;
+  return plan.tasks.map((t) => {
+    const n = taskMinutes(t);
+    if (n == null) return null;
+    const slot = { from: hm(at), to: hm(at + n) };
+    at += n;
+    return slot;
+  });
+}
+
+/** Barra: minuts de les tasques comparats amb la durada de la sessió. */
+function TimeBar({ plan }: { plan: Plan }) {
+  if (plan.tasks.length === 0) return null;
+  const mins = plan.tasks.map(taskMinutes);
+  const sum = mins.reduce<number>((a, n) => a + (n ?? 0), 0);
+  const missing = mins.filter((n) => n == null).length;
+  const target = plan.duration_min;
+  const diff = target ? target - sum : null;
+  const pct = target ? Math.min(100, Math.round((sum / target) * 100)) : 0;
+  const tone = diff == null ? "" : diff < 0 ? "over" : diff === 0 ? "ok" : diff <= 10 ? "near" : "";
+  return (
+    <section className={`card time-bar ${tone}`}>
+      <div className="row between">
+        <b>⏱ {sum} {target ? `de ${target}` : ""} min</b>
+        <span className="small">
+          {diff == null ? "Posa els minuts de la sessió a dalt per comparar" : diff === 0 ? "Quadra perfecte ✓" : diff > 0 ? `Et sobren ${diff}'` : `Et passes ${-diff}'`}
+        </span>
+      </div>
+      {target ? <i className="tb-track" aria-hidden="true"><i style={{ width: `${pct}%` }} /></i> : null}
+      {missing > 0 && <span className="muted small">{missing} {missing === 1 ? "tasca no té" : "tasques no tenen"} el temps posat (camp «Total» o «Temps»).</span>}
+    </section>
   );
 }
 
@@ -651,10 +703,14 @@ function SquadPicker({ pool, squads, onChange }: { pool: PoolPlayer[]; squads: S
   );
 }
 
-function TaskEditor({ pool, n, t, last, onChange, onMove, onRemove }: {
-  pool: PoolPlayer[]; n: number; t: Task; last: boolean; onChange: (p: Partial<Task>) => void; onMove: (d: -1 | 1) => void; onRemove: () => void;
+function TaskEditor({ pool, n, t, prev, slot, planContents, last, onChange, onMove, onRemove }: {
+  pool: PoolPlayer[]; n: number; t: Task; prev: Task | null; slot: { from: string; to: string } | null; planContents: string[];
+  last: boolean; onChange: (p: Partial<Task>) => void; onMove: (d: -1 | 1) => void; onRemove: () => void;
 }) {
   const listId = `tt-${t.id}`;
+  const [saving, setSaving] = useState(false);
+  const inPool = new Set(pool.map((p) => p.id));
+  const prevSquads = (prev?.squads ?? []).map((s) => ({ ...s, ids: s.ids.filter((id) => inPool.has(id)) })).filter((s) => s.ids.length > 0);
   async function onImage(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = "";
@@ -678,7 +734,7 @@ function TaskEditor({ pool, n, t, last, onChange, onMove, onRemove }: {
   return (
     <section className="card task-card">
       <div className="row between">
-        <h2 className="esc" style={{ margin: 0 }}>Tasca {n}{t.type ? ` · ${t.type}` : ""}</h2>
+        <h2 className="esc" style={{ margin: 0 }}>Tasca {n}{t.type ? ` · ${t.type}` : ""}{slot && <span className="task-slot">{slot.from}–{slot.to}</span>}</h2>
         <span className="row" style={{ gap: 4 }}>
           <button className="btn small secondary" disabled={n === 1} onClick={() => onMove(-1)} aria-label="Pujar">↑</button>
           <button className="btn small secondary" disabled={last} onClick={() => onMove(1)} aria-label="Baixar">↓</button>
@@ -719,6 +775,12 @@ function TaskEditor({ pool, n, t, last, onChange, onMove, onRemove }: {
       {txt("rules", "Normes de provocació", 2)}
       {txt("cues", "Consignes", 2)}
       <SquadPicker pool={pool} squads={t.squads ?? []} onChange={(squads) => onChange({ squads })} />
+      {prevSquads.length > 0 && (
+        <button type="button" className="btn small secondary" style={{ marginTop: 6 }}
+          onClick={() => ((t.squads ?? []).length === 0 || window.confirm("Substituir els equips d'aquesta tasca pels de l'anterior?")) && onChange({ squads: prevSquads })}>
+          ⇩ Copiar els equips de la tasca anterior
+        </button>
+      )}
       {txt("teams", "Equips · notes (opcional)", 2)}
       {txt("scoring", "Puntuació", 2)}
 
@@ -732,6 +794,10 @@ function TaskEditor({ pool, n, t, last, onChange, onMove, onRemove }: {
         </div>
       ))}
       <button className="btn small secondary" onClick={() => onChange({ staff: [...t.staff, { who: "", role: "", extra: "" }] })}>+ Fila</button>
+      <div className="lib-save-row">
+        {saving ? <SaveToLibrary task={t} planContents={planContents} onClose={() => setSaving(false)} />
+          : <button type="button" className="btn small secondary" onClick={() => setSaving(true)}>⭐ Guardar a la biblioteca</button>}
+      </div>
     </section>
   );
 }
