@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Crest } from "@/components/crest";
 import { ResultStoryButton } from "@/components/convo-story";
 import { prettyTeam } from "@/lib/analysis";
-import { fetchRoster, hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
-import { fetchAvatars } from "@/lib/player-photos";
+import { hhmm, KITS, kitOf, type Convocation } from "@/lib/convo";
 import { madridEpoch, outcome, phaseOf, recentResult, split, type FcfResult } from "@/lib/matchday";
 
 const COLORS = ["#022e91", "#ffffff", "#dbb34d", "#f3dc9a", "#3b5fd1"];
@@ -101,8 +100,6 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
       {phase === "joc" && <p className="md-live"><span className="dot" /> En joc · Força Europa!</p>}
       {phase === "final" && <p className="md-live done">Partit acabat · Gràcies per l&apos;esforç 💙</p>}
 
-      <CalledFaces cid={c.id} onOpen={onOpen} />
-
       <div className="md-chips">
         {c.meet_time && <span>🕘 Quedada {hhmm(c.meet_time)} h</span>}
         {c.kickoff && <span>⚽ Partit {hhmm(c.kickoff)} h</span>}
@@ -126,37 +123,6 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
         <button type="button" className="btn secondary" onClick={onOpen}>Veure la convocatòria</button>
       </div>
     </section>
-  );
-}
-
-/** «Les d'avui»: les cares de les convocades, una mica superposades. Toca per veure la convocatòria. */
-function CalledFaces({ cid, onOpen }: { cid: string; onOpen: () => void }) {
-  const [rows, setRows] = useState<RosterRow[]>([]);
-  const [faces, setFaces] = useState<Map<string, string>>(new Map());
-  useEffect(() => {
-    let alive = true;
-    fetchRoster(cid).then((r) => alive && setRows(r.filter((x) => x.called).sort((a, b) => (a.dorsal ?? 99) - (b.dorsal ?? 99))), () => {});
-    fetchAvatars().then((m) => alive && setFaces(m), () => {});
-    return () => { alive = false; };
-  }, [cid]);
-  if (!rows.length) return null;
-  const MAX = 9;
-  const shown = rows.slice(0, MAX);
-  return (
-    <button type="button" className="md-faces" onClick={onOpen} aria-label={`Les ${rows.length} convocades d'avui. Veure la convocatòria`}>
-      <span className="md-faces-k">Les d&apos;avui · {rows.length}</span>
-      <span className="md-faces-row" aria-hidden="true">
-        {shown.map((r, i) => (
-          <span key={r.player_id} className={`md-face${faces.has(r.player_id) ? "" : " num"}`} style={{ animationDelay: `${0.25 + i * 0.07}s`, zIndex: MAX - i }}>
-            {faces.has(r.player_id) ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={faces.get(r.player_id)} alt="" />
-            ) : <b>{r.dorsal ?? "·"}</b>}
-          </span>
-        ))}
-        {rows.length > MAX && <span className="md-face more" style={{ animationDelay: `${0.25 + MAX * 0.07}s` }}>+{rows.length - MAX}</span>}
-      </span>
-    </button>
   );
 }
 

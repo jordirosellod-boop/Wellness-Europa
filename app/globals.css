@@ -2616,19 +2616,4 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .mw-intro-text .mw-big { text-align: left; }
 .mw-crest.small { width: 56px; }
 
-/* --- Dia de partit: les cares de les convocades --- */
-@keyframes face-in { from { opacity: 0; transform: translateY(8px) scale(.6); } to { opacity: 1; transform: none; } }
-.md-faces { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 10px auto 4px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
-.md-faces-k { font-family: var(--display); text-transform: uppercase; letter-spacing: 1px; font-size: .78rem; color: var(--or); }
-.md-faces-row { display: flex; justify-content: center; padding-left: 12px; max-width: 100%; }
-.md-face {
-  position: relative; width: 36px; height: 36px; margin-left: -12px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 30%, #5a8cff, var(--blau) 70%); box-shadow: 0 0 0 2px #fff, 0 3px 8px rgba(0,0,20,.35);
-  animation: face-in .45s var(--ease-back) both;
-}
-.md-face img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
-.md-face.num { background: #fff; }
-.md-face.num b { font-family: var(--font-kit), var(--display); color: var(--navy); font-size: 1.15rem; line-height: 1; }
-.md-face.more { background: var(--or); color: var(--navy); font-family: var(--display); font-size: .78rem; padding-left: 6px; }
-.md-faces:focus-visible { outline: 3px solid var(--or); outline-offset: 4px; border-radius: 12px; }
 .pcard .pcard-holo { position: absolute; z-index: 3; } /* la brillantor, per sobre de tot (també de la foto) */
