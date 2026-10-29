@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Confetti } from "@/components/matchday";
 import { fetchMonthWrap, ofMonth, type MonthWrap } from "@/lib/month-wrap";
+import { fetchCutout } from "@/lib/player-photos";
 
 const SLIDE_MS = 5500;
 
@@ -27,11 +28,23 @@ function CountUp({ to, decimals = 0 }: { to: number; decimals?: number }) {
 
 type Slide = { key: string; cls: string; body: ReactNode; party?: boolean };
 
-function slidesOf(w: MonthWrap, name: string): Slide[] {
+function slidesOf(w: MonthWrap, name: string, cutout: string | null): Slide[] {
   const out: Slide[] = [];
   const first = name.trim().split(/\s+/)[0];
   out.push({
-    key: "intro", cls: "s-intro", body: (
+    key: "intro", cls: `s-intro${cutout ? " has-photo" : ""}`, body: cutout ? (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="mw-photo" src={cutout} alt="" />
+        <div className="mw-intro-text">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="mw-crest small" src="/escut.png" alt="" width={56} height={56} />
+          <span className="mw-k">Juvenil C · CE Europa</span>
+          <h2 className="mw-big">El teu<br />{w.name}</h2>
+          <p className="mw-p">{first}, mira com t&apos;ha anat el mes 👀</p>
+        </div>
+      </>
+    ) : (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="mw-crest" src="/escut.png" alt="" width={96} height={96} />
@@ -138,11 +151,17 @@ export function MonthStories({ meId, name, day, today, onClose }: { meId: string
   const [party, setParty] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
 
+  const [cutout, setCutout] = useState<string | null>(null);
   useEffect(() => {
     fetchMonthWrap(meId, day, today).then(setW, (e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [meId, day, today]);
+  useEffect(() => {
+    let alive = true;
+    fetchCutout(meId).then((x) => alive && setCutout(x), () => {});
+    return () => { alive = false; };
+  }, [meId]);
 
-  const slides = w ? slidesOf(w, name) : [];
+  const slides = w ? slidesOf(w, name, cutout) : [];
   const n = slides.length;
   const next = useCallback(() => setI((x) => (x + 1 < n ? x + 1 : x)), [n]);
   const prev = () => setI((x) => Math.max(0, x - 1));

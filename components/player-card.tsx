@@ -121,7 +121,7 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
       </section>
     )}
     <div className="pcard-wrap">
-      <div ref={ref} className={`pcard ${tier} ${kitFont.variable}${d ? "" : " loading"}`} onPointerMove={tilt} onPointerLeave={reset} onPointerUp={reset} onPointerCancel={reset}>
+      <div ref={ref} className={`pcard ${tier} ${kitFont.variable}${d ? "" : " loading"}${cutout ? " has-photo" : ""}`} onPointerMove={tilt} onPointerLeave={reset} onPointerUp={reset} onPointerCancel={reset}>
         <div className="pcard-holo" aria-hidden="true" />
         <div className="pcard-top">
           <span className="pcard-num">{d?.dorsal ?? "–"}</span>
@@ -131,8 +131,13 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
             <small>Juv. C<br />{season(today)}</small>
           </span>
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="pcard-shirt" src="/kits/home.webp" alt="" width={150} height={168} />
+        {cutout ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="pcard-photo" src={cutout} alt="" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="pcard-shirt" src="/kits/home.webp" alt="" width={150} height={168} />
+        )}
         <div className="pcard-name"><b>{first}</b>{rest.length > 0 && <span>{rest.join(" ")}</span>}</div>
         <dl className="pcard-stats">
           {stats.map(([k, v]) => (<div key={k}><dd>{v}</dd><dt>{k}</dt></div>))}
