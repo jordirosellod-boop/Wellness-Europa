@@ -2562,9 +2562,16 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .place-tile .framed { border-radius: 8px; background: linear-gradient(170deg, #061847, var(--blau)); }
 .place-tile-foot { font-family: var(--font-kit), var(--display); color: var(--navy); font-size: 1.3rem; line-height: 1.1; }
 .place-avatar {
-  width: 56px; height: 56px; border-radius: 50%; overflow: hidden; display: grid; place-items: start center;
+  width: 56px; height: 56px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
   background: radial-gradient(circle at 50% 30%, #5a8cff, var(--blau) 70%); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--blau);
 }
 .place-avatar.gk { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #111; }
 .place-zoom { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: .9rem; }
 .place-zoom input { flex: 1; min-width: 0; accent-color: var(--blau); }
+.place-h { font-size: 1rem; margin: 6px 0 0; }
+.frame-ed { display: grid; gap: 6px; }
+.place-box.round { border-radius: 50%; box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--blau); margin: 6px; }
+.place-greet {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; color: #fff;
+  font-family: var(--display); text-transform: uppercase; font-size: 1.1rem; background: linear-gradient(165deg, #050d2e, #0b1846 55%, #142b7a);
+}

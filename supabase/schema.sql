@@ -399,6 +399,9 @@ create table if not exists public.player_photos (
   updated_at timestamptz not null default now(),
   updated_by uuid default auth.uid() references public.profiles(id) on delete set null
 );
+-- «avatar»: el cap i les espatlles (quadrat, es veu en rodó a la salutació), col·locat a part pel staff.
+alter table public.player_photos add column if not exists avatar text
+  check (avatar is null or (avatar like 'data:image/%' and octet_length(avatar) < 120000));
 
 -- COM VOL QUE LA SALUDI L'APP: cada persona del staff tria el nom («Rose», «Míster»...).
 -- Només ho veu i ho canvia ella mateixa.

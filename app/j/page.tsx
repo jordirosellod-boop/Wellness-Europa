@@ -16,7 +16,7 @@ import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
 import { Shirt, useDorsals } from "@/components/shirt";
-import { fetchThumbs } from "@/lib/player-photos";
+import { fetchAvatar } from "@/lib/player-photos";
 import { AbsenceButton } from "@/components/absence-button";
 import { SeasonFx } from "@/components/season";
 import { firstName, rememberSplashName } from "@/lib/first-name";
@@ -478,7 +478,7 @@ function MeAvatar({ meId, onClick }: { meId: string; onClick: (el: HTMLElement) 
   const me = useDorsals().get(meId);
   useEffect(() => {
     let alive = true;
-    fetchThumbs().then((m) => alive && setThumb(m.get(meId) ?? null), () => {});
+    fetchAvatar(meId).then((x) => alive && setThumb(x), () => {});
     return () => { alive = false; };
   }, [meId]);
   return (

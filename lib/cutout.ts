@@ -69,7 +69,7 @@ function toData(c: HTMLCanvasElement, max: number): string {
   return out;
 }
 // Límits de la base de dades (player_photos), amb una mica de marge
-const MAX_CUTOUT = 880_000, MAX_THUMB = 240_000;
+const MAX_CUTOUT = 880_000, MAX_THUMB = 240_000, MAX_AVATAR = 115_000;
 
 /** Tros de la foto original (de 0 a 1) que s'ha triat abans de treure el fons. */
 export type Crop = { x: number; y: number; w: number; h: number };
@@ -84,6 +84,26 @@ const THUMB_H = 500;
 export function defaultPlace(cw: number, ch: number): Place {
   const h = ch * 0.6;
   return { x: cw / 2 - (h * THUMB_RATIO) / 2, y: -h * 0.03, h };
+}
+
+/** Avatar per defecte: el cap i les espatlles (un quadrat a dalt, d'un 30 % de l'alçada), centrat al cap. */
+export function defaultAvatar(cw: number, ch: number, headX = cw / 2): Place {
+  const h = ch * 0.3;
+  return { x: headX - h / 2, y: -h * 0.04, h };
+}
+
+/** On és el cap (x, en píxels): el centre del que hi ha a la part de dalt de la foto retallada. */
+export function headX(img: HTMLImageElement): number {
+  const k = Math.min(1, 200 / img.height);
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+  const ctx = c.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  const rows = Math.max(1, Math.round(c.height * 0.12));
+  const { data } = ctx.getImageData(0, 0, c.width, rows);
+  let sum = 0, n = 0;
+  for (let y = 0; y < rows; y++) for (let x = 0; x < c.width; x++) if (data[(y * c.width + x) * 4 + 3] > 128) { sum += x; n++; }
+  return n ? sum / n / k : img.width / 2;
 }
 
 /** De la foto original treu la jugadora sencera sense fons (fins a 900 px d'alt), només del tros triat. */
@@ -114,14 +134,19 @@ export async function cutoutFromFile(file: File, crop: Crop = FULL_CROP, onStep?
   }
 }
 
-/** La foto petita (4:5) a partir de la gran i d'on s'ha col·locat. El que queda fora de la foto, transparent. */
-export async function thumbFrom(cutout: string, p: Place): Promise<string> {
+/** Un tros de la foto gran (finestra «p» de proporció «ratio»). El que queda fora de la foto, transparent. */
+async function frameFrom(cutout: string, p: Place, ratio: number, maxH: number, max: number): Promise<string> {
   const img = await loadImage(cutout);
   const c = document.createElement("canvas");
-  c.height = Math.round(Math.min(THUMB_H, p.h)); c.width = Math.round(c.height * THUMB_RATIO);
+  c.height = Math.round(Math.min(maxH, p.h)); c.width = Math.round(c.height * ratio);
   const k = c.height / p.h;
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, -p.x * k, -p.y * k, img.width * k, img.height * k);
-  return toData(c, MAX_THUMB);
+  return toData(c, max);
 }
+
+/** La foto petita (4:5) de la convocatòria. */
+export const thumbFrom = (cutout: string, p: Place) => frameFrom(cutout, p, THUMB_RATIO, THUMB_H, MAX_THUMB);
+/** L'avatar (quadrat; es veu en rodó). */
+export const avatarFrom = (cutout: string, p: Place) => frameFrom(cutout, p, 1, 240, MAX_AVATAR);

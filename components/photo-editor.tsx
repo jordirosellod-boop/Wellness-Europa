@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
-import { defaultPlace, FULL_CROP, THUMB_RATIO, type Crop, type Place } from "@/lib/cutout";
+import { defaultAvatar, defaultPlace, headX, FULL_CROP, THUMB_RATIO, type Crop, type Place } from "@/lib/cutout";
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const MIN = 0.08; // el tros més petit que es pot triar (8 % de la foto)
@@ -64,55 +64,41 @@ export function CropStep({ src, name, onCancel, onDone }: { src: string; name: s
   );
 }
 
-/** La finestra de la foto petita, pintada amb CSS (per a les vistes prèvies). */
-function Framed({ src, size, p, h }: { src: string; size: { w: number; h: number }; p: Place; h: number }) {
+type Size = { w: number; h: number };
+
+/** Una finestra (de proporció «ratio») sobre la foto retallada, pintada amb CSS per a les vistes prèvies. */
+function Framed({ src, size, p, h, ratio }: { src: string; size: Size; p: Place; h: number; ratio: number }) {
   const k = h / p.h;
   return (
-    <span className="framed" style={{ width: h * THUMB_RATIO, height: h }}>
+    <span className="framed" style={{ width: h * ratio, height: h }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt="" draggable={false} style={{ width: size.w * k, height: size.h * k, left: -p.x * k, top: -p.y * k }} />
     </span>
   );
 }
 
-/** Pas 2: col·locar-la (on queda a la convocatòria i a l'avatar). */
-export function PlaceStep({ cutout, name, gk, dorsal, initial, busy, onCancel, onSave }: {
-  cutout: string; name: string; gk?: boolean; dorsal?: number | null; initial?: Place | null; busy: boolean;
-  onCancel: () => void; onSave: (p: Place) => void;
+/** Arrossegar, fletxes i zoom sobre una finestra. Zoom = quantes vegades hi cap la jugadora sencera d'alt (1 = cos sencer). */
+function FrameEditor({ src, size, p, setP, ratio, box, round, label, max = 4 }: {
+  src: string; size: Size; p: Place; setP: (f: (c: Place) => Place) => void; ratio: number; box: number; round?: boolean; label: string; max?: number;
 }) {
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-  const [p, setP] = useState<Place | null>(initial ?? null);
   const drag = useRef<{ px: number; py: number; start: Place } | null>(null);
-  const BOX = 220;
-
-  useEffect(() => {
-    const im = new Image();
-    im.onload = () => {
-      setSize({ w: im.width, h: im.height });
-      setP((cur) => cur ?? defaultPlace(im.width, im.height));
-    };
-    im.src = cutout;
-  }, [cutout]);
-  if (!size || !p) return <div className="photo-edit"><p className="muted small">Carregant…</p></div>;
-
-  // Zoom: quantes vegades l'alçada de la finestra hi cap la jugadora sencera (1 = cos sencer)
+  const k = box / p.h;
   const zoom = size.h / p.h;
   function setZoom(z: number) {
     setP((c) => {
-      if (!c || !size) return c;
-      const h = size.h / z, cx = c.x + (c.h * THUMB_RATIO) / 2, cy = c.y + c.h / 2;
-      return { h, x: cx - (h * THUMB_RATIO) / 2, y: cy - h / 2 };
+      const h = size.h / z, cx = c.x + (c.h * ratio) / 2, cy = c.y + c.h / 2;
+      return { h, x: cx - (h * ratio) / 2, y: cy - h / 2 };
     });
   }
-  const k = BOX / p.h;
   function down(e: PointerEvent<HTMLDivElement>) {
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { px: e.clientX, py: e.clientY, start: p! };
+    drag.current = { px: e.clientX, py: e.clientY, start: p };
   }
   function move(e: PointerEvent<HTMLDivElement>) {
     const d = drag.current;
     if (!d) return;
-    setP({ ...d.start, x: d.start.x - (e.clientX - d.px) / k, y: d.start.y - (e.clientY - d.py) / k });
+    const start = d.start, dx = (e.clientX - d.px) / k, dy = (e.clientY - d.py) / k;
+    setP(() => ({ ...start, x: start.x - dx, y: start.y - dy }));
   }
   const up = () => { drag.current = null; };
   function key(e: KeyboardEvent<HTMLDivElement>) {
@@ -120,36 +106,80 @@ export function PlaceStep({ cutout, name, gk, dorsal, initial, busy, onCancel, o
     const d = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
     if (!d) return;
     e.preventDefault();
-    setP((c) => c && { ...c, x: c.x + d[0], y: c.y + d[1] });
+    setP((c) => ({ ...c, x: c.x + d[0], y: c.y + d[1] }));
   }
+  return (
+    <div className="frame-ed">
+      <div className={`place-box${round ? " round" : ""}`} style={{ width: box * ratio, height: box } as CSSProperties}
+        onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+        tabIndex={0} role="group" aria-label={`${label} (arrossega-la o fes servir les fletxes)`} onKeyDown={key}>
+        <Framed src={src} size={size} p={p} h={box} ratio={ratio} />
+      </div>
+      <label className="place-zoom">
+        <span>Zoom</span>
+        <input type="range" min={1} max={max} step={0.02} value={clamp(zoom, 1, max)} onChange={(e) => setZoom(Number(e.target.value))} aria-label={`Zoom: ${label}`} />
+      </label>
+    </div>
+  );
+}
+
+export type Placement = { thumb: Place; avatar: Place };
+
+/** Pas 2: col·locar-la a la convocatòria i, a part, a l'avatar. */
+export function PlaceStep({ cutout, name, gk, dorsal, busy, onCancel, onSave }: {
+  cutout: string; name: string; gk?: boolean; dorsal?: number | null; busy: boolean;
+  onCancel: () => void; onSave: (p: Placement) => void;
+}) {
+  const [size, setSize] = useState<Size | null>(null);
+  const [p, setP] = useState<Place | null>(null);
+  const [a, setA] = useState<Place | null>(null);
+  const [head, setHead] = useState(0);
+
+  useEffect(() => {
+    const im = new Image();
+    im.onload = () => {
+      const hx = headX(im);
+      setSize({ w: im.width, h: im.height });
+      setHead(hx);
+      setP(defaultPlace(im.width, im.height));
+      setA(defaultAvatar(im.width, im.height, hx));
+    };
+    im.src = cutout;
+  }, [cutout]);
+  if (!size || !p || !a) return <div className="photo-edit"><p className="muted small">Carregant…</p></div>;
 
   return (
     <div className="photo-edit">
       <b>{name} · 2 de 2: col·loca</b>
-      <p className="muted small">Arrossega-la i fes zoom fins que quedi bé: així sortirà a la convocatòria i al seu avatar.</p>
+      <p className="muted small">Arrossega-la i fes zoom fins que quedi bé. La convocatòria i l&apos;avatar es col·loquen per separat.</p>
+
+      <h3 className="place-h">A la convocatòria</h3>
       <div className="place-row">
-        <div className="place-box" style={{ width: BOX * THUMB_RATIO, height: BOX } as CSSProperties}
-          onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
-          tabIndex={0} role="group" aria-label="Foto (arrossega-la o fes servir les fletxes)" onKeyDown={key}>
-          <Framed src={cutout} size={size} p={p} h={BOX} />
-        </div>
+        <FrameEditor src={cutout} size={size} p={p} setP={(f) => setP((c) => (c ? f(c) : c))} ratio={THUMB_RATIO} box={220} label="Foto de la convocatòria" />
         <div className="place-previews" aria-hidden="true">
-          <span className="place-k">Convocatòria</span>
+          <span className="place-k">Així surt</span>
           <span className="place-tile">
-            <Framed src={cutout} size={size} p={p} h={88} />
+            <Framed src={cutout} size={size} p={p} h={88} ratio={THUMB_RATIO} />
             <span className="place-tile-foot">{dorsal ?? "–"}</span>
           </span>
-          <span className="place-k">Avatar</span>
-          <span className={`place-avatar${gk ? " gk" : ""}`}><Framed src={cutout} size={size} p={p} h={70} /></span>
         </div>
       </div>
-      <label className="place-zoom">
-        <span>Zoom</span>
-        <input type="range" min={1} max={4} step={0.02} value={clamp(zoom, 1, 4)} onChange={(e) => setZoom(Number(e.target.value))} />
-      </label>
+
+      <h3 className="place-h">A l&apos;avatar</h3>
+      <div className="place-row">
+        <FrameEditor src={cutout} size={size} p={a} setP={(f) => setA((c) => (c ? f(c) : c))} ratio={1} box={170} round max={8} label="Foto de l'avatar" />
+        <div className="place-previews" aria-hidden="true">
+          <span className="place-k">Així surt</span>
+          <span className="place-greet">
+            <span>Hola!</span>
+            <span className={`place-avatar${gk ? " gk" : ""}`}><Framed src={cutout} size={size} p={a} h={56} ratio={1} /></span>
+          </span>
+        </div>
+      </div>
+
       <div className="row" style={{ gap: 6 }}>
-        <button type="button" className="btn small" disabled={busy} onClick={() => onSave(p)}>{busy ? "Desant…" : "Desar la foto"}</button>
-        <button type="button" className="btn small secondary" disabled={busy} onClick={() => setP(defaultPlace(size.w, size.h))}>Restablir</button>
+        <button type="button" className="btn small" disabled={busy} onClick={() => onSave({ thumb: p, avatar: a })}>{busy ? "Desant…" : "Desar la foto"}</button>
+        <button type="button" className="btn small secondary" disabled={busy} onClick={() => { setP(defaultPlace(size.w, size.h)); setA(defaultAvatar(size.w, size.h, head)); }}>Restablir</button>
         <button type="button" className="btn small secondary" disabled={busy} onClick={onCancel}>Cancel·lar</button>
       </div>
     </div>

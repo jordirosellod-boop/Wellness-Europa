@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent } from "react";
-import { CropStep, PlaceStep } from "@/components/photo-editor";
+import { CropStep, PlaceStep, type Placement } from "@/components/photo-editor";
 import { Shirt, useDorsals } from "@/components/shirt";
-import { cutoutFromFile, thumbFrom, type Crop, type Place } from "@/lib/cutout";
+import { avatarFrom, cutoutFromFile, thumbFrom, type Crop } from "@/lib/cutout";
 import { deletePhoto, fetchCutout, fetchThumbs, savePhoto } from "@/lib/player-photos";
 import type { Profile } from "@/lib/wellness";
 
@@ -56,13 +56,13 @@ export function PhotosAdmin({ players }: { players: Profile[] }) {
     } finally { setBusy(null); setStep(null); }
   }
 
-  async function save(p: Place) {
+  async function save(p: Placement) {
     if (draft?.kind !== "place") return;
     const { pid, cutout } = draft;
     setBusy(pid);
     try {
-      const thumb = await thumbFrom(cutout, p);
-      await savePhoto(pid, cutout, thumb);
+      const [thumb, avatar] = await Promise.all([thumbFrom(cutout, p.thumb), avatarFrom(cutout, p.avatar)]);
+      await savePhoto(pid, cutout, thumb, avatar);
       setThumbs((m) => new Map(m).set(pid, thumb));
       setDraft(null);
       setMsg({ ok: true, text: "Foto desada ✓" });
@@ -90,7 +90,7 @@ export function PhotosAdmin({ players }: { players: Profile[] }) {
       <p className="muted small" style={{ marginTop: 0 }}>
         Surten a la convocatòria, al seu perfil i a la story de convocada. El fons es retalla aquí mateix (la foto no surt d&apos;aquest dispositiu fins que la desis)
         i només les veu l&apos;equip. <b>Puja-les només amb el permís de la jugadora i de la família</b>, i treu-les si algú ho demana.
-        Queden millor si són de cintura amunt o de cos sencer, amb la samarreta del club. Abans de desar-la la pots retallar i col·locar; amb ✥ la pots tornar a col·locar quan vulguis.
+        Queden millor si són de cintura amunt o de cos sencer, amb la samarreta del club. Abans de desar-la la pots retallar i col·locar (a la convocatòria i a l&apos;avatar, per separat); amb ✥ la pots tornar a col·locar quan vulguis.
       </p>
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}>{msg.text}</p>}
       {draft?.kind === "crop" && <CropStep key={draft.url} src={draft.url} name={name(draft.pid)} onCancel={() => setDraft(null)} onDone={cut} />}

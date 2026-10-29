@@ -28,9 +28,17 @@ export function fetchCutout(profileId: string): Promise<string | null> {
   return p;
 }
 
-export async function savePhoto(profileId: string, cutout: string, thumb: string): Promise<void> {
+/** La foto de l'avatar (si el staff no l'ha col·locada a part, la petita). */
+export async function fetchAvatar(profileId: string): Promise<string | null> {
+  const { data, error } = await supabase().from("player_photos").select("avatar, thumb").eq("profile_id", profileId).maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = data as { avatar: string | null; thumb: string } | null;
+  return row?.avatar ?? row?.thumb ?? null;
+}
+
+export async function savePhoto(profileId: string, cutout: string, thumb: string, avatar: string): Promise<void> {
   const { data, error } = await supabase().from("player_photos")
-    .upsert({ profile_id: profileId, cutout, thumb }, { onConflict: "profile_id" }).select("profile_id").single();
+    .upsert({ profile_id: profileId, cutout, thumb, avatar }, { onConflict: "profile_id" }).select("profile_id").single();
   if (error || !data) throw new Error(error?.message ?? "No s'ha pogut desar la foto.");
   forgetThumbs();
 }
