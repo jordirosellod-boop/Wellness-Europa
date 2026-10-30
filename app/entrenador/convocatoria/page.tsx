@@ -3,6 +3,7 @@
 import { Crest } from "@/components/crest";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ConvoSheet } from "@/components/convo-sheet";
+import { ConvoPosterButton } from "@/components/convo-poster";
 import { LineupBoard } from "@/components/pitch";
 import { CoachShell, Footer } from "@/components/ui";
 import { CONVO_COLS, fetchConvocations, fetchRoster, FRIENDLY, GUEST_ORIGINS, hhmm, isFriendly, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
@@ -535,6 +536,8 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
       </section>
 
       <LineupBoard c={c} roster={roster} />
+
+      <ConvoPosterButton c={c} roster={roster} />
 
       <section className="card no-print">
         <h2>Vista de les jugadores</h2>

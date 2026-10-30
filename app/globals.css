@@ -2632,3 +2632,8 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 /* Les stories del resultat (del partit i la de gol) juntes en una sola targeta */
 .story-row { display: grid; gap: 8px; padding: 12px; margin: 0 0 14px; }
 .story-row .story-card { padding: 0; margin: 0; background: none; box-shadow: none; border: 0; }
+
+/* --- Cartell de la convocatòria (staff) --- */
+.poster-card .story-card { padding: 0; margin: 10px 0 0; background: none; box-shadow: none; border: 0; }
+.poster-pick { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: .92rem; }
+.poster-pick select { flex: 1; min-width: 0; }
