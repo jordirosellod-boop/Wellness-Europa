@@ -1,14 +1,49 @@
-// El cartell de la convocatòria (format 4:5, en alta resolució per poder-lo imprimir): el partit,
-// la llista de convocades amb el dorsal i una de les jugadores en gran. Es dibuixa al navegador.
+// El cartell de la convocatòria, a l'estil dels clubs professionals (format 4:5, en alta resolució
+// per poder-lo imprimir): títol gran amb la jugadora per davant, la llista per línies i la franja del partit.
 
-import { family, H, img, NAVY, OR, ORL, toBlob, W } from "@/lib/convo-story";
+import { family, H, img, OR, ORL, toBlob, W } from "@/lib/convo-story";
 import { hhmm, KITS, kitOf, type Convocation } from "@/lib/convo";
 import { fmtDate } from "@/lib/wellness";
 
-export type PosterRow = { name: string; dorsal: number | null; gk: boolean; origin?: string | null };
+export type PosterRow = { name: string; dorsal: number | null; gk: boolean; pos?: string | null; origin?: string | null };
 const SCALE = 2;
 
 const soft = (src: string | null) => (src ? img(src).catch(() => null) : Promise.resolve(null));
+
+/** Línies del camp, de la porteria cap endavant. */
+const LINES: { label: string; pos: string[] }[] = [
+  { label: "PORTERES", pos: ["PO"] },
+  { label: "DEFENSES", pos: ["LT", "CT"] },
+  { label: "MIGCAMPISTES", pos: ["MC", "INT"] },
+  { label: "DAVANTERES", pos: ["EXT", "PT"] },
+];
+
+function groups(rows: PosterRow[]): { label: string; rows: PosterRow[] }[] {
+  const pos = (r: PosterRow) => (r.gk ? "PO" : r.pos ?? null);
+  if (!rows.some((r) => pos(r) && pos(r) !== "PO")) {
+    // Sense posicions: porteres a part i la resta juntes
+    const gk = rows.filter((r) => r.gk), rest = rows.filter((r) => !r.gk);
+    return [{ label: "PORTERES", rows: gk }, { label: "JUGADORES", rows: rest }].filter((g) => g.rows.length);
+  }
+  const out = LINES.map((l) => ({ label: l.label, rows: rows.filter((r) => l.pos.includes(pos(r) ?? "")) }));
+  const none = rows.filter((r) => !LINES.some((l) => l.pos.includes(pos(r) ?? "")));
+  if (none.length) out.push({ label: "ALTRES", rows: none });
+  return out.filter((g) => g.rows.length);
+}
+
+/** Gra fi per al fons (com els cartells impresos). */
+function grain(x: CanvasRenderingContext2D) {
+  const n = document.createElement("canvas");
+  n.width = n.height = 160;
+  const c = n.getContext("2d")!;
+  const d = c.createImageData(160, 160);
+  for (let i = 0; i < d.data.length; i += 4) {
+    const v = Math.random() * 255;
+    d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 14;
+  }
+  c.putImageData(d, 0, 0);
+  return x.createPattern(n, "repeat");
+}
 
 export async function drawConvoPoster(o: {
   c: Convocation; called: PosterRow[]; hero: { cutout: string; name: string; dorsal: number | null } | null;
@@ -24,102 +59,103 @@ export async function drawConvoPoster(o: {
   const x = cv.getContext("2d")!;
   x.scale(SCALE, SCALE);
   x.imageSmoothingQuality = "high";
-  const fit = (t: string, font: string, size: number, max: number) => { let s = size; do { x.font = `${s}px ${font}`; s -= 2; } while (x.measureText(t).width > max && s > 14); };
+  const fit = (t: string, font: string, size: number, max: number) => { let s = size; do { x.font = `${s}px ${font}`; s -= 2; } while (x.measureText(t).width > max && s > 12); };
+  const BAR = 1176; // on comença la franja del partit
 
-  // Fons del club, llum darrere la jugadora i l'escapulat amb el filet daurat
-  const g = x.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#061847"); g.addColorStop(1, "#022e91");
+  // Fons: blau fosc, una llum darrere la jugadora, l'escut gegant en marca d'aigua, gra i vinyeta
+  const g = x.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, "#04103a"); g.addColorStop(0.55, "#0a2a8a"); g.addColorStop(1, "#04103a");
   x.fillStyle = g; x.fillRect(0, 0, W, H);
-  const sp = x.createRadialGradient(300, 880, 30, 300, 880, 560);
-  sp.addColorStop(0, "rgba(90,140,255,.45)"); sp.addColorStop(1, "rgba(90,140,255,0)");
+  const sp = x.createRadialGradient(330, 760, 40, 330, 760, 620);
+  sp.addColorStop(0, "rgba(110,160,255,.55)"); sp.addColorStop(1, "rgba(110,160,255,0)");
   x.fillStyle = sp; x.fillRect(0, 0, W, H);
-  // A dalt, la franja daurada de la convocatòria (com al full de l'app)
+  x.save(); x.globalAlpha = 0.06; x.drawImage(club, 420, 300, 860, 860); x.restore();
+  const gr = grain(x); if (gr) { x.fillStyle = gr; x.fillRect(0, 0, W, H); }
+  const vig = x.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.8);
+  vig.addColorStop(0, "rgba(0,0,0,0)"); vig.addColorStop(1, "rgba(0,0,20,.55)");
+  x.fillStyle = vig; x.fillRect(0, 0, W, H);
+
+  // Franja daurada de dalt
   const band = x.createLinearGradient(0, 0, W, 0);
-  band.addColorStop(0, "rgba(219,179,77,0)"); band.addColorStop(0.25, OR); band.addColorStop(0.5, ORL); band.addColorStop(0.75, OR); band.addColorStop(1, "rgba(219,179,77,0)");
-  x.fillStyle = band; x.fillRect(0, 0, W, 6);
+  band.addColorStop(0, OR); band.addColorStop(0.5, ORL); band.addColorStop(1, OR);
+  x.fillStyle = band; x.fillRect(0, 0, W, 8);
 
-  // Capçalera
-  x.drawImage(club, 48, 40, 88, 88);
-  x.textBaseline = "top"; x.textAlign = "left";
-  x.fillStyle = OR; fit(`JUVENIL C${o.c.competition ? ` · ${o.c.competition.toUpperCase()}` : ""}`, ESC, 30, 860);
-  x.fillText(`JUVENIL C${o.c.competition ? ` · ${o.c.competition.toUpperCase()}` : ""}`, 152, 46);
-  x.fillStyle = "#fff"; x.font = `70px ${ESC}`; x.fillText("CONVOCATÒRIA", 152, 76);
+  // Capçalera: competició, escut i el títol gegant
+  x.textBaseline = "alphabetic"; x.textAlign = "left";
+  const kicker = `JUVENIL C${o.c.competition ? ` · ${o.c.competition.toUpperCase()}` : ""}`;
+  x.fillStyle = OR; fit(kicker, ESC, 30, W - 220); x.fillText(kicker, 56, 84);
+  x.drawImage(club, W - 56 - 72, 34, 72, 72);
+  x.fillStyle = "#fff"; fit("CONVOCATÒRIA", ESC, 200, W - 100);
+  x.save(); x.shadowColor = "rgba(0,0,20,.35)"; x.shadowBlur = 20; x.fillText("CONVOCATÒRIA", 48, 272); x.restore();
 
-  // El partit
-  const home = o.c.is_home ? "CE Europa" : o.c.rival, away = o.c.is_home ? o.c.rival : "CE Europa";
-  x.fillStyle = "rgba(255,255,255,.07)"; x.beginPath(); x.roundRect(40, 176, W - 80, 228, 26); x.fill();
-  x.strokeStyle = "rgba(255,255,255,.12)"; x.lineWidth = 1.5; x.stroke();
-  const crest = (im: HTMLImageElement | null, name: string, cx: number, us: boolean) => {
-    const box = 118, top = 194;
-    x.save(); x.shadowColor = "rgba(0,0,20,.45)"; x.shadowBlur = 18; x.shadowOffsetY = 8;
-    if (im) { const k = Math.min(box / im.width, box / im.height); x.drawImage(im, cx - (im.width * k) / 2, top + (box - im.height * k) / 2, im.width * k, im.height * k); }
-    else { x.fillStyle = "rgba(255,255,255,.14)"; x.beginPath(); x.arc(cx, top + box / 2, box / 2.2, 0, Math.PI * 2); x.fill(); }
-    x.restore();
-    x.textAlign = "center"; x.textBaseline = "alphabetic"; x.fillStyle = us ? OR : "#fff";
-    fit(name.toUpperCase(), ESC, 28, 250); x.fillText(name.toUpperCase(), cx, top + box + 46);
-  };
-  crest(hc, home, 190, o.c.is_home);
-  crest(ac, away, W - 190, !o.c.is_home);
-  x.textAlign = "center"; x.textBaseline = "alphabetic";
-  x.fillStyle = OR; x.font = `28px ${ESC}`; x.fillText("VS", W / 2, 222);
-  x.fillStyle = "#fff"; fit(fmtDate(o.c.match_date).toUpperCase(), ESC, 40, 400); x.fillText(fmtDate(o.c.match_date).toUpperCase(), W / 2, 270);
-  const times = [o.c.kickoff ? `PARTIT ${hhmm(o.c.kickoff)} H` : null, o.c.meet_time ? `QUEDADA ${hhmm(o.c.meet_time)} H` : null].filter(Boolean).join(" · ");
-  if (times) { x.fillStyle = ORL; fit(times, ESC, 32, 420); x.fillText(times, W / 2, 318); }
-  const key = kitOf(o.c.kit);
-  const kit = key ? KITS.find((k) => k.key === key)?.label : o.c.kit;
-  x.fillStyle = "rgba(255,255,255,.85)";
-  const sub = [o.c.is_home ? "LOCAL" : "VISITANT", kit ? `EQUIPACIÓ ${kit.toUpperCase()}` : null].filter(Boolean).join(" · ");
-  fit(sub, ESC, 24, 420); x.fillText(sub, W / 2, 362);
-
-  // La jugadora del cartell, gran a l'esquerra, amb el seu dorsal darrere
-  const top = 424, bottom = 1262, listX = 596;
+  // La jugadora, per davant del títol
+  const listX = 612;
   if (hero && o.hero) {
-    const ph = bottom - top + 10, pw = (hero.width / hero.height) * ph;
-    const k = Math.min(1, (listX + 40) / pw);
-    const w = pw * k, h = ph * k, px = Math.max(-10, 300 - w / 2), py = bottom - h;
-    x.save(); x.shadowColor = "rgba(0,0,20,.55)"; x.shadowBlur = 26; x.shadowOffsetX = 12; x.shadowOffsetY = 10; x.drawImage(hero, px, py, w, h); x.restore();
-    x.save(); x.shadowColor = "rgba(255,255,255,.5)"; x.shadowBlur = 7; x.drawImage(hero, px, py, w, h); x.restore();
-    // Nom de la del cartell, a baix
-    const fade = x.createLinearGradient(0, bottom - 200, 0, H - 78);
-    fade.addColorStop(0, "rgba(5,18,58,0)"); fade.addColorStop(1, "rgba(5,18,58,.9)");
-    x.fillStyle = fade; x.fillRect(0, bottom - 200, W, H - 78 - (bottom - 200));
-    x.textAlign = "left"; x.textBaseline = "alphabetic";
-    let nx = 48;
-    if (o.hero.dorsal != null) { x.fillStyle = OR; x.font = `64px ${KIT}`; x.fillText(String(o.hero.dorsal), nx, bottom - 22); nx += x.measureText(String(o.hero.dorsal)).width + 14; }
-    x.fillStyle = "#fff"; fit(o.hero.name.toUpperCase(), ESC, 46, listX - nx - 30); x.fillText(o.hero.name.toUpperCase(), nx, bottom - 26);
+    const ph = BAR - 150, pw = (hero.width / hero.height) * ph;
+    const k = Math.min(1, (listX + 20) / pw), w = pw * k, h = ph * k;
+    const px = Math.max(-20, 320 - w / 2), py = BAR - h + 6;
+    x.save(); x.shadowColor = "rgba(0,0,20,.6)"; x.shadowBlur = 34; x.shadowOffsetX = 14; x.shadowOffsetY = 12; x.drawImage(hero, px, py, w, h); x.restore();
+    x.save(); x.shadowColor = "rgba(255,255,255,.45)"; x.shadowBlur = 6; x.drawImage(hero, px, py, w, h); x.restore();
+    const fade = x.createLinearGradient(0, BAR - 230, 0, BAR);
+    fade.addColorStop(0, "rgba(4,16,58,0)"); fade.addColorStop(1, "rgba(4,16,58,.95)");
+    x.fillStyle = fade; x.fillRect(0, BAR - 230, W, 230);
+    let nx = 56;
+    if (o.hero.dorsal != null) { x.fillStyle = OR; x.font = `72px ${KIT}`; x.fillText(String(o.hero.dorsal), nx, BAR - 24); nx += x.measureText(String(o.hero.dorsal)).width + 14; }
+    x.fillStyle = "#fff"; fit(o.hero.name.toUpperCase(), ESC, 52, listX - nx - 40); x.fillText(o.hero.name.toUpperCase(), nx, BAR - 28);
   }
 
-  // La llista
-  const n = Math.max(1, o.called.length);
-  x.fillStyle = "rgba(6,24,71,.72)"; x.beginPath(); x.roundRect(listX, top, W - listX - 40, bottom - top, 24); x.fill();
-  x.strokeStyle = "rgba(255,255,255,.12)"; x.lineWidth = 1.5; x.stroke();
-  x.textAlign = "left"; x.textBaseline = "alphabetic";
-  x.fillStyle = OR; x.font = `28px ${ESC}`; x.fillText(`CONVOCADES · ${o.called.length}`, listX + 26, top + 48);
-  x.fillStyle = "rgba(219,179,77,.5)"; x.fillRect(listX + 26, top + 62, W - listX - 92, 2);
-  const startY = top + 76, rowH = Math.min(42, (bottom - 20 - startY) / n);
-  const nameSize = Math.min(30, rowH * 0.72), numSize = Math.min(38, rowH * 0.9);
-  o.called.forEach((r, i) => {
-    const y = startY + rowH * (i + 0.5);
-    if (i % 2 === 0) { x.fillStyle = "rgba(255,255,255,.04)"; x.fillRect(listX + 14, y - rowH / 2, W - listX - 68, rowH); }
-    x.textBaseline = "middle";
-    x.textAlign = "right"; x.fillStyle = r.gk ? "#f7d417" : OR; x.font = `${numSize}px ${KIT}`; x.fillText(r.dorsal == null ? "–" : String(r.dorsal), listX + 86, y + 2);
-    x.textAlign = "left"; x.fillStyle = "#fff";
-    const tag = r.gk ? "POR" : r.origin ? r.origin.toUpperCase() : "";
-    fit(r.name.toUpperCase(), ESC, nameSize, W - listX - 230); x.fillText(r.name.toUpperCase(), listX + 104, y + 1);
-    if (tag) {
-      x.font = `${Math.min(18, nameSize * 0.62)}px ${ESC}`;
-      const tw = x.measureText(tag).width + 16, tx = W - 40 - 24 - tw;
-      x.fillStyle = r.gk ? "#f7d417" : "rgba(255,255,255,.18)"; x.beginPath(); x.roundRect(tx, y - 12, tw, 24, 12); x.fill();
-      x.fillStyle = r.gk ? "#111" : "#fff"; x.textAlign = "center"; x.fillText(tag, tx + tw / 2, y + 1);
+  // La llista, per línies
+  const gs = groups(o.called);
+  const top = 320, bottom = BAR - 24;
+  const units = o.called.length + gs.length * 1.5;
+  const rowH = Math.min(44, (bottom - top) / Math.max(1, units));
+  const nameSize = Math.min(32, rowH * 0.74), numSize = Math.min(40, rowH * 0.92);
+  let y = top;
+  for (const grp of gs) {
+    y += rowH * 0.95;
+    x.textAlign = "left"; x.textBaseline = "alphabetic";
+    x.fillStyle = OR; x.font = `${Math.min(24, rowH * 0.58)}px ${ESC}`;
+    x.fillText(grp.label, listX, y);
+    const lw = x.measureText(grp.label).width;
+    x.fillStyle = "rgba(219,179,77,.45)"; x.fillRect(listX + lw + 12, y - rowH * 0.2, W - 56 - listX - lw - 12, 2);
+    y += rowH * 0.55;
+    for (const r of grp.rows) {
+      const cy = y + rowH / 2;
+      x.textBaseline = "middle";
+      x.textAlign = "right"; x.fillStyle = r.gk ? "#f7d417" : "#fff"; x.font = `${numSize}px ${KIT}`;
+      x.fillText(r.dorsal == null ? "–" : String(r.dorsal), listX + 62, cy + 2);
+      x.textAlign = "left"; x.fillStyle = "#fff";
+      const tag = r.origin ? r.origin.toUpperCase() : "";
+      fit(r.name.toUpperCase(), ESC, nameSize, W - 56 - listX - 84 - (tag ? 110 : 0)); x.fillText(r.name.toUpperCase(), listX + 80, cy + 1);
+      if (tag) {
+        const nw = x.measureText(r.name.toUpperCase()).width;
+        x.fillStyle = "rgba(255,255,255,.6)"; x.font = `${Math.min(18, nameSize * 0.6)}px ${ESC}`; x.fillText(tag, listX + 80 + nw + 12, cy + 2);
+      }
+      y += rowH;
     }
-  });
+  }
 
-  // Peu daurat amb el camp
-  x.fillStyle = OR; x.fillRect(0, H - 78, W, 78);
-  x.fillStyle = NAVY; x.textBaseline = "middle";
-  const place = o.c.venue ? o.c.venue.toUpperCase() : "";
-  x.textAlign = "right"; x.font = `34px ${ESC}`; x.fillText("FORÇA EUROPA", W - 40, H - 38);
-  if (place) { x.textAlign = "left"; fit(`CAMP: ${place}`, ESC, 26, W - 420); x.fillText(`CAMP: ${place}`, 40, H - 38); }
+  // Franja del partit
+  x.fillStyle = "#030c2e"; x.fillRect(0, BAR, W, H - BAR);
+  x.fillStyle = band; x.fillRect(0, BAR, W, 4);
+  const home = o.c.is_home ? "CE Europa" : o.c.rival, away = o.c.is_home ? o.c.rival : "CE Europa";
+  const crest = (im: HTMLImageElement | null, cx: number) => {
+    const box = 92, cy = BAR + 32;
+    if (im) { const k = Math.min(box / im.width, box / im.height); x.drawImage(im, cx - (im.width * k) / 2, cy + (box - im.height * k) / 2, im.width * k, im.height * k); }
+    else { x.fillStyle = "rgba(255,255,255,.14)"; x.beginPath(); x.arc(cx, cy + box / 2, box / 2.2, 0, Math.PI * 2); x.fill(); }
+  };
+  crest(hc, 104); crest(ac, 264);
+  x.textAlign = "center"; x.textBaseline = "middle"; x.fillStyle = OR; x.font = `28px ${ESC}`; x.fillText("VS", 184, BAR + 78);
+  const infoX = 348, infoW = W - 56 - infoX;
+  x.textAlign = "left"; x.textBaseline = "alphabetic";
+  const when = `${fmtDate(o.c.match_date).toUpperCase()}${o.c.kickoff ? ` · ${hhmm(o.c.kickoff)} H` : ""}`;
+  x.fillStyle = "#fff"; fit(when, ESC, 40, infoW); x.fillText(when, infoX, BAR + 62);
+  const key = kitOf(o.c.kit);
+  const kit = key ? KITS.find((k) => k.key === key)?.label : o.c.kit;
+  const line2 = [`${home.toUpperCase()} – ${away.toUpperCase()}`, o.c.meet_time ? `QUEDADA ${hhmm(o.c.meet_time)} H` : null].filter(Boolean).join(" · ");
+  x.fillStyle = ORL; fit(line2, ESC, 26, infoW); x.fillText(line2, infoX, BAR + 102);
+  const line3 = [o.c.venue ? o.c.venue.toUpperCase() : null, kit ? `EQUIPACIÓ ${kit.toUpperCase()}` : null].filter(Boolean).join(" · ");
+  if (line3) { x.fillStyle = "rgba(255,255,255,.7)"; fit(line3, ESC, 22, infoW); x.fillText(line3, infoX, BAR + 138); }
 
   return toBlob(cv);
 }

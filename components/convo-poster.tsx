@@ -7,6 +7,7 @@ import { useDorsals } from "@/components/shirt";
 import type { Convocation, RosterRow } from "@/lib/convo";
 import { drawConvoPoster } from "@/lib/convo-poster";
 import { fetchCutout, fetchThumbs } from "@/lib/player-photos";
+import { fetchAll, supabase } from "@/lib/supabase";
 
 /** Staff: el cartell de la convocatòria per descarregar o enviar. Es tria quina jugadora hi surt en gran. */
 export function ConvoPosterButton({ c, roster }: { c: Convocation; roster: RosterRow[] }) {
@@ -14,9 +15,13 @@ export function ConvoPosterButton({ c, roster }: { c: Convocation; roster: Roste
   const dorsals = useDorsals();
   const [withPhoto, setWithPhoto] = useState<Set<string>>(new Set());
   const [hero, setHero] = useState<string>("");
+  const [pos, setPos] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     let alive = true;
     fetchThumbs().then((m) => alive && setWithPhoto(new Set(m.keys())), () => {});
+    // Posició de cada jugadora (per agrupar-les per línies al cartell)
+    fetchAll<{ profile_id: string; position: string }>((f, t) => supabase().from("player_positions").select("profile_id, position").order("profile_id").range(f, t))
+      .then((rows) => alive && setPos(new Map(rows.map((r) => [r.profile_id, r.position]))), () => {});
     return () => { alive = false; };
   }, []);
 
@@ -43,7 +48,10 @@ export function ConvoPosterButton({ c, roster }: { c: Convocation; roster: Roste
       <StoryCard label="🖼️ Fer el cartell" busyLabel="Preparant el cartell…" alt="Cartell de la convocatòria" fname={`convocatoria-${c.match_date}.png`}
         make={async () => drawConvoPoster({
           c,
-          called: called.map((r) => ({ name: r.display_name, dorsal: r.dorsal, gk: !r.guest && !!dorsals.get(r.player_id)?.gk, origin: r.guest ? r.origin : null })),
+          called: called.map((r) => ({
+            name: r.display_name, dorsal: r.dorsal, gk: !r.guest && !!dorsals.get(r.player_id)?.gk,
+            pos: r.guest ? null : pos.get(r.player_id) ?? null, origin: r.guest ? r.origin : null,
+          })),
           hero: chosen ? { cutout: (await fetchCutout(chosen.player_id)) ?? "", name: chosen.display_name, dorsal: chosen.dorsal } : null,
           homeCrest: crestFor(teams, home), awayCrest: crestFor(teams, away),
         })} />
