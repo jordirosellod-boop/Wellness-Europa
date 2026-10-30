@@ -50,8 +50,7 @@ export async function drawConvoPoster(o: {
   homeCrest: string | null; awayCrest: string | null;
 }): Promise<Blob> {
   const ESC = family("--font-escapulada", "Impact, sans-serif");
-  const KIT = family("--font-kit", ESC);
-  await Promise.all([document.fonts.load(`100px ${ESC}`), document.fonts.load(`100px ${KIT}`)]).catch(() => {});
+  await document.fonts.load(`100px ${ESC}`).catch(() => {});
   const [club, hc, ac, hero] = await Promise.all([img("/escut.png"), soft(o.homeCrest), soft(o.awayCrest), soft(o.hero?.cutout ?? null)]);
 
   const cv = document.createElement("canvas");
@@ -100,7 +99,7 @@ export async function drawConvoPoster(o: {
     fade.addColorStop(0, "rgba(4,16,58,0)"); fade.addColorStop(1, "rgba(4,16,58,.95)");
     x.fillStyle = fade; x.fillRect(0, BAR - 230, W, 230);
     let nx = 56;
-    if (o.hero.dorsal != null) { x.fillStyle = OR; x.font = `72px ${KIT}`; x.fillText(String(o.hero.dorsal), nx, BAR - 24); nx += x.measureText(String(o.hero.dorsal)).width + 14; }
+    if (o.hero.dorsal != null) { x.fillStyle = OR; x.font = `76px ${ESC}`; x.fillText(String(o.hero.dorsal), nx, BAR - 24); nx += x.measureText(String(o.hero.dorsal)).width + 14; }
     x.fillStyle = "#fff"; fit(o.hero.name.toUpperCase(), ESC, 52, listX - nx - 40); x.fillText(o.hero.name.toUpperCase(), nx, BAR - 28);
   }
 
@@ -122,7 +121,7 @@ export async function drawConvoPoster(o: {
     for (const r of grp.rows) {
       const cy = y + rowH / 2;
       x.textBaseline = "middle";
-      x.textAlign = "right"; x.fillStyle = r.gk ? "#f7d417" : "#fff"; x.font = `${numSize}px ${KIT}`;
+      x.textAlign = "right"; x.fillStyle = r.gk ? "#f7d417" : "#fff"; x.font = `${numSize}px ${ESC}`;
       x.fillText(r.dorsal == null ? "–" : String(r.dorsal), listX + 62, cy + 2);
       x.textAlign = "left"; x.fillStyle = "#fff";
       const tag = r.origin ? r.origin.toUpperCase() : "";
