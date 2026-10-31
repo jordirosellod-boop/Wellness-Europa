@@ -2638,9 +2638,36 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .poster-pick { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: .92rem; }
 .poster-pick select { flex: 1; min-width: 0; }
 
-/* Onze inicial en PDF (es fa al dispositiu): com en paper */
-.pdf-mode { padding: 18px; background: #fff; width: 640px; max-width: none; }
-.pdf-mode .print-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.pdf-mode .print-head b { display: block; font-size: 1.9rem; color: var(--navy); line-height: 1; }
-.pdf-mode .print-head span { color: #55608a; font-size: .85rem; }
+/* Onze inicial en PDF (es fa al dispositiu): full de vestidor, a l'estil dels clubs */
+.print-foot { display: none; }
+.pdf-mode { width: 680px; max-width: none; padding: 0; background: #fff; border-radius: 0; }
+.pdf-mode .print-head { display: block; margin: 0; }
+.pdf-mode .ph-band {
+  position: relative; display: flex; align-items: center; gap: 16px; padding: 22px 26px 20px; color: #fff;
+  background: var(--escapulat-net) center top / 100% auto no-repeat, linear-gradient(135deg, #04103a, var(--navy) 45%, var(--blau));
+  border-bottom: 5px solid var(--or);
+}
+.pdf-mode .ph-band img { width: 64px; height: 64px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.4)); }
+.pdf-mode .ph-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pdf-mode .ph-k { color: var(--or); text-transform: uppercase; letter-spacing: 1.2px; font-size: .95rem; }
+.pdf-mode .ph-titles b { font-weight: 400; font-size: 3.4rem; line-height: .95; text-transform: uppercase; letter-spacing: .5px; }
+.pdf-mode .ph-sys {
+  display: flex; flex-direction: column; align-items: center; padding: 8px 14px; border-radius: 12px; background: var(--or); color: var(--navy);
+  font-size: 2rem; line-height: 1;
+}
+.pdf-mode .ph-sys small { font-size: .7rem; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+.pdf-mode .ph-match { display: flex; align-items: center; gap: 16px; padding: 16px 26px; border-bottom: 1px solid #e3e8f4; }
+.pdf-mode .ph-match > div { flex: 1; min-width: 0; text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.pdf-mode .ph-match b { font-weight: 400; font-size: 1.9rem; color: var(--navy); line-height: 1; text-transform: uppercase; }
+.pdf-mode .ph-match span { color: #55608a; font-size: .85rem; }
+.pdf-mode .stadium { margin: 18px 26px 0; }
 .pdf-mode .stadium-hint { display: none; }
+.pdf-mode .bench { margin: 16px 26px 0; }
+.pdf-mode .bench h3 { font-size: 1.5rem; }
+.pdf-mode .bench h3::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, var(--or), transparent); }
+.pdf-mode .bench li { background: var(--navy); border-color: var(--navy); color: #fff; font-size: 1.15rem; }
+.pdf-mode .bench li b { color: var(--or); }
+.pdf-mode .print-foot {
+  display: flex; justify-content: space-between; margin-top: 22px; padding: 12px 26px; background: var(--navy); border-top: 4px solid var(--or);
+  color: var(--or); text-transform: uppercase; letter-spacing: 1.5px; font-size: 1.15rem;
+}

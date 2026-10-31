@@ -174,12 +174,26 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
 
       <div className="print-lineup" ref={sheet}>
         <div className="print-head">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/escut.png" alt="" width={44} height={44} />
-          <Crest name={c.rival} size={44} />
-          <div>
-            <b className="esc">{c.is_home ? `CE Europa – ${c.rival}` : `${c.rival} – CE Europa`}</b>
-            <span>{fmtDate(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""} · Sistema {lineup.formation} · {lineup.kit === "home" ? "1a" : "2a"} equipació</span>
+          {/* Capçalera del full (només al PDF i en imprimir) */}
+          <div className="ph-band esc">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/escut.png" alt="" width={64} height={64} />
+            <div className="ph-titles">
+              <span className="ph-k">CE Europa · Juvenil C{c.competition ? ` · ${c.competition}` : ""}</span>
+              <b>Onze inicial</b>
+            </div>
+            <span className="ph-sys"><small>Sistema</small>{lineup.formation}</span>
+          </div>
+          <div className="ph-match">
+            <Crest name={c.is_home ? "CE Europa" : c.rival} size={58} />
+            <div>
+              <b className="esc">{c.is_home ? `CE Europa – ${c.rival}` : `${c.rival} – CE Europa`}</b>
+              <span>
+                {fmtDate(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""}{c.meet_time ? ` · Quedada ${hhmm(c.meet_time)} h` : ""}
+                {c.venue ? ` · ${c.venue}` : ""} · {lineup.kit === "home" ? "1a" : "2a"} equipació
+              </span>
+            </div>
+            <Crest name={c.is_home ? c.rival : "CE Europa"} size={58} />
           </div>
         </div>
 
@@ -247,6 +261,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
             </ul>
           )}
         </div>
+        <div className="print-foot esc"><span>Força Europa</span><span>Juvenil C</span></div>
       </div>
 
       {picking != null && pickedSpot && (
