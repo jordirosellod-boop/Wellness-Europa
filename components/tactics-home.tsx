@@ -12,6 +12,7 @@ import {
   type BoardData, type PlanInput, type PlanSection, type Scene, type Squad,
 } from "@/lib/tactics";
 import { loadImg, sceneImage, scenesVideo, type RenderOpts } from "@/lib/tactics-render";
+import { parseIdea } from "@/lib/tactics-vestidor";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 
@@ -110,6 +111,7 @@ export function TacticsHome() {
   const [busy, setBusy] = useState(false);
   const [opts, setOpts] = useState<{ ours: string; theirs: string; press: PlanInput["press"]; build: PlanInput["build"]; side: PlanInput["side"] } | null>(null);
   const [version, setVersion] = useState(0);
+  const [idea, setIdea] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -148,6 +150,18 @@ export function TacticsHome() {
       press: opts.press, build: opts.build, side: opts.side, scout: ctx.scout, table: ctx.table, usTable: ctx.usTable,
     });
     create(`Pla de partit · ${ctx.rival}`, data, ctx.rival, ctx.matchDate);
+  }
+
+  /** «La meva idea de joc»: el que escric es reparteix per conceptes i se'n fan les pissarres. */
+  function fromIdea() {
+    if (!ctx || !opts || !idea.trim()) return;
+    const p = parseIdea(idea);
+    const ourSquad = ctx.ourSquad.length === formationOf(opts.ours).length ? ctx.ourSquad : numbered(opts.ours);
+    const data = buildPlan({
+      rival: ctx.rival, ours: opts.ours, theirs: opts.theirs, ourSquad, theirSquad: rivalSquad(opts.theirs, ctx.keyPlayers),
+      press: p.press, build: p.build, side: p.side, scout: ctx.scout, table: ctx.table, usTable: ctx.usTable,
+    });
+    create(`Idea de joc · ${ctx.rival}`, { ...data, plan: p.plan }, ctx.rival, ctx.matchDate);
   }
 
   if (open) return <TacticsEditor id={open} onBack={() => { setOpen(null); setVersion((v) => v + 1); }} />;
@@ -189,6 +203,18 @@ export function TacticsHome() {
             <button className="btn block" disabled={busy} onClick={generate}>{busy ? "Preparant…" : "⚡ Generar el pla i les pissarres"}</button>
           </>
         )}
+      </section>
+
+      <section className="card plan-gen idea-card">
+        <h3 className="esc" style={{ marginTop: 0 }}>✍️ La meva idea de joc</h3>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Explica amb les teves paraules com vols jugar: la sortida, la pressió, l&apos;atac, les transicions i les pilotes aturades.
+          Faig les pissarres i, des de la pissarra, el <b>PDF per al vestidor</b> (una pàgina per concepte).
+          {opts ? ` Sistemes: ${opts.ours} contra ${opts.theirs} (es canvien a dalt).` : ""}
+        </p>
+        <textarea rows={8} maxLength={4000} value={idea} onChange={(e) => setIdea(e.target.value)} aria-label="La meva idea de joc"
+          placeholder={"Sortida de pilota: curta des de baix, centrals obertes i la pivot baixa a rebre.\nPressió: alta. La punta orienta cap a fora i la extrem salta a la lateral.\nAtac: per la dreta, centres al primer pal.\nTransicions: quan perdem, 5 segons de pressió. Quan robem, primera passada a l'espai.\nCórners: atac al primer pal i una a la frontal."} />
+        <button className="btn block" disabled={busy || !ctx || !idea.trim()} onClick={fromIdea}>{busy ? "Preparant…" : "✍️ Fer les pissarres de la meva idea"}</button>
       </section>
 
       <section className="card">
@@ -279,7 +305,7 @@ function TacticsEditor({ id, onBack }: { id: string; onBack: () => void }) {
     return { font, showNames, crestUs, crestRival, title: row?.title };
   }
 
-  async function exportFile(kind: "png" | "video" | "videoAll" | "pdf") {
+  async function exportFile(kind: "png" | "video" | "videoAll" | "pdf" | "vestidor") {
     if (!row) return;
     setBusy(kind);
     setStatus(null);
@@ -289,6 +315,10 @@ function TacticsEditor({ id, onBack }: { id: string; onBack: () => void }) {
       let file: File;
       if (kind === "png") {
         file = new File([await sceneImage(scene, 0, o)], `${safeName(`${row.title} - ${scene.title}`)}.png`, { type: "image/png" });
+      } else if (kind === "vestidor") {
+        const { vestidorPdf } = await import("@/lib/tactics-vestidor");
+        const blob = await vestidorPdf({ title: row.title, rival: row.data.meta?.rival ?? null, date: row.match_date ? fmtDate(row.match_date) : null, data: row.data, render: o });
+        file = new File([blob], `${safeName(`${row.title} - vestidor`)}.pdf`, { type: "application/pdf" });
       } else if (kind === "pdf") {
         const { planPdf } = await import("@/lib/tactics-pdf");
         file = new File([await planPdf(row.title, row.match_date ? fmtDate(row.match_date) : "", row.data, o)], `${safeName(row.title)}.pdf`, { type: "application/pdf" });
@@ -373,6 +403,7 @@ function TacticsEditor({ id, onBack }: { id: string; onBack: () => void }) {
           <button className="btn small secondary" disabled={!!busy || scene.frames.length < 2} onClick={() => exportFile("video")}>🎬 Vídeo d&apos;aquesta escena ({Math.round(sceneLength(scene))} s)</button>
           <button className="btn small secondary" disabled={!!busy} onClick={() => exportFile("videoAll")}>🎬 Vídeo de totes</button>
           <button className="btn small" disabled={!!busy} onClick={() => exportFile("pdf")}>📄 PDF del pla</button>
+          <button className="btn small" disabled={!!busy} onClick={() => exportFile("vestidor")}>{busy === "vestidor" ? "Fent el PDF…" : "🧾 PDF per al vestidor"}</button>
         </div>
         {ready && (
           <div className="plan-pdf-ready" role="status">

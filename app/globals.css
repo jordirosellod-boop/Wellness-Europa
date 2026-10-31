@@ -2668,3 +2668,8 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .pdf-mode .pl-shirt { filter: none; }
 .pdf-mode .stadium .pitch, .pdf-mode .stadium, .pdf-mode .ph-band img, .pdf-mode .bench li { box-shadow: none; filter: none; }
 .pdf-mode .stadium .pitch { outline: 4px solid #1d6b2c; }
+
+/* Pissarra: la meva idea de joc */
+.idea-card textarea { width: 100%; margin: 0 0 10px; font: inherit; line-height: 1.45; resize: vertical; }
+/* El text llarg de la idea de joc, amb la lletra normal (l'escapulada és tota en majúscules) */
+.an-font .idea-card textarea { font-family: var(--cos), sans-serif !important; letter-spacing: 0; font-size: 1rem; }
