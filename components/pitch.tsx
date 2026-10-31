@@ -1,9 +1,11 @@
 "use client";
 
 import { Crest } from "@/components/crest";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FORMATION_NAMES, FORMATIONS, hhmm, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { escapulada } from "@/lib/fonts";
+import { deliverPdf, sheetPdf } from "@/lib/plan-pdf";
+import { canShareFile, safeName } from "@/lib/share-file";
 import { supabase } from "@/lib/supabase";
 import { fmtDate } from "@/lib/wellness";
 
@@ -46,6 +48,9 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
   const [lineup, setLineup] = useState<Lineup | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const sheet = useRef<HTMLDivElement>(null);
+  const [pdf, setPdf] = useState<File | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [picking, setPicking] = useState<number | null>(null);
   const defaultKit = kitOf(c.kit) ?? "home"; // si encara no hi ha onze, l'equipació de la convocatòria
   useEffect(() => {
@@ -120,6 +125,20 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
 
   const pickedSpot = picking != null ? spots[picking] : null;
 
+  // Imprimir: es fa el PDF al mateix dispositiu (imprimir des del navegador no funciona a l'app instal·lada a l'iPhone)
+  async function makePdf() {
+    if (!sheet.current) return;
+    setPdfBusy(true); setPdf(null);
+    try {
+      const file = await sheetPdf(sheet.current, `${safeName(`Onze ${c.is_home ? `CE Europa - ${c.rival}` : `${c.rival} - CE Europa`} ${c.match_date}`)}.pdf`);
+      // Al mòbil cal un segon toc per obrir el menú de compartir (des d'allà es pot imprimir)
+      if (canShareFile(file)) setPdf(file);
+      else await deliverPdf(file);
+    } catch (e) {
+      setStatus({ ok: false, text: `No s'ha pogut fer el PDF: ${e instanceof Error ? e.message : e}` });
+    } finally { setPdfBusy(false); }
+  }
+
   return (
     <section className={`card lineup ${escapulada.variable}`}>
       <div className="row between no-print">
@@ -148,11 +167,12 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
       <div className="row no-print" style={{ gap: 8, margin: "8px 0" }}>
         <button className="btn small" disabled={bench.length === 0 || Object.keys(slots).length >= 11} onClick={autoFill}>Omplir els buits</button>
         <button className="btn small secondary" disabled={Object.keys(slots).length === 0} onClick={() => save({ slots: {} })}>Buidar</button>
-        <button className="btn small secondary" onClick={() => window.print()}>🖨 Imprimir</button>
+        <button className="btn small secondary" disabled={pdfBusy} onClick={makePdf}>{pdfBusy ? "Fent el PDF…" : "🖨 Imprimir (PDF)"}</button>
+        {pdf && <button className="btn small" onClick={() => deliverPdf(pdf).then(() => setPdf(null))}>📤 Obrir el PDF</button>}
       </div>
       {status && <p className={`small ${status.ok ? "muted" : "msg error"} no-print`} role="status" style={{ margin: "0 0 6px" }}>{status.text}</p>}
 
-      <div className="print-lineup">
+      <div className="print-lineup" ref={sheet}>
         <div className="print-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/escut.png" alt="" width={44} height={44} />

@@ -53,3 +53,27 @@ export async function planPdf(el: HTMLElement, fileName: string): Promise<File> 
 }
 
 export { deliverFile as deliverPdf } from "@/lib/share-file";
+
+/** PDF d'una sola pàgina A4 vertical amb l'element tal com es veu (p. ex. l'onze inicial). Deixa fora el que porta «no-print». */
+export async function sheetPdf(el: HTMLElement, fileName: string): Promise<File> {
+  const [{ toCanvas }, { jsPDF }] = await Promise.all([import("html-to-image"), import("jspdf")]);
+  await document.fonts.ready;
+  // «pdf-mode»: el full es mostra com en paper (capçalera visible, sense les ajudes de la pantalla)
+  el.classList.add("pdf-mode");
+  let canvas: HTMLCanvasElement;
+  try {
+    const w0 = el.offsetWidth, h0 = el.offsetHeight;
+    canvas = await toCanvas(el, {
+      pixelRatio: Math.min(3, Math.sqrt(14_000_000 / (w0 * h0))), backgroundColor: "#ffffff", width: w0, height: h0,
+      filter: (n) => !(n instanceof HTMLElement && n.classList.contains("no-print")),
+    });
+  } finally {
+    el.classList.remove("pdf-mode");
+  }
+  const w = canvas.width, h = canvas.height;
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  const boxW = PAGE_H - 2 * MARGIN, boxH = PAGE_W - 2 * MARGIN; // A4 vertical: 210 × 297
+  const k = Math.min(boxW / w, boxH / h);
+  pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", MARGIN + (boxW - w * k) / 2, MARGIN, w * k, h * k);
+  return new File([pdf.output("blob")], fileName, { type: "application/pdf" });
+}

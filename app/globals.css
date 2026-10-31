@@ -2637,3 +2637,10 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .poster-card .story-card { padding: 0; margin: 10px 0 0; background: none; box-shadow: none; border: 0; }
 .poster-pick { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: .92rem; }
 .poster-pick select { flex: 1; min-width: 0; }
+
+/* Onze inicial en PDF (es fa al dispositiu): com en paper */
+.pdf-mode { padding: 18px; background: #fff; width: 640px; max-width: none; }
+.pdf-mode .print-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.pdf-mode .print-head b { display: block; font-size: 1.9rem; color: var(--navy); line-height: 1; }
+.pdf-mode .print-head span { color: #55608a; font-size: .85rem; }
+.pdf-mode .stadium-hint { display: none; }
