@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
-import { Avatar, useAvatars } from "@/components/avatar";
-import { useDorsals } from "@/components/shirt";
+import { Shirt, useDorsals } from "@/components/shirt";
 import { fetchNotices } from "@/lib/absence";
 import { reasonLabel } from "@/lib/attendance";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -52,7 +51,6 @@ async function loadToday(today: string): Promise<Row[]> {
 export function CoachToday({ today }: { today: string }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const dorsals = useDorsals();
-  const avatars = useAvatars();
   useEffect(() => {
     let alive = true;
     const load = () => loadToday(today).then((x) => alive && setRows(x), () => alive && setRows([]));
@@ -83,7 +81,7 @@ export function CoachToday({ today }: { today: string }) {
               <ul className="ct-alerts">
                 {alerts.map((a) => (
                   <li key={a.id} className={a.pain ? "pain" : bandOf(a.score).cls}>
-                    <Avatar src={avatars.get(a.id)} n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={26} />
+                    <Shirt n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={26} />
                     <b>{a.name}</b>
                     <span>
                       {a.pain && "🩹 Dolor"}
@@ -98,7 +96,7 @@ export function CoachToday({ today }: { today: string }) {
               <ul className="ct-alerts ct-away" aria-label="Han avisat que no vindran">
                 {away.map((a) => (
                   <li key={a.id}>
-                    <Avatar src={avatars.get(a.id)} n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={26} />
+                    <Shirt n={dorsals.get(a.id)?.n} gk={dorsals.get(a.id)?.gk} size={26} />
                     <b>{a.name}</b>
                     <span>🙋‍♀️ No vindrà · {a.reason}{a.note ? ` · «${a.note}»` : ""}</span>
                   </li>
