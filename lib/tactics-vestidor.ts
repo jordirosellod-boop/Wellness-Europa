@@ -124,102 +124,208 @@ function pages(data: BoardData): Page[] {
   return out;
 }
 
+/** Imatge d'un moment de l'escena, sense la franja de títol (només el camp). */
+async function pitchShot(s: Scene, t: number, o: RenderOpts): Promise<HTMLImageElement> {
+  const im = await blobImg(await sceneImage(s, t, { ...o, title: undefined }));
+  const bar = Math.round(im.height * 0.12);
+  const c = document.createElement("canvas");
+  c.width = im.width; c.height = im.height - bar;
+  c.getContext("2d")!.drawImage(im, 0, bar, im.width, c.height, 0, 0, c.width, c.height);
+  return img(c.toDataURL("image/png"));
+}
+
+const M = 64;
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
 export async function vestidorPdf(o: { title: string; rival: string | null; date: string | null; data: BoardData; render: RenderOpts }): Promise<Blob> {
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
   const ESC = o.render.font;
-  await document.fonts.load(`100px ${ESC}`).catch(() => {});
+  const BODY = getComputedStyle(document.body).getPropertyValue("--font-body").trim() || "sans-serif";
+  await Promise.all([document.fonts.load(`100px ${ESC}`), document.fonts.load(`400 30px ${BODY}`), document.fonts.load(`600 30px ${BODY}`)]).catch(() => {});
   const crest = await img("/escut.png").catch(() => null);
   const list = pages(o.data);
+  const ours = o.data.meta?.ours, theirs = o.data.meta?.theirs;
 
-  for (let pi = 0; pi < list.length; pi++) {
-    const pg = list[pi];
+  const page = () => {
     const cv = document.createElement("canvas");
     cv.width = PW_; cv.height = PH_;
-    const x = cv.getContext("2d")!;
+    return { cv, x: cv.getContext("2d")! };
+  };
+  const fit = (x: CanvasRenderingContext2D, t: string, font: string, size: number, max: number) => {
+    let s2 = size; do { x.font = `${s2}px ${font}`; s2 -= 2; } while (x.measureText(t).width > max && s2 > 14);
+  };
+  const drawCrest = (x: CanvasRenderingContext2D, im: HTMLImageElement | null | undefined, cx: number, cy: number, box: number) => {
+    if (!im) return;
+    const k = Math.min(box / im.naturalWidth, box / im.naturalHeight);
+    x.drawImage(im, cx - (im.naturalWidth * k) / 2, cy - (im.naturalHeight * k) / 2, im.naturalWidth * k, im.naturalHeight * k);
+  };
+  const escapulat = (x: CanvasRenderingContext2D, top: number, w: number, alpha: number) => {
+    const ky = (w * 230) / 92 / 1080, kx = w / 200;
+    x.fillStyle = `rgba(255,255,255,${alpha})`;
+    x.beginPath(); x.moveTo(0, top); x.lineTo(100 * kx, top + 62 * ky); x.lineTo(w, top); x.lineTo(w, top + 22 * ky); x.lineTo(100 * kx, top + 84 * ky); x.lineTo(0, top + 22 * ky); x.closePath(); x.fill();
+  };
+  const footer = (x: CanvasRenderingContext2D, dark = false) => {
+    x.fillStyle = dark ? "#030c2e" : NAVY; x.fillRect(0, PH_ - 80, PW_, 80);
+    x.fillStyle = OR; x.fillRect(0, PH_ - 80, PW_, 5);
+    x.textBaseline = "middle"; x.font = `32px ${ESC}`; x.fillStyle = OR;
+    x.textAlign = "left"; x.fillText("FORÇA EUROPA", M, PH_ - 38);
+    x.textAlign = "right"; x.fillText(["JUVENIL C", o.date ? o.date.toUpperCase() : null].filter(Boolean).join(" · "), PW_ - M, PH_ - 38);
+  };
+  const shots: { cv: HTMLCanvasElement }[] = [];
+
+  // ---------- Portada ----------
+  {
+    const { cv, x } = page();
+    const g = x.createLinearGradient(0, 0, PW_, PH_);
+    g.addColorStop(0, "#030c2e"); g.addColorStop(0.55, "#0a2a8a"); g.addColorStop(1, "#030c2e");
+    x.fillStyle = g; x.fillRect(0, 0, PW_, PH_);
+    if (crest) { x.save(); x.globalAlpha = 0.06; drawCrest(x, crest, PW_ * 0.62, PH_ * 0.46, 1100); x.restore(); }
+    escapulat(x, 0, PW_, 0.07);
+    x.fillStyle = OR; x.fillRect(0, 0, PW_, 10);
+    drawCrest(x, crest, M + 70, 190, 140);
+    x.textAlign = "left"; x.textBaseline = "alphabetic";
+    x.fillStyle = OR; x.font = `34px ${ESC}`; x.fillText("CE EUROPA · JUVENIL C", M + 170, 176);
+    x.fillStyle = "rgba(255,255,255,.8)"; x.font = `30px ${ESC}`; x.fillText("DOSSIER TÀCTIC DEL VESTIDOR", M + 170, 220);
+    x.fillStyle = "#fff"; fit(x, "IDEA DE JOC", ESC, 230, PW_ - 2 * M); x.fillText("IDEA DE JOC", M, 520);
+    if (o.rival) { x.fillStyle = OR; fit(x, `VS ${o.rival.toUpperCase()}`, ESC, 96, PW_ - 2 * M); x.fillText(`VS ${o.rival.toUpperCase()}`, M, 630); }
+    if (o.date) { x.fillStyle = "rgba(255,255,255,.85)"; x.font = `44px ${ESC}`; x.fillText(o.date.toUpperCase(), M, 700); }
+    // Escuts i sistemes
+    const cy = 860;
+    x.fillStyle = "rgba(255,255,255,.07)"; x.beginPath(); x.roundRect(M, cy - 110, PW_ - 2 * M, 220, 28); x.fill();
+    drawCrest(x, o.render.crestUs, M + 140, cy, 150);
+    drawCrest(x, o.render.crestRival, PW_ - M - 140, cy, 150);
+    x.textAlign = "center"; x.fillStyle = OR; x.font = `40px ${ESC}`; x.fillText("VS", PW_ / 2, cy - 30);
+    if (ours && theirs) { x.fillStyle = "#fff"; x.font = `64px ${ESC}`; x.fillText(`${ours}  ·  ${theirs}`, PW_ / 2, cy + 50); }
+    // Índex
+    let y = 1080;
+    x.textAlign = "left"; x.fillStyle = OR; x.font = `36px ${ESC}`; x.fillText("CONTINGUT", M, y);
+    x.fillRect(M + x.measureText("CONTINGUT").width + 20, y - 12, PW_ - 2 * M - x.measureText("CONTINGUT").width - 20, 3);
+    y += 30;
+    const rowH = Math.min(70, (PH_ - 140 - y) / Math.max(1, list.length));
+    list.forEach((pg, i) => {
+      const yy = y + rowH * (i + 0.7);
+      x.textAlign = "left"; x.fillStyle = OR; x.font = `${Math.min(52, rowH * 0.8)}px ${ESC}`; x.fillText(pad2(i + 1), M, yy);
+      x.fillStyle = "#fff"; fit(x, pg.title.toUpperCase(), ESC, Math.min(48, rowH * 0.72), PW_ - 2 * M - 220); x.fillText(pg.title.toUpperCase(), M + 110, yy);
+      x.textAlign = "right"; x.fillStyle = "rgba(255,255,255,.6)"; x.font = `${Math.min(34, rowH * 0.5)}px ${ESC}`; x.fillText(`PÀG. ${i + 2}`, PW_ - M, yy);
+      x.fillStyle = "rgba(255,255,255,.1)"; x.fillRect(M, yy + rowH * 0.28, PW_ - 2 * M, 1.5);
+    });
+    footer(x, true);
+    shots.push({ cv });
+  }
+
+  // ---------- Un concepte per pàgina ----------
+  for (let pi = 0; pi < list.length; pi++) {
+    const pg = list[pi];
+    const { cv, x } = page();
     x.fillStyle = "#fff"; x.fillRect(0, 0, PW_, PH_);
 
-    // Capçalera del club
-    const g = x.createLinearGradient(0, 0, PW_, 230);
-    g.addColorStop(0, "#04103a"); g.addColorStop(0.5, NAVY); g.addColorStop(1, "#022e91");
-    x.fillStyle = g; x.fillRect(0, 0, PW_, 230);
-    x.fillStyle = OR; x.fillRect(0, 230, PW_, 8);
-    if (crest) x.drawImage(crest, 56, 50, 130, 130);
+    // Capçalera: número gran, títol i escuts
+    const HB = 196;
+    const g = x.createLinearGradient(0, 0, PW_, HB);
+    g.addColorStop(0, "#030c2e"); g.addColorStop(0.6, NAVY); g.addColorStop(1, "#022e91");
+    x.fillStyle = g; x.fillRect(0, 0, PW_, HB);
+    escapulat(x, 0, PW_, 0.05);
+    x.fillStyle = OR; x.fillRect(0, HB, PW_, 7);
     x.textBaseline = "alphabetic"; x.textAlign = "left";
-    x.fillStyle = OR; x.font = `30px ${ESC}`;
-    x.fillText(["CE EUROPA · JUVENIL C", o.rival ? `VS ${o.rival.toUpperCase()}` : null].filter(Boolean).join(" · "), 214, 92);
-    let ts = 96; x.font = `${ts}px ${ESC}`;
-    while (x.measureText(pg.title.toUpperCase()).width > PW_ - 214 - 200 && ts > 40) { ts -= 4; x.font = `${ts}px ${ESC}`; }
-    x.fillStyle = "#fff"; x.fillText(pg.title.toUpperCase(), 214, 180);
-    // Número de pàgina
-    x.fillStyle = OR; x.beginPath(); x.roundRect(PW_ - 56 - 130, 86, 130, 64, 32); x.fill();
-    x.fillStyle = NAVY; x.textAlign = "center"; x.font = `36px ${ESC}`; x.fillText(`${pi + 1} / ${list.length}`, PW_ - 56 - 65, 131);
+    x.fillStyle = OR; x.font = `150px ${ESC}`; x.fillText(pad2(pi + 1), M - 6, 158);
+    const nx = M + x.measureText(pad2(pi + 1)).width + 26;
+    x.fillStyle = "rgba(255,255,255,.75)"; x.font = `28px ${ESC}`;
+    x.fillText(["IDEA DE JOC", o.rival ? `VS ${o.rival.toUpperCase()}` : null].filter(Boolean).join(" · "), nx, 82);
+    x.fillStyle = "#fff"; fit(x, pg.title.toUpperCase(), ESC, 86, PW_ - nx - M - 190); x.fillText(pg.title.toUpperCase(), nx, 158);
+    drawCrest(x, o.render.crestUs, PW_ - M - 140, HB / 2, 86);
+    drawCrest(x, o.render.crestRival, PW_ - M - 40, HB / 2, 86);
 
-    let y = 274;
+    let y = HB + 40;
     if (pg.scene) {
-      const s = pg.scene;
-      const n = s.frames.length;
-      // La pissarra gran: el moment final (amb el que ha de passar)
-      const big = await blobImg(await sceneImage(s, frameTime(s, n - 1), { ...o.render, title: undefined }));
-      const bw = PW_ - 112, bh = Math.min(760, (bw * big.height) / big.width), bwx = (bh * big.width) / big.height;
-      x.save(); x.shadowColor = "rgba(1,20,70,.25)"; x.shadowBlur = 24; x.shadowOffsetY = 8;
-      x.drawImage(big, (PW_ - bwx) / 2, y, bwx, bh); x.restore();
-      y += bh + 26;
-      // Els passos, en petit i numerats
+      const s2 = pg.scene, n = s2.frames.length;
+      // La pissarra gran, dins un marc del club
+      const big = await pitchShot(s2, frameTime(s2, n - 1), o.render);
+      const maxW = PW_ - 2 * M - 28, maxH = n > 1 ? 590 : 860;
+      const k = Math.min(maxW / big.width, maxH / big.height), bw = big.width * k, bh = big.height * k;
+      const fx = (PW_ - bw) / 2 - 14;
+      x.save(); x.shadowColor = "rgba(1,20,70,.3)"; x.shadowBlur = 30; x.shadowOffsetY = 10;
+      x.fillStyle = NAVY; x.beginPath(); x.roundRect(fx, y, bw + 28, bh + 28, 22); x.fill(); x.restore();
+      x.drawImage(big, fx + 14, y + 14, bw, bh);
+      y += bh + 28 + 18;
+      // Llegenda
+      x.textBaseline = "middle"; x.textAlign = "left"; x.font = `22px ${ESC}`;
+      let lx = (PW_ - 860) / 2;
+      const item = (draw: () => void, label: string) => { draw(); x.fillStyle = "#55608a"; x.fillText(label, lx + 40, y + 14); lx += 40 + x.measureText(label).width + 34; };
+      item(() => { x.fillStyle = "#0a2ea0"; x.beginPath(); x.arc(lx + 14, y + 14, 12, 0, 7); x.fill(); x.strokeStyle = OR; x.lineWidth = 3; x.stroke(); }, "NOSALTRES");
+      item(() => { x.fillStyle = "#d32f2f"; x.beginPath(); x.arc(lx + 14, y + 14, 12, 0, 7); x.fill(); }, "RIVAL");
+      item(() => { x.strokeStyle = "#e0b800"; x.lineWidth = 4; x.setLineDash([]); x.beginPath(); x.moveTo(lx, y + 14); x.lineTo(lx + 30, y + 14); x.stroke(); }, "PASSADA");
+      item(() => { x.strokeStyle = "#8a93b5"; x.lineWidth = 4; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(lx, y + 14); x.lineTo(lx + 30, y + 14); x.stroke(); x.setLineDash([]); }, "DESMARCATGE");
+      item(() => { x.fillStyle = "rgba(255,212,0,.35)"; x.fillRect(lx, y + 2, 30, 24); x.strokeStyle = "#e0b800"; x.lineWidth = 2; x.setLineDash([5, 4]); x.strokeRect(lx, y + 2, 30, 24); x.setLineDash([]); }, "ZONA");
+      y += 54;
+
+      // Seqüència: els passos amb la seva frase
       if (n > 1) {
-        const steps = Math.min(3, n);
-        const gap = 22;
-        let sw = (PW_ - 112 - gap * (steps - 1)) / steps, sh = 0;
+        const steps = Math.min(3, n), gap = 24;
+        x.textBaseline = "alphabetic"; x.fillStyle = NAVY; x.font = `34px ${ESC}`; x.fillText("SEQÜÈNCIA", M, y + 26);
+        x.fillStyle = OR; x.fillRect(M + x.measureText("SEQÜÈNCIA").width + 18, y + 14, PW_ - 2 * M - x.measureText("SEQÜÈNCIA").width - 18, 3);
+        y += 48;
+        let sw = (PW_ - 2 * M - gap * (steps - 1)) / steps, sh = 0;
+        const imgs: { im: HTMLImageElement; note: string }[] = [];
         for (let i = 0; i < steps; i++) {
           const fi = steps === n ? i : Math.round((i * (n - 1)) / (steps - 1));
-          const im = await blobImg(await sceneImage(s, frameTime(s, fi), { ...o.render, title: undefined }));
-          sw = Math.min(sw, (240 * im.width) / im.height); // els passos, com a molt 240 px d'alt
-          sh = (sw * im.height) / im.width;
-          const sx = (PW_ - (sw * steps + gap * (steps - 1))) / 2 + i * (sw + gap);
-          x.drawImage(im, sx, y, sw, sh);
-          x.fillStyle = OR; x.beginPath(); x.arc(sx + 30, y + 30, 24, 0, Math.PI * 2); x.fill();
-          x.fillStyle = NAVY; x.textAlign = "center"; x.textBaseline = "middle"; x.font = `30px ${ESC}`; x.fillText(String(i + 1), sx + 30, y + 32);
-          x.textBaseline = "alphabetic";
+          imgs.push({ im: await pitchShot(s2, frameTime(s2, fi), o.render), note: s2.frames[fi].note });
         }
-        y += sh + 30;
+        for (const it of imgs) sw = Math.min(sw, (190 * it.im.width) / it.im.height);
+        // Cada pas té una columna prou ampla per a la frase (el mig camp és més estret que alt)
+        const col = Math.max(sw, Math.min(340, (PW_ - 2 * M - gap * (steps - 1)) / steps));
+        const x0 = (PW_ - (col * steps + gap * (steps - 1))) / 2;
+        let capH = 0;
+        imgs.forEach((it, i) => {
+          sh = (sw * it.im.height) / it.im.width;
+          const cx0 = x0 + i * (col + gap), sx = cx0 + (col - sw) / 2;
+          x.save(); x.beginPath(); x.roundRect(sx, y, sw, sh, 12); x.clip(); x.drawImage(it.im, sx, y, sw, sh); x.restore();
+          x.fillStyle = OR; x.beginPath(); x.arc(sx + 28, y + 28, 22, 0, 7); x.fill();
+          x.fillStyle = NAVY; x.textAlign = "center"; x.textBaseline = "middle"; x.font = `28px ${ESC}`; x.fillText(String(i + 1), sx + 28, y + 30);
+          x.textAlign = "left"; x.textBaseline = "alphabetic"; x.fillStyle = "#3d4a78"; x.font = `500 21px ${BODY}`;
+          const ls = wrap(x, it.note, col).slice(0, 3);
+          ls.forEach((l, j) => x.fillText(l, cx0, y + sh + 30 + j * 27));
+          capH = Math.max(capH, ls.length * 27);
+        });
+        y += sh + capH + 34;
       }
     }
 
-    // Les claus, en gran
+    // Claus: requadre blau, numerades en daurat
     const keys = pg.lines.slice(0, 8);
     if (keys.length) {
-      x.textAlign = "left";
-      x.fillStyle = NAVY; x.font = `40px ${ESC}`; x.fillText("CLAUS", 56, y + 34);
-      x.fillStyle = OR; x.fillRect(56 + x.measureText("CLAUS").width + 16, y + 20, PW_ - 112 - x.measureText("CLAUS").width - 16, 4);
-      y += 70;
-      const room = PH_ - 120 - y;
-      let fs = pg.scene ? 34 : 46;
-      let wrapped: string[][] = [];
-      for (; fs >= 22; fs -= 2) {
-        x.font = `${fs}px sans-serif`;
-        wrapped = keys.map((k) => wrap(x, k, PW_ - 112 - 60));
-        const need = wrapped.reduce((a, w) => a + w.length * fs * 1.3 + fs * 0.6, 0);
-        if (need <= room) break;
+      const boxTop = y + 6, boxBottom = PH_ - 80 - 36, innerW = PW_ - 2 * M - 120;
+      let fs = pg.scene ? 32 : 44, wrapped: string[][] = [];
+      for (; fs >= 20; fs -= 2) {
+        x.font = `500 ${fs}px ${BODY}`;
+        wrapped = keys.map((k2) => wrap(x, k2, innerW));
+        const need = 90 + wrapped.reduce((a, w) => a + w.length * fs * 1.32 + fs * 0.75, 0);
+        if (need <= boxBottom - boxTop) break;
       }
-      x.font = `${fs}px sans-serif`;
-      wrapped.forEach((ws) => {
-        if (y + fs > PH_ - 120) return;
-        x.fillStyle = OR; x.beginPath(); x.roundRect(56, y + fs * 0.15, 14, fs * 0.8, 4); x.fill();
-        x.fillStyle = NAVY;
-        ws.forEach((w, i) => x.fillText(w, 56 + 40, y + fs * (i * 1.3 + 0.9)));
-        y += ws.length * fs * 1.3 + fs * 0.6;
+      const need = 90 + wrapped.reduce((a, w) => a + w.length * fs * 1.32 + fs * 0.75, 0);
+      const bh = Math.min(boxBottom - boxTop, need + 10);
+      const bg = x.createLinearGradient(0, boxTop, 0, boxTop + bh);
+      bg.addColorStop(0, NAVY); bg.addColorStop(1, "#0f2a7a");
+      x.fillStyle = bg; x.beginPath(); x.roundRect(M, boxTop, PW_ - 2 * M, bh, 24); x.fill();
+      x.fillStyle = OR; x.fillRect(M + 36, boxTop + 70, 70, 4);
+      x.textAlign = "left"; x.textBaseline = "alphabetic"; x.font = `36px ${ESC}`; x.fillText("CLAUS", M + 36, boxTop + 54);
+      let ky = boxTop + 96;
+      wrapped.forEach((ws, i) => {
+        if (ky + fs > boxTop + bh) return;
+        x.fillStyle = OR; x.beginPath(); x.arc(M + 58, ky + fs * 0.42, fs * 0.62, 0, 7); x.fill();
+        x.fillStyle = NAVY; x.textAlign = "center"; x.textBaseline = "middle"; x.font = `${Math.round(fs * 0.8)}px ${ESC}`; x.fillText(String(i + 1), M + 58, ky + fs * 0.48);
+        x.textAlign = "left"; x.textBaseline = "alphabetic"; x.fillStyle = "#fff"; x.font = `500 ${fs}px ${BODY}`;
+        ws.forEach((w, j) => x.fillText(w, M + 100, ky + fs * (0.8 + j * 1.32)));
+        ky += ws.length * fs * 1.32 + fs * 0.75;
       });
     }
-
-    // Peu
-    x.fillStyle = NAVY; x.fillRect(0, PH_ - 84, PW_, 84);
-    x.fillStyle = OR; x.fillRect(0, PH_ - 84, PW_, 6);
-    x.textBaseline = "middle"; x.font = `34px ${ESC}`;
-    x.textAlign = "left"; x.fillText("FORÇA EUROPA", 56, PH_ - 40);
-    x.textAlign = "right"; x.fillText(o.date ? o.date.toUpperCase() : "JUVENIL C", PW_ - 56, PH_ - 40);
-
-    if (pi > 0) pdf.addPage();
-    pdf.addImage(cv.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, 210, 297);
+    footer(x);
+    shots.push({ cv });
   }
+
+  shots.forEach(({ cv }, i) => {
+    if (i > 0) pdf.addPage();
+    pdf.addImage(cv.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, 210, 297);
+  });
   return pdf.output("blob");
 }
