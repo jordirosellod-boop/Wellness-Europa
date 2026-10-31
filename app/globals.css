@@ -2673,15 +2673,3 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .idea-card textarea { width: 100%; margin: 0 0 10px; font: inherit; line-height: 1.45; resize: vertical; }
 /* El text llarg de la idea de joc, amb la lletra normal (l'escapulada és tota en majúscules) */
 .an-font .idea-card textarea { font-family: var(--cos), sans-serif !important; letter-spacing: 0; font-size: 1rem; }
-/* Onze en PDF: els suplents en una columna al costat del camp, perquè tot ompli la pàgina A4 */
-.pdf-mode { width: 940px; display: grid; grid-template-columns: minmax(0, 1fr) 236px; column-gap: 20px; align-items: start; }
-.pdf-mode .print-head, .pdf-mode .print-foot { grid-column: 1 / -1; }
-.pdf-mode .stadium { margin: 20px 0 0 26px; padding: 12px; }
-.pdf-mode .stadium .pitch { width: 100%; }
-.pdf-mode .bench { margin: 20px 26px 0 0; padding: 16px 14px; border-radius: 16px; background: #f1f4fb; }
-.pdf-mode .bench h3 { font-size: 1.6rem; margin-bottom: 12px; }
-.pdf-mode .bench ul { flex-direction: column; gap: 8px; }
-.pdf-mode .bench li { font-size: 1.3rem; padding: 8px 14px; border-radius: 12px; }
-.pdf-mode .ph-titles b { font-size: 4rem; }
-.pdf-mode .ph-match b { font-size: 2.3rem; }
-.pdf-mode .ph-match span { font-size: 1rem; }
