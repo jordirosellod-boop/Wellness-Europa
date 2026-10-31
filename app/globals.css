@@ -2663,3 +2663,8 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
   display: flex; justify-content: space-between; margin-top: 22px; padding: 12px 26px; background: var(--navy); border-top: 4px solid var(--or);
   color: var(--or); text-transform: uppercase; letter-spacing: 1.5px; font-size: 1.15rem;
 }
+/* Al PDF, sense ombres: en alguns mòbils (Safari) la còpia les pinta com una taca negra */
+.pdf-mode .pl-label { box-shadow: none; }
+.pdf-mode .pl-shirt { filter: none; }
+.pdf-mode .stadium .pitch, .pdf-mode .stadium, .pdf-mode .ph-band img, .pdf-mode .bench li { box-shadow: none; filter: none; }
+.pdf-mode .stadium .pitch { outline: 4px solid #1d6b2c; }
