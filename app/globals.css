@@ -2785,3 +2785,6 @@ body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom,
 .cv-foot { justify-content: center; }
 .cv-foot .kit-name { text-align: center; font-size: .84rem; }
 .cv-photo { background: linear-gradient(170deg, #061847, var(--blau)); }
+/* Dorsals una mica més petits: la jugadora hi guanya protagonisme */
+.cv-num { font-size: clamp(3.6rem, 19vw, 5rem); left: 7%; top: 5%; }
+.convo-grid li:not(.has-photo) .cv-num { top: 50%; transform: translateY(-50%); }
