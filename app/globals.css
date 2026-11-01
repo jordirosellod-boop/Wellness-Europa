@@ -2784,3 +2784,4 @@ body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom,
 .cv-photo .shirt-ico { position: relative; z-index: 1; place-self: center; margin: auto; }
 .cv-foot { justify-content: center; }
 .cv-foot .kit-name { text-align: center; font-size: .84rem; }
+.cv-photo { background: linear-gradient(170deg, #061847, var(--blau)); }
