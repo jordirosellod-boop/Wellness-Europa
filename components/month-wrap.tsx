@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Confetti } from "@/components/matchday";
 import { fetchMonthWrap, ofMonth, type MonthWrap } from "@/lib/month-wrap";
-import { fetchCutout } from "@/lib/player-photos";
+import { fetchActionCutout } from "@/lib/player-photos";
 
 const SLIDE_MS = 5500;
 
@@ -157,7 +157,7 @@ export function MonthStories({ meId, name, day, today, onClose }: { meId: string
   }, [meId, day, today]);
   useEffect(() => {
     let alive = true;
-    fetchCutout(meId).then((x) => alive && setCutout(x), () => {});
+    fetchActionCutout(meId).then((x) => alive && setCutout(x), () => {});
     return () => { alive = false; };
   }, [meId]);
 

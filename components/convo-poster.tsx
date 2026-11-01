@@ -6,7 +6,7 @@ import { crestFor, useCrests } from "@/components/crest";
 import { useDorsals } from "@/components/shirt";
 import type { Convocation, RosterRow } from "@/lib/convo";
 import { drawConvoPoster } from "@/lib/convo-poster";
-import { fetchPosterCutout, fetchThumbs } from "@/lib/player-photos";
+import { fetchActionCutout, fetchThumbs } from "@/lib/player-photos";
 import { fetchAll, supabase } from "@/lib/supabase";
 
 /** Staff: el cartell de la convocatòria per descarregar o enviar. Es tria quina jugadora hi surt en gran. */
@@ -52,7 +52,7 @@ export function ConvoPosterButton({ c, roster }: { c: Convocation; roster: Roste
             name: r.display_name, dorsal: r.dorsal, gk: !r.guest && !!dorsals.get(r.player_id)?.gk,
             pos: r.guest ? null : pos.get(r.player_id) ?? null, origin: r.guest ? r.origin : null,
           })),
-          hero: chosen ? { cutout: (await fetchPosterCutout(chosen.player_id)) ?? "", name: chosen.display_name, dorsal: chosen.dorsal } : null,
+          hero: chosen ? { cutout: (await fetchActionCutout(chosen.player_id)) ?? "", name: chosen.display_name, dorsal: chosen.dorsal } : null,
           homeCrest: crestFor(teams, home), awayCrest: crestFor(teams, away),
         })} />
     </section>

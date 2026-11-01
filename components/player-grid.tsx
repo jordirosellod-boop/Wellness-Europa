@@ -5,7 +5,7 @@ import { flushSync } from "react-dom";
 import { PlayerZoom, type Zoomed } from "@/components/player-zoom";
 import { Shirt, useDorsals } from "@/components/shirt";
 import type { RosterRow } from "@/lib/convo";
-import { fetchCutout, fetchThumbs } from "@/lib/player-photos";
+import { fetchActionCutout, fetchThumbs } from "@/lib/player-photos";
 import { transition } from "@/lib/vt";
 
 /** Dorsal amb la tipografia de samarreta (les fletxes ja formen part de la lletra). */
@@ -31,7 +31,7 @@ export function PlayerGrid({ rows, meId }: { rows: GridRow[]; meId?: string }) {
   async function open(r: GridRow) {
     const thumb = thumbs.get(r.player_id);
     if (!thumb) return;
-    const photo = await fetchCutout(r.player_id).catch(() => null) ?? thumb;
+    const photo = await fetchActionCutout(r.player_id).catch(() => null) ?? thumb;
     const img = tileImg(r.player_id);
     if (img) img.style.viewTransitionName = "pz-photo";
     transition("zoom", () => {

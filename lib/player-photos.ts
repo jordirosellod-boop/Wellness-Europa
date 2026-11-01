@@ -13,7 +13,7 @@ export function fetchThumbs(): Promise<Map<string, string>> {
 }
 const cutouts = new Map<string, Promise<string | null>>();
 let avatarsCache: Promise<Map<string, string>> | null = null;
-export const forgetThumbs = () => { thumbsCache = null; avatarsCache = null; cutouts.clear(); };
+export const forgetThumbs = () => { thumbsCache = null; avatarsCache = null; cutouts.clear(); actions.clear(); };
 
 /** Els avatars (cap i espatlles) de tot l'equip. Si no n'hi ha cap de col·locat, la foto petita. */
 export function fetchAvatars(): Promise<Map<string, string>> {
@@ -58,22 +58,33 @@ export async function fetchAvatar(profileId: string): Promise<string | null> {
   return row?.avatar ?? row?.thumb ?? null;
 }
 
-/** La foto del cartell de la convocatòria (la guardada a part) o, si no n'hi ha, la de l'app. */
-export async function fetchPosterCutout(profileId: string): Promise<string | null> {
-  const { data, error } = await supabase().from("player_photos").select("poster_cutout, cutout").eq("profile_id", profileId).maybeSingle();
-  if (error) throw new Error(error.message);
-  const row = data as { poster_cutout: string | null; cutout: string } | null;
-  return row?.poster_cutout ?? row?.cutout ?? null;
+const actions = new Map<string, Promise<string | null>>();
+/**
+ * La foto «en acció» (jugant): la del cartell, el cromo, la fitxa gran i les stories. És la guardada a part
+ * (poster_cutout) o, si no n'hi ha, la de l'app. Les petites (quadradets i avatar) surten de la foto de l'app.
+ */
+export function fetchActionCutout(profileId: string): Promise<string | null> {
+  let p = actions.get(profileId);
+  if (!p) {
+    p = Promise.resolve(supabase().from("player_photos").select("poster_cutout, cutout").eq("profile_id", profileId).maybeSingle()).then(({ data, error }) => {
+      if (error) throw new Error(error.message);
+      const row = data as { poster_cutout: string | null; cutout: string } | null;
+      return row?.poster_cutout ?? row?.cutout ?? null;
+    });
+    p.catch(() => actions.delete(profileId));
+    actions.set(profileId, p);
+  }
+  return p;
 }
 
-/** Qui té una foto del cartell guardada a part. */
+/** Qui té una foto en acció guardada a part. */
 export async function fetchPosterIds(): Promise<Set<string>> {
   const rows = await fetchAll<{ profile_id: string }>((f, t) =>
     supabase().from("player_photos").select("profile_id").not("poster_cutout", "is", null).order("profile_id").range(f, t));
   return new Set(rows.map((r) => r.profile_id));
 }
 
-/** Desa la foto de l'app. Amb «poster», també passa a ser la del cartell (si no, la del cartell no es toca). */
+/** Desa la foto de l'app. Amb «poster», també passa a ser la foto en acció (si no, aquella no es toca). */
 export async function savePhoto(profileId: string, cutout: string, thumb: string, avatar: string, poster = false): Promise<void> {
   const { data, error } = await supabase().from("player_photos")
     .upsert({ profile_id: profileId, cutout, thumb, avatar, ...(poster ? { poster_cutout: cutout } : {}) }, { onConflict: "profile_id" }).select("profile_id").single();

@@ -6,7 +6,7 @@ import { prettyTeam } from "@/lib/analysis";
 import { drawConvoStory, drawResultStory, shareOrDownload } from "@/lib/convo-story";
 import type { Convocation, RosterRow } from "@/lib/convo";
 import { fetchScorers, outcome, type FcfResult } from "@/lib/matchday";
-import { fetchCutout } from "@/lib/player-photos";
+import { fetchActionCutout } from "@/lib/player-photos";
 import { drawGoalStory } from "@/lib/player-stories";
 import { supabase } from "@/lib/supabase";
 
@@ -49,7 +49,7 @@ export function ConvoStoryButton({ c, me }: { c: Convocation; me: RosterRow }) {
   const [cutout, setCutout] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    fetchCutout(me.player_id).then((x) => alive && setCutout(x), () => alive && setCutout(null));
+    fetchActionCutout(me.player_id).then((x) => alive && setCutout(x), () => alive && setCutout(null));
     return () => { alive = false; };
   }, [me.player_id]);
 
@@ -88,7 +88,7 @@ export function GoalStoryButton({ r, meId, name }: { r: FcfResult; meId: string;
       const { data: app } = await sb.from("fcf_appearances").select("goals").eq("acta_id", r.acta_id).eq("fcf_id", me.fcf_id).maybeSingle();
       const goals = (app?.goals as number | undefined) ?? 0;
       if (goals < 1) return;
-      const cutout = await fetchCutout(meId);
+      const cutout = await fetchActionCutout(meId);
       if (alive && cutout) setMine({ goals, dorsal: /^\d{1,2}$/.test(me.dorsal ?? "") ? me.dorsal : null, cutout });
     })().catch(() => {});
     return () => { alive = false; };

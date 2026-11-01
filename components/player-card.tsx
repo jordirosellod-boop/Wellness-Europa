@@ -8,7 +8,7 @@ import { addDays } from "@/lib/dates";
 import { kitFont } from "@/lib/fonts";
 import { fetchStreak } from "@/lib/streak";
 import { supabase } from "@/lib/supabase";
-import { fetchCutout } from "@/lib/player-photos";
+import { fetchActionCutout } from "@/lib/player-photos";
 import { drawCardStory } from "@/lib/player-stories";
 import { StoryCard } from "@/components/convo-story";
 
@@ -63,7 +63,7 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
   const [cutout, setCutout] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    fetchCutout(meId).then((x) => alive && setCutout(x), () => {});
+    fetchActionCutout(meId).then((x) => alive && setCutout(x), () => {});
     return () => { alive = false; };
   }, [meId]);
   const [d, setD] = useState<CardData | null>(null);

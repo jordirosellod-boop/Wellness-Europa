@@ -79,7 +79,7 @@ export function PhotosAdmin({ players }: { players: Profile[] }) {
   }
 
   async function remove(p: Profile) {
-    if (!window.confirm(`Treure la foto de ${p.display_name}? (També la del cartell.)`)) return;
+    if (!window.confirm(`Treure les fotos de ${p.display_name}? (També la foto en acció.)`)) return;
     setBusy(p.id);
     try {
       await deletePhoto(p.id);
@@ -99,15 +99,16 @@ export function PhotosAdmin({ players }: { players: Profile[] }) {
         Surten a la convocatòria, al seu perfil i a la story de convocada. El fons es retalla aquí mateix (la foto no surt d&apos;aquest dispositiu fins que la desis)
         i només les veu l&apos;equip. <b>Puja-les només amb el permís de la jugadora i de la família</b>, i treu-les si algú ho demana.
         Queden millor si són de cintura amunt o de cos sencer, amb la samarreta del club. Abans de desar-la la pots retallar i col·locar (a la convocatòria i a l&apos;avatar, per separat); amb ✥ la pots tornar a col·locar quan vulguis.
-        El <b>cartell de la convocatòria</b> té la seva pròpia foto (🖼️): en pujar-ne una de nova pots triar si també la fa servir el cartell o no.
+        Cada jugadora té dues fotos: la de l&apos;app (quadradets i avatar; millor de cara) i la <b>foto en acció</b> 🏃‍♀️ (cartell, cromo, fitxa gran i stories; millor jugant).
+        En pujar-ne una de nova pots triar si també ha de ser la foto en acció.
       </p>
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}>{msg.text}</p>}
       {draft?.kind === "crop" && <CropStep key={draft.url} src={draft.url} name={name(draft.pid)} onCancel={() => setDraft(null)} onDone={cut} />}
       {draft?.kind === "place" && draft.fresh && (
         <label className="poster-also">
           <input type="checkbox" checked={alsoPoster} onChange={(e) => setAlsoPoster(e.target.checked)} />
-          <span>Fer servir aquesta foto també per al <b>cartell de la convocatòria</b>
-            {posters.has(draft.pid) ? " (si no ho marques, el cartell continua amb la foto d'abans)" : ""}</span>
+          <span>Fer servir aquesta foto també com a <b>foto en acció</b> (cartell, cromo, fitxa gran i stories)
+            {posters.has(draft.pid) ? ". Si no ho marques, es queda la d'abans." : ""}</span>
         </label>
       )}
       {draft?.kind === "place" && (
@@ -128,7 +129,7 @@ export function PhotosAdmin({ players }: { players: Profile[] }) {
                 {busy === p.id && <span className="photo-busy">{step ?? "Desant…"}</span>}
               </div>
               <span className="photo-name">{p.display_name}</span>
-              {posters.has(p.id) && <span className="photo-poster" title="Té una foto guardada per al cartell de la convocatòria">🖼️ cartell</span>}
+              {posters.has(p.id) && <span className="photo-poster" title="Té una foto en acció guardada a part (cartell, cromo, fitxa i stories)">🏃‍♀️ en acció</span>}
               <span className="row" style={{ gap: 4, justifyContent: "center" }}>
                 <label className={`btn small${t ? " secondary" : ""}`} aria-disabled={!!busy}>
                   {t ? <>📷<span className="sr-only"> Canviar la foto de {p.display_name}</span></> : "📷 Pujar"}
