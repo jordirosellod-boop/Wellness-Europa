@@ -12,13 +12,15 @@ export const metadata: Metadata = {
   description: "Juvenil C 2026/2027 del CE Europa: wellness, RPE, calendari, multes i estadístiques",
   robots: { index: false, follow: false },
   // A l'iPhone, l'app afegida a la pantalla d'inici s'obre a pantalla completa (necessari per als avisos).
-  appleWebApp: { capable: true, title: "Juvenil C", statusBarStyle: "default" },
+  // «black-translucent»: l'app ocupa també la franja de l'hora (la barra de dalt hi deixa espai amb safe-area)
+  appleWebApp: { capable: true, title: "Juvenil C", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0a2ea0",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover", // a l'iPhone, de vora a vora (la pantalla d'entrada ocupa tota la pantalla)
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

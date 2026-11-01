@@ -269,8 +269,8 @@ h3 { font-size: 1.15rem; }
 .topbar {
   background: var(--blau);
   border-bottom: 1px solid rgba(255, 255, 255, 0.35);
-  padding: 8px 16px;
-  min-height: 64px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
+  min-height: calc(64px + env(safe-area-inset-top, 0px));
 }
 .brand { font-size: 1.35rem; text-transform: uppercase; letter-spacing: 0.6px; }
 .brand-logo { width: 46px; height: 46px; }
@@ -713,7 +713,7 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
    ===================================================================== */
 .plan .esc, .plan h2.esc { font-family: var(--font-escapulada), var(--display); letter-spacing: .5px; }
 .plan-savebar {
-  position: sticky; top: 64px; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  position: sticky; top: calc(64px + env(safe-area-inset-top, 0px)); z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 8px;
   background: var(--navy); color: #fff; border-radius: 12px; padding: 8px 10px; margin: 10px 0;
   font-family: var(--font-escapulada), var(--display); letter-spacing: .4px;
 }
@@ -841,7 +841,7 @@ body:has(.analysis) main { max-width: 1320px; }
 .analysis .esc { font-family: var(--font-escapulada), var(--display); letter-spacing: .4px; font-weight: 400; }
 .an-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 @media (max-width: 900px) { .an-layout { grid-template-columns: 1fr; } }
-.an-left { position: sticky; top: 72px; }
+.an-left { position: sticky; top: calc(72px + env(safe-area-inset-top, 0px)); }
 @media (max-width: 900px) { .an-left { position: static; } }
 .an-video-card { padding: 8px; }
 .an-video { display: block; width: 100%; max-height: 62vh; background: #000; border-radius: 8px; }
@@ -1882,18 +1882,24 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* --- Entrada: l'escut apareix i tot s'esvaeix --- */
-@keyframes splash-out { 0%, 80% { opacity: 1; visibility: visible; } 100% { opacity: 0; visibility: hidden; } }
+@keyframes splash-out { 0%, 84% { opacity: 1; visibility: visible; } 100% { opacity: 0; visibility: hidden; } }
 @keyframes splash-crest { 0% { opacity: 0; transform: scale(.6) rotate(-8deg); } 55% { opacity: 1; transform: scale(1.06) rotate(1deg); } 100% { transform: none; } }
 @keyframes splash-text { from { opacity: 0; transform: translateY(8px); letter-spacing: 6px; } to { opacity: 1; transform: none; } }
 .splash {
   position: fixed; inset: 0; z-index: 9999; pointer-events: none; display: grid; place-content: center; justify-items: center; gap: 6px;
-  /* La grada del CEE (foto del club), enfosquida amb el blau perquè l'escut i la salutació es llegeixin bé */
-  background: linear-gradient(180deg, rgba(4,16,58,.55) 0%, rgba(6,24,71,.72) 45%, rgba(2,46,145,.9) 100%), url(/fons-grada.webp) center / cover no-repeat, #061847;
-  color: #fff; animation: splash-out 2.25s var(--ease) both;
+  overflow: hidden; background: #061847; color: #fff; animation: splash-out 3.2s var(--ease) both;
 }
-.splash img { width: 112px; height: 112px; filter: drop-shadow(0 10px 24px rgba(0,0,0,.45)); animation: splash-crest .7s var(--ease-back) both; }
-.splash b { font-family: var(--display); font-weight: 400; font-size: 2rem; letter-spacing: 1px; text-transform: uppercase; margin-top: 8px; animation: splash-text .5s var(--ease) .25s both; }
-.splash span { font-family: var(--display); color: var(--or); letter-spacing: 3px; text-transform: uppercase; font-size: .85rem; animation: splash-text .5s var(--ease) .35s both; }
+/* La grada del CEE (foto del club) a tota la pantalla: apareix a poc a poc i s'apropa suaument */
+@keyframes splash-photo { 0% { opacity: 0; transform: scale(1.12); } 45% { opacity: 1; } 100% { opacity: 1; transform: scale(1); } }
+.splash::before {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(180deg, rgba(4,16,58,.5) 0%, rgba(6,24,71,.55) 50%, rgba(4,16,58,.62) 100%), url(/fons-grada.webp) center / cover no-repeat;
+  animation: splash-photo 3.2s cubic-bezier(.2,.7,.2,1) both;
+}
+.splash > * { position: relative; z-index: 1; }
+.splash img { width: 112px; height: 112px; filter: drop-shadow(0 10px 24px rgba(0,0,0,.45)); animation: splash-crest .8s var(--ease-back) .35s both; }
+.splash b { font-family: var(--display); font-weight: 400; font-size: 2rem; letter-spacing: 1px; text-transform: uppercase; margin-top: 8px; animation: splash-text .6s var(--ease) .7s both; }
+.splash span { font-family: var(--display); color: var(--or); letter-spacing: 3px; text-transform: uppercase; font-size: .85rem; animation: splash-text .6s var(--ease) .85s both; }
 @media (prefers-reduced-motion: reduce) { .splash { display: none; } }
 @media print { .splash { display: none; } }
 
@@ -2679,12 +2685,12 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .splash .sp-match, .splash .sp-today { display: none; }
 html[data-matchday] .splash .sp-match { display: flex; }
 html[data-matchday] .splash .sp-today { display: block; }
-.splash .sp-match { align-items: center; gap: 18px; margin-top: 18px; animation: splash-text .5s var(--ease) .45s both; }
+.splash .sp-match { align-items: center; gap: 18px; margin-top: 18px; animation: splash-text .6s var(--ease) 1s both; }
 .splash .sp-match img { width: 64px; height: 64px; object-fit: contain; animation: none; filter: drop-shadow(0 6px 14px rgba(0,0,0,.4)); }
 html[data-matchday="away"] .splash .sp-match { flex-direction: row-reverse; } /* a fora, el local (el rival) primer */
 .splash .sp-match i { font-style: normal; font-family: var(--display); color: var(--or); font-size: 1.2rem; }
 .splash .sp-today {
   margin-top: 14px; padding: 6px 16px; border-radius: 999px; background: var(--or); color: var(--navy);
-  letter-spacing: 2px; font-size: 1rem; animation: splash-text .5s var(--ease) .55s both;
+  letter-spacing: 2px; font-size: 1rem; animation: splash-text .6s var(--ease) 1.15s both;
 }
 .splash #sp-rival:not([src]) { display: none; } /* sense escut del rival: només el nostre */
