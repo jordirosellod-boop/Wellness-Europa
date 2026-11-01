@@ -19,6 +19,7 @@ export const viewport: Viewport = {
   themeColor: "#0a2ea0",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover", // a l'iPhone, de vora a vora: l'entrada ocupa tota la pantalla (la barra de dalt baixa el contingut, veure --top-safe)
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

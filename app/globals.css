@@ -269,8 +269,8 @@ h3 { font-size: 1.15rem; }
 .topbar {
   background: var(--blau);
   border-bottom: 1px solid rgba(255, 255, 255, 0.35);
-  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
-  min-height: calc(64px + env(safe-area-inset-top, 0px));
+  padding: calc(8px + var(--top-safe)) 16px 8px;
+  min-height: calc(64px + var(--top-safe));
 }
 .brand { font-size: 1.35rem; text-transform: uppercase; letter-spacing: 0.6px; }
 .brand-logo { width: 46px; height: 46px; }
@@ -713,7 +713,7 @@ body:has(.bottom-nav) footer.foot { padding-bottom: calc(84px + env(safe-area-in
    ===================================================================== */
 .plan .esc, .plan h2.esc { font-family: var(--font-escapulada), var(--display); letter-spacing: .5px; }
 .plan-savebar {
-  position: sticky; top: calc(64px + env(safe-area-inset-top, 0px)); z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  position: sticky; top: calc(64px + var(--top-safe)); z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 8px;
   background: var(--navy); color: #fff; border-radius: 12px; padding: 8px 10px; margin: 10px 0;
   font-family: var(--font-escapulada), var(--display); letter-spacing: .4px;
 }
@@ -841,7 +841,7 @@ body:has(.analysis) main { max-width: 1320px; }
 .analysis .esc { font-family: var(--font-escapulada), var(--display); letter-spacing: .4px; font-weight: 400; }
 .an-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 @media (max-width: 900px) { .an-layout { grid-template-columns: 1fr; } }
-.an-left { position: sticky; top: calc(72px + env(safe-area-inset-top, 0px)); }
+.an-left { position: sticky; top: calc(72px + var(--top-safe)); }
 @media (max-width: 900px) { .an-left { position: static; } }
 .an-video-card { padding: 8px; }
 .an-video { display: block; width: 100%; max-height: 62vh; background: #000; border-radius: 8px; }
@@ -2694,3 +2694,7 @@ html[data-matchday="away"] .splash .sp-match { flex-direction: row-reverse; } /*
   letter-spacing: 2px; font-size: 1rem; animation: splash-text .6s var(--ease) 1.15s both;
 }
 .splash #sp-rival:not([src]) { display: none; } /* sense escut del rival: només el nostre */
+
+/* Espai de dalt a l'iPhone: la zona de l'hora i el difuminat que l'iPhone hi posa a sota (uns 28 px més).
+   Als mòbils sense aquesta zona (inset 0) no afegeix res. */
+:root { --top-safe: calc(env(safe-area-inset-top, 0px) + min(env(safe-area-inset-top, 0px), 1px) * 28); }
