@@ -154,7 +154,8 @@ function ConvoForm({ c, friendly = false, onSaved }: { c?: Convocation; friendly
       const j = (await res.json()) as { venue?: { venue: string | null; address: string | null } | null; error?: string; stale?: boolean };
       if (res.ok && j.venue?.venue) {
         const v = j.venue;
-        setF((x) => ({ ...x, venue: v.venue ?? x.venue, address: v.address ?? x.address }));
+        // Si el camp canvia i la FCF no en dona l'adreça, es treu la d'abans (seria d'un altre camp)
+        setF((x) => ({ ...x, venue: v.venue ?? x.venue, address: v.address ?? (v.venue && v.venue !== x.venue ? "" : x.address) }));
         setMsg(j.stale ? "La FCF ara no respon: he posat el camp que tenia guardat. Comprova'l." : null);
         return;
       }

@@ -1,4 +1,4 @@
-import { fetchMatchVenue } from "@/lib/fcf";
+import { fetchMatchVenue, fetchVenueFromActaPage } from "@/lib/fcf";
 import { fresh, groupMatches, rivalKey } from "@/lib/fcf-cache";
 import { adminClient } from "@/lib/server-admin";
 
@@ -35,6 +35,12 @@ export async function GET(req: Request) {
     if (m) {
       const { data: c } = await db.from("fcf_cache").select("data").eq("key", `venue:${m.acta_id}`).maybeSingle();
       if (c?.data) return Response.json({ venue: c.data, stale: true });
+      // La pàgina pública del partit (la del web de la FCF) també diu el camp
+      const page = await fetchVenueFromActaPage(m.acta_id).catch(() => null);
+      if (page?.venue) {
+        await db.from("fcf_cache").upsert({ key: `venue:${m.acta_id}`, data: page, fetched_at: new Date().toISOString() }).then(() => {}, () => {});
+        return Response.json({ venue: page });
+      }
       const home = m.home_id === cfg.team_id;
       const rival = rivalKey(home ? m.away : m.home);
       const { data: prev } = await db.from("convocations").select("rival, is_home, venue, address").eq("is_home", home).not("venue", "is", null)

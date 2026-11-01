@@ -122,6 +122,19 @@ export async function fetchActaPayload(actaId: string): Promise<string> {
   return extractPayload(await res.text());
 }
 
+/** El camp d'un partit, de la seva pàgina pública (la mateixa que es veu al web de la FCF). */
+export async function fetchVenueFromActaPage(actaId: string): Promise<MatchVenue | null> {
+  if (!/^\d{1,12}$/.test(actaId)) return null;
+  const res = await fetch(`${FCF_BASE}/ca/competicio/acta/${encodeURIComponent(actaId)}`, { headers: { "User-Agent": UA }, cache: "no-store" });
+  if (!res.ok) throw new Error(`FCF acta ${actaId}: ${res.status}`);
+  const html = await res.text();
+  // «<a href="/ca/camps/237#info">Estadi<!-- -->: <!-- -->CAMP DE FUTBOL MPAL. DE BREDA</a>»
+  const m = html.match(/href="\/ca\/camps\/\d+#info">\s*Estadi(?:<!-- -->)?\s*:\s*(?:<!-- -->)?\s*([^<]{3,160})</);
+  if (!m) return null;
+  const raw = m[1].replace(/&#x27;|&#39;/g, "'").replace(/&amp;/g, "&").trim();
+  return { acta_id: actaId, venue: prettyPlace(raw).slice(0, 120), address: null, lat: null, lng: null };
+}
+
 export function extractPayload(html: string): string {
   const parts: string[] = [];
   const re = /self\.__next_f\.push\(\[1,"((?:[^"\\]|\\.)*)"\]\)/g;
