@@ -73,7 +73,13 @@ export function CoachShell({ children }: { children: (me: Profile) => ReactNode 
         <Link href="/entrenador" style={{ textDecoration: "none" }}>
           <Brand />
         </Link>
-        <nav className="nav">
+        {/* Tornar a tocar la pestanya on ja ets: puja suaument a dalt de tot */}
+        <nav className="nav" onClick={(e) => {
+          const a = (e.target as HTMLElement).closest("a");
+          if (!a || new URL(a.href).pathname !== window.location.pathname) return;
+          e.preventDefault();
+          window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        }}>
           <Link
             href="/entrenador"
             className={path === "/entrenador" || path.startsWith("/entrenador/sessio") || path.startsWith("/entrenador/programacio") ? "active" : ""}

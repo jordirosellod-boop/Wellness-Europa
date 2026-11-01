@@ -2702,3 +2702,21 @@ html[data-matchday="away"] .splash .sp-match { flex-direction: row-reverse; } /*
 @media (max-width: 520px) {
   .topbar { padding-top: calc(6px + var(--top-safe) + min(var(--top-safe), 1px) * 12); padding-bottom: calc(6px - min(var(--top-safe), 1px) * 4); }
 }
+
+/* --- Detalls d'app: estirar per actualitzar i sense connexió --- */
+html[data-nosplash] .splash { display: none; }
+body { overscroll-behavior-y: none; } /* el gest d'estirar el fem nosaltres (amb l'escut) */
+.ptr {
+  position: fixed; left: 50%; top: calc(var(--top-safe) + 4px); z-index: 60; width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center; background: #fff; box-shadow: 0 6px 18px rgba(1,20,70,.3); pointer-events: none;
+}
+.ptr img { width: 34px; height: 34px; }
+.ptr.ready { box-shadow: 0 0 0 3px var(--or), 0 6px 18px rgba(1,20,70,.3); }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
+.ptr.busy img { animation: ptr-spin .8s linear infinite; }
+.offline {
+  position: fixed; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 70;
+  padding: 10px 14px; border-radius: 14px; background: var(--navy); color: #fff; font-size: .88rem; text-align: center;
+  box-shadow: 0 8px 22px rgba(1,20,70,.35); border-top: 3px solid var(--or); animation: rise .35s var(--ease) both;
+}
+body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }

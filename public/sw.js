@@ -2,6 +2,9 @@
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
+  // Avís per a una jugadora (recordatori del wellness, l'RPE…): punt a la icona de l'app fins que l'obri
+  const url = data.url || "/j";
+  if (url.startsWith("/j") && self.navigator && self.navigator.setAppBadge) self.navigator.setAppBadge(typeof data.badge === "number" ? data.badge : 1).catch(() => {});
   event.waitUntil(
     self.registration.showNotification(data.title || "Juvenil C 2026/2027", {
       body: data.body || "Recorda omplir el wellness.",

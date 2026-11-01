@@ -35,6 +35,7 @@ import { Brand, Footer } from "@/components/ui";
 import { fmtShort, isoDow, startOfWeek, viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { transition } from "@/lib/vt";
+import { setAppBadge } from "@/lib/app-badge";
 import {
   bandOf,
   fmtDate,
@@ -219,7 +220,7 @@ function PlayerHome({ me }: { me: Profile }) {
       }
       window.scrollTo({ top: 0 });
     };
-    if (next === section) return run();
+    if (next === section) return window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     if (from) from.style.viewTransitionName = "panel";
     transition(from ? "grow" : "slide", () => {
       if (from) from.style.viewTransitionName = "";
@@ -537,6 +538,20 @@ function Dashboard({
   }, [me.id, today, sessions, yesterdaySessions, version]);
 
   const lateRpe = data ? yesterdaySessions.filter((s) => !data.mine.get(s.id)?.r) : [];
+
+  // Número a la icona de l'app (com els missatges sense llegir): el que li falta per fer avui
+  useEffect(() => {
+    if (!data) return;
+    const now = nowMadridHHMM();
+    let n = lateRpe.length;
+    for (const s of sessions) {
+      if (s.cancelled) continue;
+      const m = data.mine.get(s.id);
+      if (!m?.w) n++;
+      if (!m?.r && (!s.start_time || s.start_time.slice(0, 5) <= now)) n++;
+    }
+    setAppBadge(n);
+  }, [data, sessions, lateRpe.length]);
 
   return (
     <>
