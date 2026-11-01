@@ -137,13 +137,16 @@ export function Calendar({
                   className={`cal-day${out ? " out" : ""}${day === today ? " today" : ""}`}
                   aria-pressed={day === anchor}
                   style={{ ["--i" as string]: idx }}
-                  aria-label={`${fmtDate(day)}: ${match ? `partit contra ${prettyTeam(match.rival)}${match.us != null && match.them != null ? ` (${match.us}-${match.them})` : ""}. ` : ""}${list.length ? list.map((i) => `${i.session.name} (${STATUS_LABEL[i.status]})`).join(", ") : match ? "" : "cap sessió"}`}
+                  aria-label={`${fmtDate(day)}: ${match ? `partit ${match.home ? "a casa" : "a fora"} contra ${prettyTeam(match.rival)}${match.us != null && match.them != null ? ` (${match.us}-${match.them})` : ""}. ` : ""}${list.length ? list.map((i) => `${i.session.name} (${STATUS_LABEL[i.status]})`).join(", ") : match ? "" : "cap sessió"}`}
                   onClick={() => go(day)}
                 >
                   <span>{Number(day.slice(8))}</span>
                   {match ? (
                     <span className={`cal-match${match.us == null || match.them == null ? "" : match.us > match.them ? " win" : match.us === match.them ? " draw" : " loss"}`}>
-                      <Crest name={prettyTeam(match.rival)} size={20} />
+                      <span className="cal-crest">
+                        <Crest name={prettyTeam(match.rival)} size={20} />
+                        <i className="cal-where" aria-hidden="true">{match.home ? "🏠" : "🚌"}</i>
+                      </span>
                       {match.us != null && match.them != null && <small>{match.us}-{match.them}</small>}
                     </span>
                   ) : (
