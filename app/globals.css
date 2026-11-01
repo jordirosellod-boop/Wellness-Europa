@@ -2699,4 +2699,6 @@ html[data-matchday="away"] .splash .sp-match { flex-direction: row-reverse; } /*
    però el logo i el menú comencen a sota (i una mica més avall, fora del difuminat), amb la mateixa alçada de blau. */
 :root { --top-safe: env(safe-area-inset-top, 0px); }
 .topbar { padding-top: calc(8px + var(--top-safe) + min(var(--top-safe), 1px) * 8); }
-@media (max-width: 520px) { .topbar { padding-top: calc(6px + var(--top-safe) + min(var(--top-safe), 1px) * 8); } }
+@media (max-width: 520px) {
+  .topbar { padding-top: calc(6px + var(--top-safe) + min(var(--top-safe), 1px) * 12); padding-bottom: calc(6px - min(var(--top-safe), 1px) * 4); }
+}
