@@ -11,6 +11,7 @@ import { CONVO_COLS, fetchConvocations, fetchRoster, FRIENDLY, GUEST_ORIGINS, hh
 import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
+import { rivalKey } from "@/lib/analysis";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
 
@@ -132,33 +133,53 @@ function ConvoForm({ c, friendly = false, onSaved }: { c?: Convocation; friendly
   }, [c]);
 
   const [venueBusy, setVenueBusy] = useState(false);
-  /** Camp i adreça segons la FCF (pel partit triat o pel dia del formulari). */
-  async function venueFromFcf(by: { acta?: string; date?: string }, quiet = false) {
+  const [mapQ, setMapQ] = useState<string | null>(null); // per buscar el camp al mapa si no el trobem
+  /** El camp de l'última convocatòria contra aquest rival (a fora) o el nostre (a casa). */
+  async function venueFromPast(rival: string, isHome: boolean): Promise<{ venue: string; address: string | null } | null> {
+    const { data } = await supabase().from("convocations").select("rival, is_home, venue, address")
+      .eq("is_home", isHome).not("venue", "is", null).order("match_date", { ascending: false }).order("id").range(0, 199);
+    const key = rivalKey(rival);
+    const hit = (data ?? []).find((p) => isHome || rivalKey(p.rival as string) === key);
+    return hit ? { venue: hit.venue as string, address: (hit.address as string | null) ?? null } : null;
+  }
+  /** Camp i adreça segons la FCF (pel partit triat o pel dia del formulari). Si la FCF no respon, el que ja sabem. */
+  async function venueFromFcf(by: { acta?: string; date?: string }, ctx: { rival: string; is_home: boolean }, quiet = false) {
     setVenueBusy(true);
+    setMapQ(null);
+    let fcfError: string | null = null;
     try {
       const { data } = await supabase().auth.getSession();
       const qs = by.acta ? `acta=${encodeURIComponent(by.acta)}` : `date=${encodeURIComponent(by.date ?? "")}`;
       const res = await fetch(`/api/fcf/venue?${qs}`, { headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` }, cache: "no-store" });
-      const j = (await res.json()) as { venue?: { venue: string | null; address: string | null } | null; error?: string };
-      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
-      if (!j.venue?.venue) {
-        if (!quiet) setMsg("La FCF no té cap partit nostre aquest dia (o encara no hi ha el camp).");
+      const j = (await res.json()) as { venue?: { venue: string | null; address: string | null } | null; error?: string; stale?: boolean };
+      if (res.ok && j.venue?.venue) {
+        const v = j.venue;
+        setF((x) => ({ ...x, venue: v.venue ?? x.venue, address: v.address ?? x.address }));
+        setMsg(j.stale ? "La FCF ara no respon: he posat el camp que tenia guardat. Comprova'l." : null);
         return;
       }
-      const v = j.venue;
-      setF((x) => ({ ...x, venue: v.venue ?? x.venue, address: v.address ?? x.address }));
-      setMsg(null);
+      fcfError = res.ok ? "La FCF no té el camp d'aquest partit." : (j.error ?? `Error ${res.status}`);
     } catch (e) {
-      if (!quiet) setMsg(`No s'ha pogut buscar el camp: ${e instanceof Error ? e.message : e}`);
+      fcfError = e instanceof Error ? e.message : String(e);
     } finally {
       setVenueBusy(false);
     }
+    // La FCF no ho dona (sovint bloqueja les consultes): el camp de l'última vegada contra aquest rival
+    const past = ctx.rival.trim() ? await venueFromPast(ctx.rival, ctx.is_home).catch(() => null) : null;
+    if (past) {
+      setF((x) => ({ ...x, venue: past.venue, address: past.address ?? x.address }));
+      setMsg(ctx.is_home ? "La FCF ara no respon: he posat el nostre camp de l'últim partit a casa. Comprova'l." : `La FCF ara no respon: he posat el camp de l'última vegada contra ${ctx.rival}. Comprova'l.`);
+      return;
+    }
+    if (quiet) return;
+    setMapQ(ctx.is_home ? "camp de futbol CE Europa Barcelona" : `camp de futbol ${shortTeam(ctx.rival)}`);
+    setMsg(`${fcfError === "La FCF no té el camp d'aquest partit." ? fcfError : "La FCF ara no deixa consultar el camp."} Encara no l'he vist mai contra aquest rival: busca'l al mapa i escriu-lo, la propera vegada ja el recordaré.`);
   }
 
   function fromFcf(id: string) {
     const m = fcf.find((x) => x.acta_id === id);
     if (!m) return;
-    void venueFromFcf({ acta: m.acta_id });
+    void venueFromFcf({ acta: m.acta_id }, { rival: shortTeam(m.is_home ? m.away : m.home), is_home: m.is_home });
     const kick = m.kickoff ?? "";
     setF((x) => ({
       ...x,
@@ -250,11 +271,16 @@ function ConvoForm({ c, friendly = false, onSaved }: { c?: Convocation; friendly
       <div>
         <div className="row between">
           <label className="field" htmlFor="cvenue">Camp</label>
-          {!isAmistos && <button type="button" className="btn small secondary" disabled={venueBusy || !f.match_date} onClick={() => venueFromFcf({ date: f.match_date })}>
+          {!isAmistos && <button type="button" className="btn small secondary" disabled={venueBusy || !f.match_date} onClick={() => venueFromFcf({ date: f.match_date }, { rival: f.rival, is_home: f.is_home })}>
             {venueBusy ? "Buscant…" : "📍 Camp i adreça de la FCF"}
           </button>}
         </div>
         <input id="cvenue" type="text" maxLength={120} placeholder="Ex.: Nou Sardenya" value={f.venue} onChange={(e) => set("venue", e.target.value)} />
+        {mapQ && (
+          <a className="btn small secondary" style={{ marginTop: 6 }} href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQ)}`} target="_blank" rel="noreferrer">
+            🔎 Buscar el camp al mapa
+          </a>
+        )}
       </div>
       <div>
         <label className="field" htmlFor="caddr">Adreça (opcional)</label>
