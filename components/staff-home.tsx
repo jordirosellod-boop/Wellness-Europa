@@ -1,5 +1,6 @@
 "use client";
 
+import { SplashMatchSaver } from "@/components/splash-match";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoachToday } from "@/components/coach-today";
@@ -125,6 +126,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
 
   return (
     <div className="staff-home">
+      <SplashMatchSaver today={today} />
       <header className={`greet ${part}`}>
         <span className="greet-sky" aria-hidden="true" />
         {editing ? (

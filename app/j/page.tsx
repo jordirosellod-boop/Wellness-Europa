@@ -16,6 +16,7 @@ import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
 import { Squad } from "@/components/squad";
+import { SplashMatchSaver } from "@/components/splash-match";
 import { Shirt, useDorsals } from "@/components/shirt";
 import { fetchAvatar } from "@/lib/player-photos";
 import { AbsenceButton } from "@/components/absence-button";
@@ -543,6 +544,7 @@ function Dashboard({
       {error && <p className="msg error">{error}</p>}
 
       <MonthWrapBanner meId={me.id} name={me.display_name} today={today} />
+      <SplashMatchSaver today={today} />
 
       <ResultCard today={today} meId={me.id} name={me.display_name} />
 

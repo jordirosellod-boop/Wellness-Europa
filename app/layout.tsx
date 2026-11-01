@@ -23,7 +23,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ca" className={`${escapulada.variable} ${kitFont.variable} ${display.variable} ${body.variable}`}>
+    <html lang="ca" suppressHydrationWarning className={`${escapulada.variable} ${kitFont.variable} ${display.variable} ${body.variable}`}>
       <body>
         {/* Entrada: l'escut apareix i s'esvaeix (només CSS; no bloqueja res i no surt si es demana menys moviment). */}
         <div className="splash" aria-hidden="true">
@@ -31,12 +31,23 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <img src="/escut.png" alt="" width={112} height={112} />
           <b id="splash-hello" suppressHydrationWarning>Juvenil C</b>
           <span>CE Europa</span>
+          {/* Dia de partit (amagat la resta de dies; ho omple el guió de sota) */}
+          <div className="sp-match">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/escut.png" alt="" width={64} height={64} />
+            <i>VS</i>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img id="sp-rival" alt="" width={64} height={64} suppressHydrationWarning />
+          </div>
+          <span className="sp-today" id="sp-today" suppressHydrationWarning>Avui partit</span>
         </div>
         {/* Si ja havia entrat abans, la saluda pel nom (es llegeix del mateix mòbil abans de pintar). */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var n=localStorage.getItem('splash-name'),h=document.getElementById('splash-hello');if(n&&h){var t=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',hour:'2-digit',hourCycle:'h23'}).format(new Date());h.textContent=(t>='06'&&t<'13'?'Bon dia':t>='13'&&t<'20'?'Bona tarda':'Bona nit')+', '+n+'!';h.className='named'}}catch(e){}",
+              "try{var n=localStorage.getItem('splash-name'),h=document.getElementById('splash-hello');if(n&&h){var t=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',hour:'2-digit',hourCycle:'h23'}).format(new Date());h.textContent=(t>='06'&&t<'13'?'Bon dia':t>='13'&&t<'20'?'Bona tarda':'Bona nit')+', '+n+'!';h.className='named'}}catch(e){}" +
+              // El dia de partit: els dos escuts i «Avui partit · hora» (guardat per l'app a SplashMatchSaver)
+              "try{var m=JSON.parse(localStorage.getItem('splash-match')||'null'),d=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid'}).format(new Date());if(m&&m.d===d){var r=document.getElementById('sp-rival'),t=document.getElementById('sp-today');if(r&&typeof m.c==='string'&&m.c.indexOf('/api/fcf/crest?f=')===0)r.src=m.c;if(t)t.textContent='Avui partit'+(m.t?' · '+m.t+' h':'');document.documentElement.setAttribute('data-matchday',m.h===false?'away':'home')}}catch(e){}",
           }}
         />
         {children}

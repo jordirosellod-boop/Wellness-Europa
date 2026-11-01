@@ -2673,3 +2673,17 @@ html[data-vt="zoom"] .topbar, html[data-vt="zoom"] .bottom-nav { view-transition
 .idea-card textarea { width: 100%; margin: 0 0 10px; font: inherit; line-height: 1.45; resize: vertical; }
 /* El text llarg de la idea de joc, amb la lletra normal (l'escapulada és tota en majúscules) */
 .an-font .idea-card textarea { font-family: var(--cos), sans-serif !important; letter-spacing: 0; font-size: 1rem; }
+
+/* Entrada el dia de partit: els dos escuts i «Avui partit · hora» */
+.splash .sp-match, .splash .sp-today { display: none; }
+html[data-matchday] .splash .sp-match { display: flex; }
+html[data-matchday] .splash .sp-today { display: block; }
+.splash .sp-match { align-items: center; gap: 18px; margin-top: 18px; animation: splash-text .5s var(--ease) .45s both; }
+.splash .sp-match img { width: 64px; height: 64px; object-fit: contain; animation: none; filter: drop-shadow(0 6px 14px rgba(0,0,0,.4)); }
+html[data-matchday="away"] .splash .sp-match { flex-direction: row-reverse; } /* a fora, el local (el rival) primer */
+.splash .sp-match i { font-style: normal; font-family: var(--display); color: var(--or); font-size: 1.2rem; }
+.splash .sp-today {
+  margin-top: 14px; padding: 6px 16px; border-radius: 999px; background: var(--or); color: var(--navy);
+  letter-spacing: 2px; font-size: 1rem; animation: splash-text .5s var(--ease) .55s both;
+}
+.splash #sp-rival:not([src]) { display: none; } /* sense escut del rival: només el nostre */
