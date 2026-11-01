@@ -26,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ca" suppressHydrationWarning className={`${escapulada.variable} ${kitFont.variable} ${display.variable} ${body.variable}`}>
       <body>
         {/* Entrada: l'escut apareix i s'esvaeix (només CSS; no bloqueja res i no surt si es demana menys moviment). */}
+        <link rel="preload" as="image" href="/fons-grada.webp" type="image/webp" />
         <div className="splash" aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/escut.png" alt="" width={112} height={112} />

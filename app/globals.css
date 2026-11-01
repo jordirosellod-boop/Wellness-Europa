@@ -1887,7 +1887,8 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
 @keyframes splash-text { from { opacity: 0; transform: translateY(8px); letter-spacing: 6px; } to { opacity: 1; transform: none; } }
 .splash {
   position: fixed; inset: 0; z-index: 9999; pointer-events: none; display: grid; place-content: center; justify-items: center; gap: 6px;
-  background: var(--escapulat) center top / 100% auto no-repeat, linear-gradient(165deg, #061847, var(--navy) 50%, var(--blau));
+  /* La grada del CEE (foto del club), enfosquida amb el blau perquè l'escut i la salutació es llegeixin bé */
+  background: linear-gradient(180deg, rgba(4,16,58,.55) 0%, rgba(6,24,71,.72) 45%, rgba(2,46,145,.9) 100%), url(/fons-grada.webp) center / cover no-repeat, #061847;
   color: #fff; animation: splash-out 2.25s var(--ease) both;
 }
 .splash img { width: 112px; height: 112px; filter: drop-shadow(0 10px 24px rgba(0,0,0,.45)); animation: splash-crest .7s var(--ease-back) both; }
