@@ -2753,6 +2753,3 @@ body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom,
 .ml-season table { width: 100%; border-collapse: collapse; font-size: .92rem; }
 .ml-season th, .ml-season td { padding: 6px 4px; border-bottom: 1px solid var(--vora); text-align: right; }
 .ml-season th:first-child, .ml-season td:first-child { text-align: left; }
-/* Calendari: a casa o a fora, en petit a la cantonada de l'escut */
-.cal-crest { position: relative; display: inline-block; line-height: 0; }
-.cal-where { position: absolute; right: -9px; bottom: -4px; font-style: normal; font-size: .58rem; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
