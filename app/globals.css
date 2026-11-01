@@ -269,7 +269,7 @@ h3 { font-size: 1.15rem; }
 .topbar {
   background: var(--blau);
   border-bottom: 1px solid rgba(255, 255, 255, 0.35);
-  padding: calc(8px + var(--top-safe)) 16px 8px;
+  padding: 8px 16px;
   min-height: calc(64px + var(--top-safe));
 }
 .brand { font-size: 1.35rem; text-transform: uppercase; letter-spacing: 0.6px; }
@@ -2695,6 +2695,8 @@ html[data-matchday="away"] .splash .sp-match { flex-direction: row-reverse; } /*
 }
 .splash #sp-rival:not([src]) { display: none; } /* sense escut del rival: només el nostre */
 
-/* Espai de dalt a l'iPhone: la zona de l'hora i el difuminat que l'iPhone hi posa a sota (uns 28 px més).
-   Als mòbils sense aquesta zona (inset 0) no afegeix res. */
-:root { --top-safe: calc(env(safe-area-inset-top, 0px) + min(env(safe-area-inset-top, 0px), 1px) * 28); }
+/* Espai de dalt a l'iPhone: la zona de l'hora (0 als mòbils que no en tenen). La barra blava hi arriba,
+   però el logo i el menú comencen a sota (i una mica més avall, fora del difuminat), amb la mateixa alçada de blau. */
+:root { --top-safe: env(safe-area-inset-top, 0px); }
+.topbar { padding-top: calc(8px + var(--top-safe) + min(var(--top-safe), 1px) * 8); }
+@media (max-width: 520px) { .topbar { padding-top: calc(6px + var(--top-safe) + min(var(--top-safe), 1px) * 8); } }
