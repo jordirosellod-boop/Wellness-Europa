@@ -15,7 +15,7 @@ export function KitNumber({ n }: { n: number | null }) {
 
 export type GridRow = Pick<RosterRow, "player_id" | "display_name" | "dorsal" | "origin">;
 
-/** Quadradets amb foto (o samarreta), dorsal i nom. Tocar-ne un amb foto: la foto creix fins a la fitxa gran (i hi torna en tancar). */
+/** Quadradets amb el dorsal gran al fons, la jugadora per davant i el nom a sota. Tocar-ne un amb foto: la foto creix fins a la fitxa gran (i hi torna en tancar). */
 export function PlayerGrid({ rows, meId }: { rows: GridRow[]; meId?: string }) {
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
   const dorsals = useDorsals();
@@ -58,13 +58,15 @@ export function PlayerGrid({ rows, meId }: { rows: GridRow[]; meId?: string }) {
         {rows.map((r) => (
           <li key={r.player_id} data-id={r.player_id} className={`${r.player_id === meId ? "mine" : ""}${thumbs.has(r.player_id) ? " has-photo" : ""}`} {...tap(r)}>
             <div className="cv-photo">
+              {/* El dorsal gran, darrere de la jugadora */}
+              {r.dorsal != null && <span className="cv-num" aria-hidden="true">{r.dorsal}</span>}
               {thumbs.has(r.player_id) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={thumbs.get(r.player_id)} alt="" loading="lazy" />
-              ) : <Shirt n={null} gk={dorsals.get(r.player_id)?.gk} size={58} />}
+              ) : r.dorsal == null && <Shirt n={null} gk={dorsals.get(r.player_id)?.gk} size={58} />}
             </div>
             <div className="cv-foot">
-              <KitNumber n={r.dorsal} />
+              <span className="sr-only">{r.dorsal == null ? "Sense dorsal" : `Dorsal ${r.dorsal}`}</span>
               <span className="kit-name">{r.display_name}</span>
             </div>
             {r.origin && <span className="kit-origin">{r.origin}</span>}

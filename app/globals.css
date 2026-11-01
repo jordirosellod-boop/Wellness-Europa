@@ -2757,3 +2757,30 @@ body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom,
 .poster-also { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin: 8px 0; border-radius: 12px; background: #fff8e6; border: 1px solid #f0dfae; font-size: .92rem; }
 .poster-also input { margin-top: 3px; width: 20px; height: 20px; flex: none; }
 .photo-poster { font-size: .72rem; font-weight: 700; color: #8a6a12; }
+
+/* Quadradets de la convocatòria i la plantilla: el dorsal gran al fons (a l'esquerra, amb relleu)
+   i la jugadora per davant, a la dreta, amb una llum al darrere i fent ombra sobre el número. */
+.cv-photo { position: relative; display: flex; align-items: flex-end; justify-content: flex-end; }
+.cv-num {
+  position: absolute; left: 6%; top: 1%; z-index: 0; pointer-events: none;
+  font-family: var(--font-kit), var(--display); font-size: clamp(4.6rem, 25vw, 6.4rem); line-height: .82; letter-spacing: -.01em;
+  background: linear-gradient(180deg, #fff 0%, #fff 38%, rgba(190,210,255,.55) 78%, rgba(190,210,255,.08) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(3px 4px 0 rgba(3,12,46,.55)) drop-shadow(0 10px 16px rgba(0,0,30,.45));
+}
+.convo-grid li.has-photo .cv-photo::before {
+  content: ""; position: absolute; z-index: 0; right: -10%; bottom: -6%; width: 85%; height: 85%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(120,170,255,.55), rgba(120,170,255,0));
+}
+.cv-photo::after {
+  content: ""; position: absolute; inset: auto 0 0 0; height: 28%; z-index: 1; pointer-events: none;
+  background: linear-gradient(to top, rgba(4,16,58,.55), rgba(4,16,58,0));
+}
+.cv-photo img {
+  position: relative; z-index: 1; width: auto; height: 97%; max-width: 100%; margin-right: -6%; object-fit: contain; object-position: right bottom;
+  filter: drop-shadow(-12px 6px 10px rgba(0,0,30,.6)) drop-shadow(0 0 1.5px rgba(255,255,255,.7));
+}
+.convo-grid li:not(.has-photo) .cv-num { left: 0; right: 0; text-align: center; }
+.cv-photo .shirt-ico { position: relative; z-index: 1; place-self: center; margin: auto; }
+.cv-foot { justify-content: center; }
+.cv-foot .kit-name { text-align: center; font-size: .84rem; }
