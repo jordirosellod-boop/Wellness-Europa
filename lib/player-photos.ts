@@ -58,9 +58,25 @@ export async function fetchAvatar(profileId: string): Promise<string | null> {
   return row?.avatar ?? row?.thumb ?? null;
 }
 
-export async function savePhoto(profileId: string, cutout: string, thumb: string, avatar: string): Promise<void> {
+/** La foto del cartell de la convocatòria (la guardada a part) o, si no n'hi ha, la de l'app. */
+export async function fetchPosterCutout(profileId: string): Promise<string | null> {
+  const { data, error } = await supabase().from("player_photos").select("poster_cutout, cutout").eq("profile_id", profileId).maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = data as { poster_cutout: string | null; cutout: string } | null;
+  return row?.poster_cutout ?? row?.cutout ?? null;
+}
+
+/** Qui té una foto del cartell guardada a part. */
+export async function fetchPosterIds(): Promise<Set<string>> {
+  const rows = await fetchAll<{ profile_id: string }>((f, t) =>
+    supabase().from("player_photos").select("profile_id").not("poster_cutout", "is", null).order("profile_id").range(f, t));
+  return new Set(rows.map((r) => r.profile_id));
+}
+
+/** Desa la foto de l'app. Amb «poster», també passa a ser la del cartell (si no, la del cartell no es toca). */
+export async function savePhoto(profileId: string, cutout: string, thumb: string, avatar: string, poster = false): Promise<void> {
   const { data, error } = await supabase().from("player_photos")
-    .upsert({ profile_id: profileId, cutout, thumb, avatar }, { onConflict: "profile_id" }).select("profile_id").single();
+    .upsert({ profile_id: profileId, cutout, thumb, avatar, ...(poster ? { poster_cutout: cutout } : {}) }, { onConflict: "profile_id" }).select("profile_id").single();
   if (error || !data) throw new Error(error?.message ?? "No s'ha pogut desar la foto.");
   forgetThumbs();
 }

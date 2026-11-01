@@ -2753,3 +2753,7 @@ body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom,
 .ml-season table { width: 100%; border-collapse: collapse; font-size: .92rem; }
 .ml-season th, .ml-season td { padding: 6px 4px; border-bottom: 1px solid var(--vora); text-align: right; }
 .ml-season th:first-child, .ml-season td:first-child { text-align: left; }
+/* Fotos: la del cartell es guarda a part */
+.poster-also { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin: 8px 0; border-radius: 12px; background: #fff8e6; border: 1px solid #f0dfae; font-size: .92rem; }
+.poster-also input { margin-top: 3px; width: 20px; height: 20px; flex: none; }
+.photo-poster { font-size: .72rem; font-weight: 700; color: #8a6a12; }

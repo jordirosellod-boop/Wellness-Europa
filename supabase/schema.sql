@@ -403,6 +403,12 @@ create table if not exists public.player_photos (
 alter table public.player_photos add column if not exists avatar text
   check (avatar is null or (avatar like 'data:image/%' and octet_length(avatar) < 120000));
 
+-- «poster_cutout»: la foto del cartell de la convocatòria (es pot mantenir encara que es canviï la de l'app).
+-- La primera vegada s'hi copia la foto que hi havia.
+alter table public.player_photos add column if not exists poster_cutout text
+  check (poster_cutout is null or (poster_cutout like 'data:image/%' and octet_length(poster_cutout) < 900000));
+update public.player_photos set poster_cutout = cutout where poster_cutout is null;
+
 -- CALENDARI AL MÒBIL: un enllaç secret per persona per subscriure's als entrenos i partits (sense noms).
 -- Només el llegeix el servidor (per fer el calendari); cadascú obté el seu amb my_calendar_token().
 create table if not exists public.calendar_tokens (
