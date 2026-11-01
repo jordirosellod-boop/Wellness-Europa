@@ -50,7 +50,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             __html:
               "try{var n=localStorage.getItem('splash-name'),h=document.getElementById('splash-hello');if(n&&h){var t=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',hour:'2-digit',hourCycle:'h23'}).format(new Date());h.textContent=(t>='06'&&t<'13'?'Bon dia':t>='13'&&t<'20'?'Bona tarda':'Bona nit')+', '+n+'!';h.className='named'}}catch(e){}" +
               // El dia de partit: els dos escuts i «Avui partit · hora» (guardat per l'app a SplashMatchSaver)
-              "try{var m=JSON.parse(localStorage.getItem('splash-match')||'null'),d=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid'}).format(new Date());if(m&&m.d===d){var r=document.getElementById('sp-rival'),t=document.getElementById('sp-today');if(r&&typeof m.c==='string'&&m.c.indexOf('/api/fcf/crest?f=')===0)r.src=m.c;if(t)t.textContent='Avui partit'+(m.t?' · '+m.t+' h':'');document.documentElement.setAttribute('data-matchday',m.h===false?'away':'home')}}catch(e){}",
+              "try{var m=JSON.parse(localStorage.getItem('splash-match')||'null'),d=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid'}).format(new Date());if(m&&m.d===d){var r=document.getElementById('sp-rival'),t=document.getElementById('sp-today');if(r&&typeof m.c==='string'&&m.c.indexOf('/api/fcf/crest?f=')===0)r.src=m.c;if(t)t.textContent='Avui partit'+(m.t?' · '+m.t+' h':'');document.documentElement.setAttribute('data-matchday',m.h===false?'away':'home')}}catch(e){}" +
+              // A l'iPhone, la franja de l'hora pren el color de l'app (blau): mentre dura l'entrada, el de dalt de la foto
+              "try{var tc=document.querySelector('meta[name=theme-color]');if(tc&&!matchMedia('(prefers-reduced-motion: reduce)').matches){var tc0=tc.getAttribute('content');tc.setAttribute('content','#5f6b89');setTimeout(function(){tc.setAttribute('content',tc0)},3200)}}catch(e){}",
           }}
         />
         {children}
