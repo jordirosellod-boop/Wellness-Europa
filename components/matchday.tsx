@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Crest } from "@/components/crest";
+import { Crest, useRivalColor } from "@/components/crest";
+import type { CSSProperties } from "react";
 import { WeatherChip } from "@/components/weather";
 import { GoalStoryButton, ResultStoryButton } from "@/components/convo-story";
 import { prettyTeam } from "@/lib/analysis";
@@ -78,9 +79,10 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
   const kitKey = kitOf(c.kit);
   const kit = kitKey ? KITS.find((k) => k.key === kitKey) : null;
   const place = [c.venue, c.address].filter(Boolean).join(", ");
+  const tint = rivalTint(useRivalColor(c.rival), c.is_home);
 
   return (
-    <section className={`matchday phase-${phase}`} aria-label="Dia de partit">
+    <section className={`matchday phase-${phase}${tint ? " tinted" : ""}`} style={tint} aria-label="Dia de partit">
       <span className="md-kicker">⚽ Dia de partit{c.competition ? ` · ${c.competition}` : ""}</span>
       <div className="md-teams">
         <span className={c.is_home ? "us" : ""}><Crest name={home} size={64} className="md-crest" /><b>{home}</b></span>
@@ -128,11 +130,17 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
   );
 }
 
+/** El toc de color del rival, al costat on surt el seu escut. */
+function rivalTint(color: string | null, isHome: boolean): CSSProperties | undefined {
+  return color ? ({ "--rival": color, "--rival-x": isHome ? "80%" : "20%" } as CSSProperties) : undefined;
+}
+
 const RES = { G: { k: "Victòria!", cls: "win" }, E: { k: "Empat", cls: "draw" }, P: { k: "Derrota", cls: "loss" } } as const;
 
 /** Resultat oficial del darrer partit (dels últims dos dies). Si hem guanyat, confeti (un cop per partit). */
 export function ResultCard({ today, meId, name }: { today: string; meId?: string; name?: string }) {
   const [r, setR] = useState<FcfResult | null>(null);
+  const rivalColor = useRivalColor(r ? (r.is_home ? r.away : r.home) : null);
   const [party, setParty] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -155,7 +163,7 @@ export function ResultCard({ today, meId, name }: { today: string; meId?: string
   return (
     <>
       {party && <Confetti onDone={() => setParty(false)} />}
-      <button type="button" className={`result-card ${o.cls}`} onClick={() => setParty(outcome(r) === "G")} aria-label={`${o.k} ${home} ${r.home_goals} ${away} ${r.away_goals}`}>
+      <button type="button" className={`result-card ${o.cls}${rivalColor ? " tinted" : ""}`} style={rivalTint(rivalColor, r.is_home)} onClick={() => setParty(outcome(r) === "G")} aria-label={`${o.k} ${home} ${r.home_goals} ${away} ${r.away_goals}`}>
         <span className="rc-k">Resultat final · {o.k}</span>
         <span className="rc-line">
           <span className={r.is_home ? "us" : ""}><Crest name={home} size={40} /><b>{home}</b></span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { flushSync } from "react-dom";
 import { PlayerZoom, type Zoomed } from "@/components/player-zoom";
 import { Shirt, useDorsals } from "@/components/shirt";
@@ -52,9 +52,22 @@ export function PlayerGrid({ rows, meId }: { rows: GridRow[]; meId?: string }) {
     onKeyDown: (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(r); } },
   } : {};
 
+  // Profunditat: en moure el dit (o el ratolí) per sobre, la jugadora es mou més que el número de darrere
+  const tilt = (e: PointerEvent<HTMLUListElement>) => {
+    const li = (e.target as HTMLElement).closest<HTMLElement>("li.has-photo");
+    grid.current?.querySelectorAll<HTMLElement>("li.tilt").forEach((o) => o !== li && o.classList.remove("tilt"));
+    if (!li) return;
+    const b = li.getBoundingClientRect();
+    li.style.setProperty("--px", (((e.clientX - b.left) / b.width) * 2 - 1).toFixed(2));
+    li.style.setProperty("--py", (((e.clientY - b.top) / b.height) * 2 - 1).toFixed(2));
+    li.classList.add("tilt");
+  };
+  const untilt = () => grid.current?.querySelectorAll<HTMLElement>("li.tilt").forEach((li) => li.classList.remove("tilt"));
+
   return (
     <>
-      <ul className="convo-grid" ref={grid}>
+      <ul className="convo-grid" ref={grid} onPointerMove={tilt} onPointerDown={tilt}
+        onPointerLeave={untilt} onPointerUp={untilt} onPointerCancel={untilt}>
         {rows.map((r) => (
           <li key={r.player_id} data-id={r.player_id} className={`${r.player_id === meId ? "mine" : ""}${thumbs.has(r.player_id) ? " has-photo" : ""}`} {...tap(r)}>
             <div className="cv-photo">

@@ -98,7 +98,7 @@ export function PlayerTraining({ staff = false }: { staff?: boolean } = {}) {
           ))}
         </div>
       )}
-      {current && !data && !error && <p className="muted">Carregant l&apos;entreno…</p>}
+      {current && !data && !error && <Loading lines={4} />}
       {data && (
         <>
           <FitSheet data={data} />

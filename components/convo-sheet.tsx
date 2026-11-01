@@ -4,7 +4,7 @@ import { KitNumber, PlayerGrid } from "@/components/player-grid";
 import { Crest } from "@/components/crest";
 import { hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { kitFont } from "@/lib/fonts";
-import { fmtDate } from "@/lib/wellness";
+import { fmtDateSmart } from "@/lib/wellness";
 
 export { KitNumber };
 
@@ -39,7 +39,7 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
         <i>vs</i>
         <span className={c.is_home ? "" : "us"}><Crest name={away} size={72} className="convo-crest" /><b>{away}</b></span>
       </div>
-      <p className="convo-date"><span>{fmtDate(c.match_date)}</span>{c.kickoff && <span>{hhmm(c.kickoff)} h</span>}<span className={c.is_home ? "home" : "away"}>{c.is_home ? "Local" : "Visitant"}</span></p>
+      <p className="convo-date"><span>{fmtDateSmart(c.match_date)}</span>{c.kickoff && <span>{hhmm(c.kickoff)} h</span>}<span className={c.is_home ? "home" : "away"}>{c.is_home ? "Local" : "Visitant"}</span></p>
 
       {me && (
         <p className={`convo-me ${me.called ? "yes" : "no"}`}>

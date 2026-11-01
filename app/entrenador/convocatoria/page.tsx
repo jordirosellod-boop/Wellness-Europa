@@ -10,7 +10,7 @@ import { CoachShell, Footer } from "@/components/ui";
 import { CONVO_COLS, fetchConvocations, fetchRoster, FRIENDLY, GUEST_ORIGINS, hhmm, isFriendly, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { addDays } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
-import { fmtDate, todayMadrid } from "@/lib/wellness";
+import { fmtDateSmart, todayMadrid } from "@/lib/wellness";
 import { rivalKey } from "@/lib/analysis";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
@@ -486,7 +486,7 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
             <Crest name={c.rival} size={40} />
             <div>
             <b>{c.is_home ? `CE Europa – ${c.rival}` : `${c.rival} – CE Europa`}</b>
-            <div className="muted small">{fmtDate(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""}</div>
+            <div className="muted small">{fmtDateSmart(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""}</div>
             </div>
           </div>
           {c.published ? <span className="chip fet">Publicada</span> : <span className="chip pendent">Esborrany</span>}

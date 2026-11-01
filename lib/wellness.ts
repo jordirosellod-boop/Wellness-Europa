@@ -140,6 +140,21 @@ export function fmtDate(d: string, opts: { year?: boolean } = {}): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/** Com es diu de paraula: «Avui», «Demà», «Ahir», «Dissabte» (aquesta setmana) o, si és més lluny, la data sencera. */
+export function fmtDateSmart(d: string, opts: { short?: boolean; today?: string } = {}): string {
+  const today = opts.today ?? todayMadrid();
+  const diff = Math.round((Date.parse(`${d}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400000);
+  if (diff === 0) return "Avui";
+  if (diff === 1) return "Demà";
+  if (diff === -1) return "Ahir";
+  if (diff > 1 && diff < 7) {
+    const w = new Intl.DateTimeFormat("ca-ES", { timeZone: "UTC", weekday: "long" }).format(new Date(`${d}T12:00:00Z`));
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }
+  if (opts.short) return new Intl.DateTimeFormat("ca-ES", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(new Date(`${d}T12:00:00Z`));
+  return fmtDate(d);
+}
+
 export function fmtSessionTime(t: string | null): string {
   return t ? t.slice(0, 5) : "";
 }

@@ -2788,3 +2788,33 @@ body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom,
 /* Dorsals una mica més petits: la jugadora hi guanya protagonisme */
 .cv-num { font-size: clamp(3.6rem, 19vw, 5rem); left: 7%; top: 5%; }
 .convo-grid li:not(.has-photo) .cv-num { top: 50%; transform: translateY(-50%); }
+
+/* Toc del color del rival a la targeta del partit (molt suau, al costat del seu escut) */
+.matchday.tinted, .result-card.tinted { isolation: isolate; }
+.matchday.tinted::before, .result-card.tinted::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(50% 60% at var(--rival-x, 80%) 40%, rgb(var(--rival) / .3), rgb(var(--rival) / 0) 72%);
+  mix-blend-mode: screen;
+  animation: rival-in 1.2s var(--ease) both;
+}
+@keyframes rival-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .matchday.tinted::before, .result-card.tinted::after { animation: none; } }
+
+/* Números que compten: amplada fixa perquè no ballin mentre pugen */
+.count-up { font-variant-numeric: tabular-nums; }
+
+/* Profunditat als quadradets amb foto: la jugadora es mou més que el número (com si fos en 3D) */
+.convo-grid li.has-photo .cv-photo { transition: transform .35s var(--ease); }
+.convo-grid li.has-photo .cv-photo img, .convo-grid li.has-photo .cv-num { transition: translate .35s var(--ease); }
+.convo-grid li.has-photo.tilt .cv-photo { transform: perspective(520px) rotateY(calc(var(--px, 0) * 7deg)) rotateX(calc(var(--py, 0) * -7deg)); transition-duration: .12s; }
+.convo-grid li.has-photo.tilt .cv-photo img { translate: calc(var(--px, 0) * 5px) calc(var(--py, 0) * 3px); transition-duration: .12s; }
+.convo-grid li.has-photo.tilt .cv-num { translate: calc(var(--px, 0) * -3px) calc(var(--py, 0) * -2px); transition-duration: .12s; }
+@media (prefers-reduced-motion: reduce) {
+  .convo-grid li.has-photo.tilt .cv-photo { transform: none; }
+  .convo-grid li.has-photo.tilt .cv-photo img, .convo-grid li.has-photo.tilt .cv-num { translate: none; }
+}
+
+/* Les fotes dels quadradets apareixen amb un fos suau quan arriben */
+.cv-photo img { animation: cv-img-in .45s var(--ease) backwards; }
+@keyframes cv-img-in { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .cv-photo img { animation: none; } }

@@ -15,7 +15,7 @@ import { fetchConvocations, hhmm, type Convocation } from "@/lib/convo";
 import { addDays, fmtShort, startOfWeek } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fetchWeeklyPlan } from "@/lib/weekly";
-import { fmtDate, fmtSessionTime, nowMadridHHMM, SESSION_COLS, type Session } from "@/lib/wellness";
+import { fmtDate, fmtDateSmart, fmtSessionTime, nowMadridHHMM, SESSION_COLS, type Session } from "@/lib/wellness";
 
 type Info = {
   next: Session | null;
@@ -234,7 +234,7 @@ function NextUp({ s, today }: { s: Session; today: string }) {
     <Link href={`/entrenador/sessio?id=${s.id}`} className="coach-today next-up">
       <span className="ct-k">Avui no hi ha sessió · La propera</span>
       <b className="ct-title">{s.name}</b>
-      <span className="ct-sub">{fmtDate(s.session_date)}{s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""} · {s.kind}</span>
+      <span className="ct-sub">{fmtDateSmart(s.session_date)}{s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""} · {s.kind}</span>
     </Link>
   );
 }

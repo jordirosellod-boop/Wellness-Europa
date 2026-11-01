@@ -7,6 +7,7 @@ import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDateTime, friendlyError, type Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
+import { CountUp } from "@/components/count-up";
 
 type Match = {
   acta_id: string; jornada: number; kickoff: string | null; home: string; away: string;
@@ -134,9 +135,9 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
           <section className="card">
             <h2>L&apos;equip</h2>
             <div className="stats three">
-              <div className="stat">Partits<b>{played.length}</b><span className="small">{tally.G}V · {tally.E}E · {tally.P}D</span></div>
-              <div className="stat">Gols a favor<b>{gf}</b></div>
-              <div className="stat">Gols en contra<b>{ga}</b></div>
+              <div className="stat">Partits<b><CountUp value={played.length} /></b><span className="small">{tally.G}V · {tally.E}E · {tally.P}D</span></div>
+              <div className="stat">Gols a favor<b><CountUp value={gf} /></b></div>
+              <div className="stat">Gols en contra<b><CountUp value={ga} /></b></div>
             </div>
             {next && (
               <p style={{ marginBottom: 0 }}>

@@ -6,6 +6,7 @@ import { fetchAEvents, type AEvent, type AMatch } from "@/lib/analysis";
 import { fetchAll, supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
 import { Empty } from "@/components/empty";
+import { Loading } from "@/components/loading";
 
 type Data = { matches: AMatch[]; events: Map<string, AEvent[]>; players: Map<string, string> };
 
@@ -26,7 +27,7 @@ export function AnalysisSeason({ matches }: { matches: AMatch[] }) {
   }, [matches]);
 
   if (error) return <p className="msg error">{error}</p>;
-  if (!data) return <p className="muted">Carregant la temporada…</p>;
+  if (!data) return <Loading lines={4} />;
   if (data.matches.length === 0) return <Empty art="video" title="Encara no hi ha cap partit analitzat" hint="Puja el vídeo d&apos;un partit i marca-hi les accions." />;
 
   const all = [...data.events.values()].flat();

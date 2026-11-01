@@ -34,7 +34,7 @@ import { fetchAttendance, fetchSessionsBetween, monthBounds, summarize } from "@
 import { detect as detectReminders, Reminders, type Status as ReminderStatus } from "@/components/reminders";
 import { daysToPay, fmtEuros } from "@/lib/fines";
 import { Brand, Footer } from "@/components/ui";
-import { fmtShort, isoDow, startOfWeek, viewRange, type CalView } from "@/lib/dates";
+import { isoDow, startOfWeek, viewRange, type CalView } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { transition } from "@/lib/vt";
 import { setAppBadge } from "@/lib/app-badge";
@@ -43,6 +43,7 @@ import {
   fmtDate,
   fmtSessionTime,
   fmtTime,
+  fmtDateSmart,
   nowMadridHHMM,
   SESSION_COLS,
   dayBefore,
@@ -571,7 +572,7 @@ function Dashboard({
 
       {data?.convo && data.convo.c.match_date !== today && (
         <button type="button" className={`convo-banner ${data.convo.called ? "yes" : "no"}`} onClick={(e) => go("convo", e.currentTarget)}>
-          <span className="convo-banner-k">Convocatòria · {fmtShort(data.convo.c.match_date)}{data.convo.c.kickoff ? ` · ${hhmm(data.convo.c.kickoff)} h` : ""}</span>
+          <span className="convo-banner-k">Convocatòria · {fmtDateSmart(data.convo.c.match_date, { short: true })}{data.convo.c.kickoff ? ` · ${hhmm(data.convo.c.kickoff)} h` : ""}</span>
           <b className="team-inline"><Crest name={data.convo.c.rival} size={30} />{data.convo.c.is_home ? `CE Europa – ${data.convo.c.rival}` : `${data.convo.c.rival} – CE Europa`}</b>
           <span>{data.convo.called ? "✓ Estàs convocada · Veure la convocatòria" : "Veure la convocatòria"}</span>
         </button>
@@ -664,7 +665,7 @@ function Dashboard({
         <button type="button" className="tile" onClick={(e) => go("calendari", e.currentTarget)}>
           {ICONS.calendari}
           <b>Calendari</b>
-          <span>{data?.next ? `Propera: ${fmtShort(data.next.session_date)}` : "Les meves sessions"}</span>
+          <span>{data?.next ? `Propera: ${fmtDateSmart(data.next.session_date, { short: true }).toLowerCase()}` : "Les meves sessions"}</span>
         </button>
         <button type="button" className="tile" onClick={(e) => go("multes", e.currentTarget)}>
           {ICONS.multes}

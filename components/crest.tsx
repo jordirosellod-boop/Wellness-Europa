@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { rivalKey } from "@/lib/analysis";
+import { crestColor } from "@/lib/crest-color";
 
 // Escuts dels equips (de la FCF). Es demanen un sol cop per pàgina.
 type Team = { id: string; name: string; crest: string };
@@ -89,4 +90,18 @@ export function MatchLine({ home, away, score, size = 22, className = "" }: { ho
       <span className="ml-team away"><span>{away}</span><Crest name={away} size={size} /></span>
     </span>
   );
+}
+
+/** El color de l'escut del rival («r g b»), per tenyir suaument la targeta del partit. Mai el nostre. */
+export function useRivalColor(name: string | null | undefined): string | null {
+  const teams = useCrests();
+  const src = name && !isUs(name) ? crestFor(teams, name) : null;
+  const [got, setGot] = useState<{ src: string; color: string | null } | null>(null);
+  useEffect(() => {
+    if (!src) return;
+    let alive = true;
+    crestColor(src).then((color) => alive && setGot({ src, color }));
+    return () => { alive = false; };
+  }, [src]);
+  return got && got.src === src ? got.color : null;
 }

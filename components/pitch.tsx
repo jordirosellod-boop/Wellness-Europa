@@ -8,6 +8,7 @@ import { deliverPdf, sheetPdf } from "@/lib/plan-pdf";
 import { canShareFile, safeName } from "@/lib/share-file";
 import { supabase } from "@/lib/supabase";
 import { fmtDate } from "@/lib/wellness";
+import { Loading } from "@/components/loading";
 
 type Kit = "home" | "away";
 type Lineup = { formation: string; slots: Record<string, string>; kit: Kit };
@@ -74,7 +75,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
   const byId = new Map(roster.map((r) => [r.player_id, r]));
 
   if (error) return <p className="msg error">{error}</p>;
-  if (!lineup) return <p className="muted">Carregant l&apos;onze…</p>;
+  if (!lineup) return <Loading lines={2} />;
 
   // Només compten les jugadores que encara estan convocades.
   const slots: Record<string, string> = Object.fromEntries(

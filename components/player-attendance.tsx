@@ -7,6 +7,7 @@ import { addMonths, fmtShort } from "@/lib/dates";
 import { fmtSessionTime, todayMadrid, type Session } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
+import { CountUp } from "@/components/count-up";
 
 /** Assistència de la jugadora (només la seva), mes a mes. */
 export function PlayerAttendance({ meId }: { meId: string }) {
@@ -51,10 +52,10 @@ export function PlayerAttendance({ meId }: { meId: string }) {
         <section className="card">
           <h2>Entrenaments</h2>
           <div className="stats three">
-            <div className="stat">Presents<b>{sum.present}</b></div>
-            <div className="stat">Absents<b>{sum.marked - sum.present}</b></div>
+            <div className="stat">Presents<b><CountUp value={sum.present} /></b></div>
+            <div className="stat">Absents<b><CountUp value={sum.marked - sum.present} /></b></div>
             <div className="stat">
-              Assistència<b>{sum.pct == null ? "–" : `${sum.pct}%`}</b>
+              Assistència<b>{sum.pct == null ? "–" : <CountUp value={sum.pct} suffix="%" />}</b>
               {sum.pct != null && <span className={`chip ${pctClass(sum.pct)}`} style={{ alignSelf: "flex-start" }}>{sum.pct >= 90 ? "Molt bé" : sum.pct >= 75 ? "Correcte" : "Baixa"}</span>}
             </div>
           </div>
