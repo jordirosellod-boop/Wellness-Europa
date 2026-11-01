@@ -403,6 +403,25 @@ create table if not exists public.player_photos (
 alter table public.player_photos add column if not exists avatar text
   check (avatar is null or (avatar like 'data:image/%' and octet_length(avatar) < 120000));
 
+-- CALENDARI AL MÒBIL: un enllaç secret per persona per subscriure's als entrenos i partits (sense noms).
+-- Només el llegeix el servidor (per fer el calendari); cadascú obté el seu amb my_calendar_token().
+create table if not exists public.calendar_tokens (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  token      text not null unique check (token ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now()
+);
+
+-- MINUTS JUGATS: el staff els apunta en directe durant el partit (entra / surt). Cada jugadora veu els seus.
+create table if not exists public.match_minutes (
+  convocation_id uuid not null references public.convocations(id) on delete cascade,
+  player_id      uuid not null references public.profiles(id) on delete cascade,
+  minutes        smallint not null check (minutes between 0 and 130),
+  started        boolean not null default false,
+  updated_at     timestamptz not null default now(),
+  updated_by     uuid default auth.uid() references public.profiles(id) on delete set null,
+  primary key (convocation_id, player_id)
+);
+
 -- COM VOL QUE LA SALUDI L'APP: cada persona del staff tria el nom («Rose», «Míster»...).
 -- Només ho veu i ho canvia ella mateixa.
 create table if not exists public.staff_greetings (
@@ -1341,6 +1360,24 @@ language sql stable security definer set search_path = '' as $$
   order by 3 nulls last, p.display_name, p.id;
 $$;
 
+-- L'enllaç secret del calendari de qui ho demana (el crea el primer cop).
+create or replace function public.my_calendar_token()
+returns text language plpgsql security definer set search_path = '' as $$
+declare t text;
+begin
+  if not ((select public.is_coach()) or (select public.is_player())) then
+    raise exception 'No autoritzat' using errcode = '42501';
+  end if;
+  select c.token into t from public.calendar_tokens c where c.profile_id = (select auth.uid());
+  if t is null then
+    insert into public.calendar_tokens (profile_id, token)
+      values ((select auth.uid()), replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''))
+      on conflict (profile_id) do nothing;
+    select c.token into t from public.calendar_tokens c where c.profile_id = (select auth.uid());
+  end if;
+  return t;
+end $$;
+
 -- Llista de la convocatòria: totes les jugadores, amb el dorsal i si estan convocades.
 -- El staff la veu sempre; una jugadora, només si la convocatòria està publicada.
 create or replace function public.convo_roster(cid uuid)
@@ -1472,6 +1509,18 @@ drop trigger if exists player_photos_stamp on public.player_photos;
 create trigger player_photos_stamp before insert or update on public.player_photos
   for each row execute function public.stamp_player_photo();
 
+-- Minuts: l'hora i qui els ha apuntat les posa el servidor.
+create or replace function public.stamp_match_minutes()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  new.updated_at := now();
+  new.updated_by := (select auth.uid());
+  return new;
+end $$;
+drop trigger if exists match_minutes_stamp on public.match_minutes;
+create trigger match_minutes_stamp before insert or update on public.match_minutes
+  for each row execute function public.stamp_match_minutes();
+
 -- Biblioteca: les dates les posa el servidor.
 create or replace function public.stamp_task_library()
 returns trigger language plpgsql set search_path = '' as $$
@@ -1597,6 +1646,8 @@ alter table public.staff_greetings    enable row level security;
 alter table public.absence_notices    enable row level security;
 alter table public.task_library       enable row level security;
 alter table public.player_photos      enable row level security;
+alter table public.calendar_tokens    enable row level security;
+alter table public.match_minutes      enable row level security;
 alter table public.training_plans     enable row level security;
 alter table public.analysis_matches   enable row level security;
 alter table public.analysis_events    enable row level security;
@@ -1622,7 +1673,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
-  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.training_plans,
+  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.calendar_tokens, public.match_minutes, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
   public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
@@ -1654,6 +1705,9 @@ grant all on public.task_library to service_role;
 grant select, insert, update, delete on public.task_library to authenticated;
 grant all on public.player_photos to service_role;
 grant select, insert, update, delete on public.player_photos to authenticated;
+grant all on public.calendar_tokens to service_role; -- les persones no hi accedeixen directament (només amb my_calendar_token)
+grant all on public.match_minutes to service_role;
+grant select, insert, update, delete on public.match_minutes to authenticated;
 grant select, insert, update, delete on public.injuries, public.player_positions, public.player_nicknames, public.training_plans to authenticated;
 grant all on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to service_role;
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
@@ -1677,8 +1731,8 @@ revoke all on function public.bib_schedule(date, date) from public, anon;
 grant execute on function public.bib_schedule(date, date) to authenticated, service_role;
 revoke all on function public.notice_is_open(uuid) from public, anon;
 grant execute on function public.notice_is_open(uuid) to authenticated;
-revoke all on function public.team_dorsals(), public.team_roster() from public, anon;
-grant execute on function public.team_dorsals(), public.team_roster() to authenticated;
+revoke all on function public.team_dorsals(), public.team_roster(), public.my_calendar_token() from public, anon;
+grant execute on function public.team_dorsals(), public.team_roster(), public.my_calendar_token() to authenticated;
 revoke all on function public.convo_roster(uuid) from public, anon;
 grant execute on function public.convo_roster(uuid) to authenticated;
 grant execute on function public.is_coach(), public.is_player(), public.session_is_open(uuid), public.wellness_is_open(uuid), public.rpe_is_open(uuid) to authenticated;
@@ -1954,6 +2008,14 @@ drop policy if exists player_photos_write on public.player_photos;
 create policy player_photos_write on public.player_photos for all to authenticated
   using ((select public.is_coach()))
   with check ((select public.is_coach()) and exists (select 1 from public.profiles p where p.id = profile_id and p.role = 'player'));
+-- MINUTS: el staff els apunta; cada jugadora veu només els seus.
+drop policy if exists match_minutes_staff on public.match_minutes;
+create policy match_minutes_staff on public.match_minutes for all to authenticated
+  using ((select public.is_coach()))
+  with check ((select public.is_coach()) and exists (select 1 from public.profiles p where p.id = player_id and p.role = 'player'));
+drop policy if exists match_minutes_own on public.match_minutes;
+create policy match_minutes_own on public.match_minutes for select to authenticated
+  using (player_id = (select auth.uid()) and (select public.is_player()));
 drop policy if exists task_library_owner on public.task_library;
 create policy task_library_owner on public.task_library for all to authenticated
   using (owner_id = (select auth.uid()) and (select public.is_owner()))

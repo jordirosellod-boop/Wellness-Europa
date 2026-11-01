@@ -842,3 +842,33 @@ select pg_temp.expect_error($$select * from public.player_photos$$, 'Anònim tam
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 with u as (delete from public.player_photos returning 1) select pg_temp.check(count(*) = 1, 'El staff la pot treure quan es demani') from u;
 reset role;
+
+-- =============== CALENDARI AL MÒBIL ===============
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select public.my_calendar_token()) ~ '^[0-9a-f]{64}$', 'La jugadora obté el seu enllaç secret del calendari');
+select pg_temp.check((select public.my_calendar_token()) = (select public.my_calendar_token()), 'I sempre és el mateix');
+select pg_temp.expect_error($$select * from public.calendar_tokens$$, 'Però no pot llegir la taula d''enllaços');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.check((select public.my_calendar_token()) <> '' , 'El staff també en té');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000cc', false); set role authenticated;
+select pg_temp.expect_error($$select public.my_calendar_token()$$, 'Un compte sense perfil no en té');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select public.my_calendar_token()$$, 'Anònim tampoc');
+reset role;
+select pg_temp.check((select count(distinct token) from public.calendar_tokens) = 2, 'Cada persona té un enllaç diferent');
+
+-- =============== MINUTS JUGATS ===============
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.convocations (id, match_date, kickoff, rival, published) values ('88888888-0000-0000-0000-0000000000a1', (select today from vars), '11:00', 'Minuts FC', true);
+insert into public.match_minutes (convocation_id, player_id, minutes, started) values
+  ('88888888-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b2', 80, true),
+  ('88888888-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000e5', 25, false);
+select pg_temp.check((select updated_by = '00000000-0000-0000-0000-00000000000a' from public.match_minutes where player_id = '00000000-0000-0000-0000-0000000000b2'), 'El staff apunta els minuts (i el servidor posa qui)');
+select pg_temp.expect_error($$insert into public.match_minutes (convocation_id, player_id, minutes) values ('88888888-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-00000000000a', 10)$$, 'Només minuts de jugadores');
+select pg_temp.expect_error($$update public.match_minutes set minutes = 200 where player_id = '00000000-0000-0000-0000-0000000000b2'$$, 'Minuts impossibles no');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.match_minutes) = 1 and (select minutes from public.match_minutes) = 80, 'La jugadora veu només els seus minuts');
+select pg_temp.expect_error($$insert into public.match_minutes (convocation_id, player_id, minutes) values ('88888888-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b2', 90) on conflict (convocation_id, player_id) do update set minutes = 90$$, 'I no els pot canviar');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.match_minutes$$, 'Anònim no veu minuts');
+reset role;

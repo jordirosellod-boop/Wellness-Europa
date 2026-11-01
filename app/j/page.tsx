@@ -16,6 +16,8 @@ import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
 import { PlayerCard } from "@/components/player-card";
 import { Squad } from "@/components/squad";
+import { CalendarSync } from "@/components/calendar-sync";
+import { WeatherChip } from "@/components/weather";
 import { SplashMatchSaver } from "@/components/splash-match";
 import { Shirt, useDorsals } from "@/components/shirt";
 import { fetchAvatar } from "@/lib/player-photos";
@@ -619,6 +621,7 @@ function Dashboard({
                 <b>{s.name}</b>
                 <span className="chip">{s.kind}{s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""}</span>
               </div>
+              {!s.cancelled && <WeatherChip date={s.session_date} time={s.start_time} />}
               <div className="row" style={{ marginTop: 8 }}>
                 {m?.w ? (
                   <span className="chip fet">Wellness fet</span>
@@ -647,6 +650,7 @@ function Dashboard({
                 <b>{s.name}</b>
                 <span className="chip">{s.kind}{s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""}</span>
               </div>
+              {!s.cancelled && <WeatherChip date={s.session_date} time={s.start_time} />}
               <div className="row" style={{ marginTop: 8 }}>
                 <span className="chip band-baix">RPE fora de termini · fins avui 23:59</span>
               </div>
@@ -890,6 +894,7 @@ function PlayerCalendar({ me, today, version, onOpenSession }: { me: Profile; to
           );
         }}
       />
+      <CalendarSync />
     </>
   );
 }

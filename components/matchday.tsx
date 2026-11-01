@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Crest } from "@/components/crest";
+import { WeatherChip } from "@/components/weather";
 import { GoalStoryButton, ResultStoryButton } from "@/components/convo-story";
 import { prettyTeam } from "@/lib/analysis";
 import { hhmm, KITS, kitOf, type Convocation } from "@/lib/convo";
@@ -100,6 +101,7 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
       {phase === "joc" && <p className="md-live"><span className="dot" /> En joc · Força Europa!</p>}
       {phase === "final" && <p className="md-live done">Partit acabat · Gràcies per l&apos;esforç 💙</p>}
 
+      <WeatherChip date={c.match_date} time={c.kickoff ?? c.meet_time} address={c.is_home ? null : c.address} dark />
       <div className="md-chips">
         {c.meet_time && <span>🕘 Quedada {hhmm(c.meet_time)} h</span>}
         {c.kickoff && <span>⚽ Partit {hhmm(c.kickoff)} h</span>}

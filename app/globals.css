@@ -2720,3 +2720,36 @@ body { overscroll-behavior-y: none; } /* el gest d'estirar el fem nosaltres (amb
   box-shadow: 0 8px 22px rgba(1,20,70,.35); border-top: 3px solid var(--or); animation: rise .35s var(--ease) both;
 }
 body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+
+/* --- Calendari al mòbil --- */
+.cal-sync { display: grid; gap: 10px; }
+.cal-sync-head { display: flex; gap: 12px; align-items: flex-start; }
+.cal-sync-head > span { font-size: 1.8rem; line-height: 1; }
+.cal-sync-head div { display: flex; flex-direction: column; gap: 2px; }
+.cal-sync-opts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cal-sync-opts .btn { text-decoration: none; }
+
+/* --- El temps que farà --- */
+.weather { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: .82rem; font-weight: 600; background: #eef4ff; color: var(--navy); }
+.weather.dark { background: rgba(255,255,255,.12); color: #fff; }
+.matchday .weather { align-self: center; margin: 6px auto 0; }
+
+/* --- Minuts en directe (staff) --- */
+.minutes-live { display: grid; gap: 10px; }
+.ml-clock { display: flex; flex-direction: column; align-items: center; padding: 14px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #04103a, var(--navy) 50%, var(--blau)); }
+.ml-clock b { font-family: var(--font-escapulada), var(--display); font-weight: 400; font-size: 3.4rem; line-height: 1; letter-spacing: 1px; }
+.ml-clock span { color: var(--or); font-family: var(--display); text-transform: uppercase; letter-spacing: 1px; font-size: .85rem; margin-top: 4px; }
+.ml-clock.run b { color: #fff; text-shadow: 0 0 18px rgba(219,179,77,.45); }
+.ml-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 1.15rem; color: var(--navy); }
+.ml-h span { background: var(--navy); color: var(--or); border-radius: 999px; padding: 0 9px; font-size: .9rem; }
+.ml-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ml-p { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-height: 48px; border-radius: 12px; border: 1.5px solid var(--vora); background: #fff; font: inherit; color: var(--navy); cursor: pointer; text-align: left; }
+.ml-p.on { border-color: #34c759; background: #effaf2; }
+.ml-name { flex: 1; min-width: 0; font-weight: 600; }
+.ml-min { font-family: var(--font-escapulada), var(--display); font-size: 1.3rem; min-width: 44px; text-align: right; }
+.ml-act { font-size: .78rem; font-weight: 700; color: var(--blau); min-width: 56px; text-align: right; }
+.ml-p.on .ml-act { color: #c62828; }
+.ml-season summary { cursor: pointer; font-weight: 700; color: var(--navy); min-height: 44px; display: flex; align-items: center; }
+.ml-season table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.ml-season th, .ml-season td { padding: 6px 4px; border-bottom: 1px solid var(--vora); text-align: right; }
+.ml-season th:first-child, .ml-season td:first-child { text-align: left; }

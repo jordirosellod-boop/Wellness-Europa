@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarSync } from "@/components/calendar-sync";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { Calendar, StatusChip, type CalItem, type CalStatus } from "@/components/calendar";
@@ -131,6 +132,7 @@ function CoachCalendar({ meId, name }: { meId: string; name: string }) {
           )
         }
       />
+      <CalendarSync />
       <Reminders staff />
     </>
   );

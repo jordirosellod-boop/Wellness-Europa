@@ -4,6 +4,7 @@ import { Crest } from "@/components/crest";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ConvoSheet } from "@/components/convo-sheet";
 import { ConvoPosterButton } from "@/components/convo-poster";
+import { MinutesLive } from "@/components/minutes-live";
 import { LineupBoard } from "@/components/pitch";
 import { CoachShell, Footer } from "@/components/ui";
 import { CONVO_COLS, fetchConvocations, fetchRoster, FRIENDLY, GUEST_ORIGINS, hhmm, isFriendly, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
@@ -536,6 +537,8 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
       </section>
 
       <LineupBoard c={c} roster={roster} />
+
+      <MinutesLive c={c} roster={roster} />
 
       <ConvoPosterButton c={c} roster={roster} />
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Shirt, useDorsals } from "@/components/shirt";
+import { WeatherChip } from "@/components/weather";
 import { fetchNotices } from "@/lib/absence";
 import { reasonLabel } from "@/lib/attendance";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -73,6 +74,7 @@ export function CoachToday({ today }: { today: string }) {
               <div className="ct-info">
                 <span className="ct-k">Avui · {s.kind}{s.start_time ? ` · ${fmtSessionTime(s.start_time)}` : ""}</span>
                 <b className="ct-title">{s.name}</b>
+                <WeatherChip date={s.session_date} time={s.start_time} dark />
                 <span className="ct-sub">RPE {r}/{expected} · {pct >= 100 ? "Tothom ha respost ✓" : `Falten ${Math.max(0, expected - w)} wellness`}</span>
                 <Link className="btn small ct-go" href={`/entrenador/sessio?id=${s.id}`}>Veure la sessió ›</Link>
               </div>
