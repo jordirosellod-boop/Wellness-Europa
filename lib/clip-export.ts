@@ -37,6 +37,8 @@ export type ExportOptions = {
   rival?: RivalCard | null; // fitxa del rival (només amb la pantalla inicial)
   onProgress?: (fraction: number) => void;
   signal?: AbortSignal;
+  /** Si hi és, el vídeo s'hi va escrivint a trossos (MP4 fragmentat) en lloc de fer-lo sencer a la memòria. */
+  out?: WritableStream<{ type: "write"; data: Uint8Array; position: number }>;
 };
 
 const CARD_S = 2.5;
@@ -58,7 +60,7 @@ export function totalSeconds(sections: Section[], o: Pick<ExportOptions, "cards"
 }
 
 /** `file`: el fitxer del dispositiu o l'adreça del vídeo (Veo). */
-export async function exportClips(file: File | string, sections: Section[], o: ExportOptions): Promise<Blob> {
+export async function exportClips(file: File | string, sections: Section[], o: ExportOptions): Promise<Blob | null> {
   const mb = await import("mediabunny");
   if (typeof VideoEncoder === "undefined") {
     throw new ExportError("Aquest navegador no pot fer vídeos. Fes servir Safari (iPad/iPhone actualitzat) o Chrome.");
@@ -88,7 +90,9 @@ export async function exportClips(file: File | string, sections: Section[], o: E
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext("2d")!;
-    const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target: new mb.BufferTarget() });
+    const output = o.out
+      ? new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "fragmented" }), target: new mb.StreamTarget(o.out as WritableStream<{ type: "write"; data: Uint8Array<ArrayBuffer>; position: number }>, { chunked: true }) })
+      : new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target: new mb.BufferTarget() });
     const vSrc = new mb.CanvasSource(canvas, { codec: vCodec, bitrate: mb.QUALITY_MEDIUM, keyFrameInterval: 2 });
     output.addVideoTrack(vSrc, { frameRate: 30 });
     const aSrc = aTrack && aCodec ? new mb.AudioSampleSource({ codec: aCodec, bitrate: 128_000 }) : null;
@@ -230,6 +234,7 @@ export async function exportClips(file: File | string, sections: Section[], o: E
     }
 
     await output.finalize();
+    if (o.out) return null;
     const buf = (output.target as InstanceType<typeof mb.BufferTarget>).buffer;
     if (!buf) throw new ExportError("No s'ha pogut crear el vídeo.");
     return new Blob([buf], { type: "video/mp4" });

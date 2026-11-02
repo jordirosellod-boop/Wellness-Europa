@@ -10,7 +10,7 @@ import type { RivalSummary } from "@/lib/rival-summary";
 import { supabase } from "@/lib/supabase";
 import { canShareFile, deliverFile, safeName } from "@/lib/share-file";
 import { fmtDate } from "@/lib/wellness";
-import { asFile, deleteVideo, keepAwake, listVideos, saveVideo, type SavedVideo } from "@/lib/saved-videos";
+import { asFile, createVideoWriter, deleteVideo, keepAwake, listVideos, type SavedVideo } from "@/lib/saved-videos";
 
 type TeamFilter = "us" | "rival" | "all";
 type Job = { label: string; progress: number; ctrl: AbortController };
@@ -76,10 +76,12 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
   const [open, setOpen] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [ready, setReady] = useState<File | null>(null);
-  const [saved, setSaved] = useState<SavedVideo[]>([]);
+  // Vídeos fets (i el seu fitxer ja preparat: el menú de compartir s'ha d'obrir just en tocar)
+  const [saved, setSaved] = useState<{ v: SavedVideo; file: File }[]>([]);
+  const withFile = async (v: SavedVideo) => ({ v, file: await asFile(v) });
   useEffect(() => {
     let alive = true;
-    listVideos(match.id).then((v) => alive && setSaved(v), () => {});
+    listVideos(match.id).then((l) => Promise.all(l.map(withFile))).then((l) => alive && setSaved(l), () => {});
     return () => { alive = false; };
   }, [match.id]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -143,6 +145,9 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
     const ctrl = new AbortController();
     setJob({ label, progress: 0, ctrl });
     const release = await keepAwake();
+    const name = `${safeName(fileName)}.mp4`;
+    // El vídeo es va escrivint al dispositiu a trossos; si no es pot (navegador sense espai), es fa a la memòria.
+    const writer = await createVideoWriter(match.id, name).catch(() => null);
     const font = root.current ? getComputedStyle(root.current).getPropertyValue("--font-escapulada").trim() || "sans-serif" : "sans-serif";
     try {
       const blob = await exportClips(file, secs, {
@@ -155,15 +160,23 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
         rival: o.intro ? rival : null,
         signal: ctrl.signal,
         onProgress: (p) => setJob((j) => (j && j.ctrl === ctrl ? { ...j, progress: p } : j)),
+        out: writer?.stream,
       });
-      const f = new File([blob], `${safeName(fileName)}.mp4`, { type: "video/mp4" });
-      // Es guarda al dispositiu: si surts de l'app abans de desar-lo, quan tornis encara hi és.
-      const kept = await saveVideo(match.id, f).then((v) => { setSaved((l) => [v, ...l]); return true; }, () => false);
+      let f: File;
+      let kept = false;
+      if (writer) {
+        // Ja és al dispositiu: es posa a «Vídeos fets» encara que surtis de l'app
+        const item = await withFile(await writer.finish());
+        setSaved((l) => [item, ...l]);
+        f = item.file;
+        kept = true;
+      } else f = new File([blob!], name, { type: "video/mp4" });
       // Mòbil/iPad: cal un toc nou per compartir; ordinador: es descarrega directament.
       if (!canShareFile(f)) await deliverFile(f);
       else if (!kept) setReady(f);
       setMsg({ ok: true, text: `Fet: ${f.name} (${mb(f.size)}).${kept ? " Queda guardat a «Vídeos fets»." : ""}` });
     } catch (e) {
+      writer?.abort();
       if (e instanceof DOMException && e.name === "AbortError") setMsg({ ok: true, text: "Cancel·lat." });
       else if (typeof file === "string" && !(e instanceof ExportError))
         // Veo no sempre deixa llegir el vídeo des d'una altra web: llavors cal el fitxer.
@@ -179,12 +192,12 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
         <section className="card saved-videos">
           <h3 className="esc" style={{ marginTop: 0 }}>Vídeos fets</h3>
           <ul>
-            {saved.map((v) => (
+            {saved.map(({ v, file: vf }) => (
               <li key={v.id}>
                 <span><b>{v.name.replace(/\.mp4$/, "")}</b><span className="muted small"> · {mb(v.size)} · {new Date(v.created).toLocaleString("ca-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</span></span>
-                <button className="btn small" onClick={() => deliverFile(asFile(v))}>📤 Desar</button>
+                <button className="btn small" onClick={() => deliverFile(vf)}>📤 Desar</button>
                 <button className="btn small secondary" aria-label={`Esborrar ${v.name}`}
-                  onClick={() => window.confirm("Esborrar aquest vídeo del dispositiu?") && deleteVideo(v.id).then(() => setSaved((l) => l.filter((x) => x.id !== v.id)))}>🗑</button>
+                  onClick={() => window.confirm("Esborrar aquest vídeo del dispositiu?") && deleteVideo(v.id).then(() => setSaved((l) => l.filter((x) => x.v.id !== v.id)))}>🗑</button>
               </li>
             ))}
           </ul>
