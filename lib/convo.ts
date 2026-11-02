@@ -59,18 +59,21 @@ export const GUEST_ORIGINS = ["Cadet A", "Juvenil D"];
 export const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 
 // ---------- Equipacions ----------
-export type KitKey = "home" | "away";
+export type KitKey = "home" | "away" | "third";
 export const KITS: { key: KitKey; value: string; label: string; img: string }[] = [
   { key: "home", value: "1a equipació", label: "1a · Blanca", img: "/kits/home.webp" },
   { key: "away", value: "2a equipació", label: "2a · Blava", img: "/kits/away.webp" },
+  { key: "third", value: "3a equipació", label: "3a · Vermella", img: "/kits/third.webp" },
 ];
 /** Quina equipació és, a partir del text desat («1a equipació», «Blava (2a)», «blanca»…). */
 export function kitOf(kit: string | null | undefined): KitKey | null {
   const k = (kit ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (!k.trim()) return null;
-  // el número mana (1a / 2a); si no n'hi ha, el color
+  // el número mana (1a / 2a / 3a); si no n'hi ha, el color
   if (/\b1a\b|primera/.test(k)) return "home";
   if (/\b2a\b|segona/.test(k)) return "away";
+  if (/\b3a\b|tercera/.test(k)) return "third";
+  if (/vermell|roja|roig/.test(k)) return "third";
   if (/blava|blau|marino|fosca/.test(k)) return "away";
   if (/blanca|blanc/.test(k)) return "home";
   return null;

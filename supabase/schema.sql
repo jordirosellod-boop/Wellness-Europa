@@ -706,8 +706,10 @@ create table if not exists public.analysis_buttons (
 );
 create index if not exists analysis_buttons_owner_idx on public.analysis_buttons (owner_id, sort);
 
--- Equipació de la pissarra: 1a (blanca) o 2a (blava). La portera sempre de groc.
-alter table public.convocation_lineups add column if not exists kit text not null default 'home' check (kit in ('home', 'away'));
+-- Equipació de la pissarra: 1a (blanca), 2a (blava) o 3a (vermella). La portera sempre de groc.
+alter table public.convocation_lineups add column if not exists kit text not null default 'home' check (kit in ('home', 'away', 'third'));
+alter table public.convocation_lineups drop constraint if exists convocation_lineups_kit_check;
+alter table public.convocation_lineups add constraint convocation_lineups_kit_check check (kit in ('home', 'away', 'third'));
 
 -- RPE: durada real i càrrega (RPE x minuts, en unitats arbitràries) calculada per la base de dades.
 alter table public.rpe add column if not exists duration_min smallint check (duration_min between 1 and 300);

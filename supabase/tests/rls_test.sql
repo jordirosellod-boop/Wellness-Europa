@@ -446,6 +446,8 @@ insert into public.convocation_players (convocation_id, player_id, called) value
 insert into public.player_numbers (profile_id, dorsal) values ('00000000-0000-0000-0000-0000000000b2', 7);
 insert into public.convocation_lineups (convocation_id, formation, slots) values ('88888888-0000-0000-0000-000000000001', '4-3-3', '{"0":"00000000-0000-0000-0000-0000000000b2"}');
 select pg_temp.expect_error($$insert into public.convocation_players (convocation_id, player_id, called) values ('88888888-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', true)$$, 'No es pot convocar el staff');
+with u as (update public.convocation_lineups set kit = 'third' where convocation_id = '88888888-0000-0000-0000-000000000001' returning 1) select pg_temp.check(count(*) = 1, 'L''onze pot anar amb la 3a equipació') from u;
+select pg_temp.expect_error($$update public.convocation_lineups set kit = 'rosa' where convocation_id = '88888888-0000-0000-0000-000000000001'$$, 'Però no amb una equipació que no existeix');
 insert into public.convocation_guests (convocation_id, name, dorsal, origin) values ('88888888-0000-0000-0000-000000000001', 'Nora (Cadet A)', 18, 'Cadet A');
 select pg_temp.check((select count(*) from public.convocation_guests) = 1, 'El staff afegeix una jugadora d''un altre equip');
 select pg_temp.expect_error($$insert into public.convocation_guests (convocation_id, name, dorsal) values ('88888888-0000-0000-0000-000000000001', 'X', 120)$$, 'El dorsal de l''afegida ha de ser 0-99');

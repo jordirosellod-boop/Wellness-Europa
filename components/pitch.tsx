@@ -10,10 +10,11 @@ import { supabase } from "@/lib/supabase";
 import { fmtDate } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 
-type Kit = "home" | "away";
+type Kit = "home" | "away" | "third";
 type Lineup = { formation: string; slots: Record<string, string>; kit: Kit };
 
-const KIT_IMG: Record<Kit | "gk", string> = { home: "/kits/home.webp", away: "/kits/away.webp", gk: "/kits/gk.webp" };
+const KIT_IMG: Record<Kit | "gk", string> = { home: "/kits/home.webp", away: "/kits/away.webp", third: "/kits/third.webp", gk: "/kits/gk.webp" };
+const KIT_NUM: Record<Kit, string> = { home: "1a", away: "2a", third: "3a" };
 
 // Posició dins del camp amb marge perquè cap samarreta ni nom en surti.
 const px = (x: number) => 9 + x * 0.82;
@@ -156,11 +157,11 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
       </div>
 
       <div className="kit-pick no-print" role="group" aria-label="Equipació">
-        {(["home", "away"] as Kit[]).map((k) => (
+        {(["home", "away", "third"] as Kit[]).map((k) => (
           <button key={k} type="button" aria-pressed={lineup.kit === k} onClick={() => lineup.kit !== k && save({ kit: k })}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={KIT_IMG[k]} alt="" width={26} height={32} />
-            {k === "home" ? "1a equipació" : "2a equipació"}
+            {KIT_NUM[k]} equipació
           </button>
         ))}
       </div>
@@ -191,7 +192,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
               <b className="esc">{c.is_home ? `CE Europa – ${c.rival}` : `${c.rival} – CE Europa`}</b>
               <span>
                 {fmtDate(c.match_date)}{c.kickoff ? ` · ${hhmm(c.kickoff)} h` : ""}{c.meet_time ? ` · Quedada ${hhmm(c.meet_time)} h` : ""}
-                {c.venue ? ` · ${c.venue}` : ""} · {lineup.kit === "home" ? "1a" : "2a"} equipació
+                {c.venue ? ` · ${c.venue}` : ""} · {KIT_NUM[lineup.kit] ?? "1a"} equipació
               </span>
             </div>
             <Crest name={c.is_home ? c.rival : "CE Europa"} size={58} />
