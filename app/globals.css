@@ -2824,3 +2824,8 @@ body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom,
 .kit-choose button { padding: 8px 4px; min-width: 0; }
 .kit-choose button img { width: 100%; max-width: 78px; }
 .kit-choose button span { font-size: .8rem; line-height: 1.1; text-align: center; white-space: nowrap; }
+
+/* Vídeos de talls ja fets (guardats al dispositiu) */
+.saved-videos ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.saved-videos li { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 10px; background: #f3f5fa; }
+.saved-videos li > span { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.2; }

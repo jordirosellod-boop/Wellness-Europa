@@ -10,10 +10,12 @@ import type { RivalSummary } from "@/lib/rival-summary";
 import { supabase } from "@/lib/supabase";
 import { canShareFile, deliverFile, safeName } from "@/lib/share-file";
 import { fmtDate } from "@/lib/wellness";
+import { asFile, deleteVideo, keepAwake, listVideos, saveVideo, type SavedVideo } from "@/lib/saved-videos";
 
 type TeamFilter = "us" | "rival" | "all";
 type Job = { label: string; progress: number; ctrl: AbortController };
 
+const mb = (b: number) => (b < 10e6 ? `${(b / 1e6).toFixed(1).replace(".", ",")} MB` : `${Math.round(b / 1e6)} MB`);
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 
 type ScoutFields = { system?: string; strengths?: string; weaknesses?: string; keys?: string; key_players?: { dorsal: string; name: string; pos: string }[] };
@@ -74,6 +76,12 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
   const [open, setOpen] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [ready, setReady] = useState<File | null>(null);
+  const [saved, setSaved] = useState<SavedVideo[]>([]);
+  useEffect(() => {
+    let alive = true;
+    listVideos(match.id).then((v) => alive && setSaved(v), () => {});
+    return () => { alive = false; };
+  }, [match.id]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const root = useRef<HTMLDivElement>(null);
   // Escuts: el nostre i el del rival (en un vídeo del rival, «nosaltres» és el rival analitzat).
@@ -134,6 +142,7 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
     setReady(null);
     const ctrl = new AbortController();
     setJob({ label, progress: 0, ctrl });
+    const release = await keepAwake();
     const font = root.current ? getComputedStyle(root.current).getPropertyValue("--font-escapulada").trim() || "sans-serif" : "sans-serif";
     try {
       const blob = await exportClips(file, secs, {
@@ -148,10 +157,12 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
         onProgress: (p) => setJob((j) => (j && j.ctrl === ctrl ? { ...j, progress: p } : j)),
       });
       const f = new File([blob], `${safeName(fileName)}.mp4`, { type: "video/mp4" });
+      // Es guarda al dispositiu: si surts de l'app abans de desar-lo, quan tornis encara hi és.
+      const kept = await saveVideo(match.id, f).then((v) => { setSaved((l) => [v, ...l]); return true; }, () => false);
       // Mòbil/iPad: cal un toc nou per compartir; ordinador: es descarrega directament.
-      if (canShareFile(f)) setReady(f);
-      else await deliverFile(f);
-      setMsg({ ok: true, text: `Fet: ${f.name} (${Math.round(f.size / 1e6)} MB).` });
+      if (!canShareFile(f)) await deliverFile(f);
+      else if (!kept) setReady(f);
+      setMsg({ ok: true, text: `Fet: ${f.name} (${mb(f.size)}).${kept ? " Queda guardat a «Vídeos fets»." : ""}` });
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") setMsg({ ok: true, text: "Cancel·lat." });
       else if (typeof file === "string" && !(e instanceof ExportError))
@@ -159,24 +170,44 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
         setMsg({ ok: false, text: "Veo no deixa retallar aquest vídeo des de l'enllaç. Descarrega el partit de Veo (MP4) i obre'l com a fitxer per fer els talls." });
       else setMsg({ ok: false, text: e instanceof ExportError ? e.message : `No s'ha pogut fer el vídeo: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
+      release();
       setJob(null);
     }
   }
 
+  const savedList = saved.length > 0 ? (
+        <section className="card saved-videos">
+          <h3 className="esc" style={{ marginTop: 0 }}>Vídeos fets</h3>
+          <ul>
+            {saved.map((v) => (
+              <li key={v.id}>
+                <span><b>{v.name.replace(/\.mp4$/, "")}</b><span className="muted small"> · {mb(v.size)} · {new Date(v.created).toLocaleString("ca-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</span></span>
+                <button className="btn small" onClick={() => deliverFile(asFile(v))}>📤 Desar</button>
+                <button className="btn small secondary" aria-label={`Esborrar ${v.name}`}
+                  onClick={() => window.confirm("Esborrar aquest vídeo del dispositiu?") && deleteVideo(v.id).then(() => setSaved((l) => l.filter((x) => x.id !== v.id)))}>🗑</button>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small" style={{ margin: "4px 0 0" }}>Es guarden en aquest dispositiu 3 setmanes. «Desar» obre el menú per guardar-lo a Fotos, Arxius o Google Drive.</p>
+        </section>
+  ) : null;
+
   if (match.video_source === "youtube" && !file) {
     return (
-      <section className="card">
+      <><section className="card">
         <h3 className="esc" style={{ marginTop: 0 }}>Talls</h3>
         <p className="muted">Els vídeos de YouTube no es poden retallar ni descarregar. Per fer talls, carrega el fitxer del partit (MP4 del Veo o del mòbil).</p>
       </section>
+      {savedList}</>
     );
   }
   if (!file) {
     return (
-      <section className="card">
+      <><section className="card">
         <h3 className="esc" style={{ marginTop: 0 }}>Talls</h3>
         <p className="muted">Carrega primer el vídeo del partit (a dalt, «Obrir vídeo») per poder descarregar els talls.</p>
       </section>
+      {savedList}</>
     );
   }
 
@@ -213,7 +244,7 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
           </button>
         )}
         <p className="muted small" style={{ margin: "6px 0 0" }}>
-          Es fa al teu dispositiu (el vídeo no es puja enlloc). Pot trigar una mica: deixa aquesta pantalla oberta.
+          Es fa al teu dispositiu (el vídeo no es puja enlloc). Mentre es fa, deixa l&apos;app oberta (la pantalla no s&apos;apagarà). Quan acaba, queda guardat a «Vídeos fets» encara que surtis.
         </p>
 
         {job && (
@@ -232,6 +263,8 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
         )}
         {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
       </section>
+
+      {savedList}
 
       {sections.length === 0 && <p className="card muted">No hi ha accions marcades{team !== "all" ? " d'aquest equip" : ""}.</p>}
 
