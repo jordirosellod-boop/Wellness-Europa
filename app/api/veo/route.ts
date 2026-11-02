@@ -39,6 +39,22 @@ function findVideos(x: unknown, out: Video[] = [], ctx: { w: number; pano: boole
   return out;
 }
 
+/** Vídeo a partir de la pàgina pública del partit (etiquetes og:). Es comprova que el vídeo existeix. */
+async function videoFromPage(page: URL): Promise<{ url: string; title: string | null } | null> {
+  const res = await fetch(page, { headers: { "User-Agent": UA, Accept: "text/html" }, cache: "no-store" });
+  if (!res.ok) return null;
+  const html = await res.text();
+  const meta = (p: string) => html.match(new RegExp(`<meta[^>]+property="${p}"[^>]+content="([^"]+)"`, "i"))?.[1] ?? null;
+  const img = meta("og:image");
+  const m = img?.match(/^(https:\/\/c\.veocdn\.com\/[0-9a-f-]+\/standard\/[a-z]+\/[0-9a-f-]+\/)thumbnail\.jpg$/i);
+  if (!m) return null;
+  const url = `${m[1]}video.mp4`;
+  const head = await fetch(url, { method: "HEAD", headers: { "User-Agent": UA }, cache: "no-store" });
+  if (!head.ok) return null;
+  const title = meta("og:title")?.replace(/^Veo \|\s*/, "") ?? null;
+  return { url, title };
+}
+
 export async function GET(req: Request) {
   const db = adminClient();
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -70,11 +86,17 @@ export async function GET(req: Request) {
     // Vídeos: de la llista de vídeos o, si no es pot llegir, de la mateixa fitxa del partit
     const videos = findVideos(vRes.ok ? await vRes.json().catch(() => []) : []);
     if (!videos.length) findVideos(match, videos);
+    // Si Veo no deixa llegir la fitxa, es mira la pàgina pública del partit (la de la vista prèvia dels enllaços):
+    // la imatge del partit és al costat del vídeo (…/thumbnail.jpg → …/video.mp4)
+    if (!videos.length && (!mRes.ok || !vRes.ok)) {
+      const fromPage = await videoFromPage(page).catch(() => null);
+      if (fromPage) return Response.json({ video_url: fromPage.url, title: fromPage.title, link: page.toString() });
+    }
     if (!videos.length && (!mRes.ok || !vRes.ok)) {
       console.error("veo", slug, mRes.status, vRes.status);
       const blocked = [mRes.status, vRes.status].some((x) => x === 401 || x === 403);
       return Response.json({ error: blocked
-        ? `Veo no deixa que el nostre servidor llegeixi els partits (resposta ${mRes.status}/${vRes.status}), encara que siguin públics. Descarrega el vídeo des de Veo (Descarregar) i obre'l amb «Obrir el vídeo del dispositiu».`
+        ? `Veo no deixa que el nostre servidor llegeixi els partits (resposta ${mRes.status}/${vRes.status}), encara que siguin públics. A la web de Veo, obre el partit, toca Descarregar i, quan s'obri el vídeo, copia l'adreça (comença per https://c.veocdn.com) i enganxa-la aquí.`
         : `Veo no ens deixa llegir aquest partit ara mateix (resposta ${mRes.status}/${vRes.status}). Torna-ho a provar d'aquí a una estona.` }, { status: 502 });
     }
     // La millor: la retransmissió (no la panoràmica), i de més resolució

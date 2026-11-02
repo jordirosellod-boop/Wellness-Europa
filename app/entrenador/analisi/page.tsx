@@ -214,8 +214,12 @@ function writeLive(id: string, l: Live) {
 }
 const liveNow = (l: Live) => l.acc + (l.running ? (Date.now() - l.startedAt) / 1000 : 0);
 
+const VEO_MP4 = /^https:\/\/([a-z0-9-]+\.)*veocdn\.com\/[^\s]+\.mp4(\?[^\s]*)?$/i;
+
 /** Enllaç de Veo → adreça del vídeo (la busca el servidor de l'app). */
 async function resolveVeo(link: string): Promise<{ video_url: string; title: string | null; link: string }> {
+  // Enllaç directe al vídeo de Veo (el de «Descarregar»): es mira directament, sense passar pel servidor
+  if (VEO_MP4.test(link.trim())) return { video_url: link.trim(), title: null, link: link.trim() };
   const { data } = await supabase().auth.getSession();
   const res = await fetch(`/api/veo?url=${encodeURIComponent(link)}`, { headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` }, cache: "no-store" });
   const j = await res.json().catch(() => ({}));
@@ -401,7 +405,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   /** Enllaç de YouTube o de Veo. */
   async function openLink() {
     const link = ytUrl.trim();
-    if (/veo\.(co|com)\//i.test(link)) {
+    if (/veo\.(co|com)\/|veocdn\.com\//i.test(link)) {
       setVeoBusy(true);
       setMsg(null);
       try {
