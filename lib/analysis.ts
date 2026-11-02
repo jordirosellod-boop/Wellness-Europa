@@ -60,7 +60,7 @@ export const ABUTTON_COLS = "id, label, category, color, pre_s, post_s, ask_play
 export const HIGHLIGHT_BUTTON = { label: "A destacar", category: "Altres", color: "#c9a227", pre_s: 6, post_s: 6, ask_player: true, ask_result: false, ask_zone: false };
 
 /** Ordre dels apartats al vídeo de talls: sortida, pressió, transicions, a destacar i, per acabar, els gols.
- *  La resta d'accions van després, en l'ordre dels botons. */
+ *  La resta d'accions (6) van dins de «A destacar». */
 export function videoRank(label: string): number {
   const k = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (k.includes("sortida")) return 0;

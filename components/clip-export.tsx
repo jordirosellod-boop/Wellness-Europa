@@ -3,7 +3,7 @@
 import { crestFor, useCrests } from "@/components/crest";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Shape } from "@/components/telestrator";
-import { minuteOf, prettyTeam, rivalKey, teamLabels, toVideo, videoRank, type AButton, type AEvent, type AMatch } from "@/lib/analysis";
+import { minuteOf, prettyTeam, rivalKey, teamLabels, toVideo, videoRank, HIGHLIGHT_BUTTON, type AButton, type AEvent, type AMatch } from "@/lib/analysis";
 import { prettyPlayer } from "@/lib/bigdata";
 import { exportClips, ExportError, rivalPages, totalSeconds, type Clip, type RivalCard, type Section } from "@/lib/clip-export";
 import type { RivalSummary } from "@/lib/rival-summary";
@@ -84,17 +84,20 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
   const rivalInfo = useRivalCard(match, crestFor(teams, match.rival));
   const rival = withRival ? rivalInfo.card : null;
 
-  // Apartats: sortida, pressió, transicions defensives i ofensives, a destacar i gols; la resta, com els botons. Dins de cada apartat, per temps.
+  // Apartats: sortida, pressió, transicions defensives i ofensives, a destacar (amb tota la resta) i gols. Dins de cada apartat, per temps.
   const sections = useMemo(() => {
     const order = new Map(buttons.map((b) => [b.label, b.sort]));
     const color = new Map(buttons.map((b) => [b.label, b.color]));
     const list = events.filter((e) => team === "all" || e.team === team);
-    const actions = [...new Set(list.map((e) => e.action))].sort(
+    // Tot el que no és de la llista (xuts, recuperacions, córners…) va a «A destacar»
+    const HL = buttons.find((b) => videoRank(b.label) === 4)?.label ?? HIGHLIGHT_BUTTON.label;
+    const group = (a: string) => (videoRank(a) >= 4 && videoRank(a) !== 5 ? HL : a);
+    const actions = [...new Set(list.map((e) => group(e.action)))].sort(
       (a, b) => videoRank(a) - videoRank(b) || (order.get(a) ?? 999) - (order.get(b) ?? 999) || a.localeCompare(b, "ca"),
     );
     return actions.map((a): Section & { key: string } => {
-      const evs = list.filter((e) => e.action === a).sort((x, y) => x.t - y.t);
-      const c = color.get(a) ?? evs[0]?.color ?? "#0a2ea0";
+      const evs = list.filter((e) => group(e.action) === a).sort((x, y) => x.t - y.t);
+      const c = color.get(a) ?? (a === HL ? HIGHLIGHT_BUTTON.color : evs[0]?.color) ?? "#0a2ea0";
       return {
         key: a,
         title: a,
