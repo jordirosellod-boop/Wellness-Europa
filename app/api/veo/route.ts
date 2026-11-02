@@ -72,7 +72,10 @@ export async function GET(req: Request) {
     if (!videos.length) findVideos(match, videos);
     if (!videos.length && (!mRes.ok || !vRes.ok)) {
       console.error("veo", slug, mRes.status, vRes.status);
-      return Response.json({ error: `Veo no ens deixa llegir aquest partit ara mateix (resposta ${mRes.status}/${vRes.status}). Torna-ho a provar d'aquí a una estona.` }, { status: 502 });
+      const blocked = [mRes.status, vRes.status].some((x) => x === 401 || x === 403);
+      return Response.json({ error: blocked
+        ? `Veo no deixa que el nostre servidor llegeixi els partits (resposta ${mRes.status}/${vRes.status}), encara que siguin públics. Descarrega el vídeo des de Veo (Descarregar) i obre'l amb «Obrir el vídeo del dispositiu».`
+        : `Veo no ens deixa llegir aquest partit ara mateix (resposta ${mRes.status}/${vRes.status}). Torna-ho a provar d'aquí a una estona.` }, { status: 502 });
     }
     // La millor: la retransmissió (no la panoràmica), i de més resolució
     const best = videos.sort((a, b) => Number(a.pano) - Number(b.pano) || b.w - a.w)[0];
