@@ -862,6 +862,16 @@ select pg_temp.expect_error($$select public.my_calendar_token()$$, 'Anònim tamp
 reset role;
 select pg_temp.check((select count(distinct token) from public.calendar_tokens) = 2, 'Cada persona té un enllaç diferent');
 
+-- =============== GOOGLE DRIVE ===============
+insert into public.google_drive_links (profile_id, refresh_token) values ('00000000-0000-0000-0000-00000000000a', '1//secret-refresh-token');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.expect_error($$select * from public.google_drive_links$$, 'Ni el mateix staff pot llegir el permís de Drive des de l''app');
+select pg_temp.expect_error($$insert into public.oauth_states (state, profile_id, expires_at) values (repeat('a', 64), '00000000-0000-0000-0000-00000000000a', now())$$, 'Ni crear connexions de Google');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.google_drive_links$$, 'Anònim tampoc');
+reset role;
+select pg_temp.expect_error($$insert into public.oauth_states (state, profile_id, expires_at) values ('xyz', '00000000-0000-0000-0000-00000000000a', now())$$, 'L''estat de la connexió ha de ser un codi vàlid');
+
 -- =============== MINUTS JUGATS ===============
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 insert into public.convocations (id, match_date, kickoff, rival, published) values ('88888888-0000-0000-0000-0000000000a1', (select today from vars), '11:00', 'Minuts FC', true);

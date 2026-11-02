@@ -3,7 +3,7 @@
 // El vídeo s'hi va escrivint a trossos mentre es fa: així no cal tenir-lo sencer a la memòria
 // (un vídeo llarg sencer a la memòria fa que l'iPad recarregui la pàgina just al final).
 
-export type SavedVideo = { id: string; match_id: string; name: string; size: number; created: number; parts?: number; blob?: Blob };
+export type SavedVideo = { id: string; match_id: string; name: string; size: number; created: number; parts?: number; blob?: Blob; drive?: string };
 type Part = { k: string; vid: string; blob: Blob };
 export type VideoChunk = { type: "write"; data: Uint8Array; position: number };
 
@@ -78,6 +78,15 @@ export async function listVideos(match_id: string): Promise<SavedVideo[]> {
   const old = all.filter((v) => Date.now() - v.created > MAX_DAYS * 86400_000);
   for (const v of old) await deleteVideo(v.id).catch(() => {});
   return all.filter((v) => !old.includes(v)).map(({ blob, ...v }) => (blob ? { ...v, blob } : v)).sort((a, b) => b.created - a.created);
+}
+
+/** Apunta que ja és al Drive (enllaç per obrir-lo). */
+export async function markOnDrive(id: string, link: string) {
+  await tx([STORE], "readwrite", (t) => {
+    const st = t.objectStore(STORE);
+    const r = st.get(id);
+    r.onsuccess = () => { if (r.result) st.put({ ...r.result, drive: link }); };
+  });
 }
 
 export const deleteVideo = (id: string) => tx([STORE, PARTS], "readwrite", (t) => {

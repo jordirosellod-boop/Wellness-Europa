@@ -10,7 +10,8 @@ import type { RivalSummary } from "@/lib/rival-summary";
 import { supabase } from "@/lib/supabase";
 import { canShareFile, deliverFile, safeName } from "@/lib/share-file";
 import { fmtDate } from "@/lib/wellness";
-import { asFile, createVideoWriter, deleteVideo, keepAwake, listVideos, type SavedVideo } from "@/lib/saved-videos";
+import { asFile, createVideoWriter, deleteVideo, keepAwake, listVideos, markOnDrive, type SavedVideo } from "@/lib/saved-videos";
+import { connectDrive, disconnectDrive, driveStatus, uploadToDrive, type DriveStatus } from "@/lib/drive-upload";
 
 type TeamFilter = "us" | "rival" | "all";
 type Job = { label: string; progress: number; ctrl: AbortController };
@@ -79,6 +80,39 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
   // Vídeos fets (i el seu fitxer ja preparat: el menú de compartir s'ha d'obrir just en tocar)
   const [saved, setSaved] = useState<{ v: SavedVideo; file: File }[]>([]);
   const withFile = async (v: SavedVideo) => ({ v, file: await asFile(v) });
+  // Google Drive: si està connectat, cada vídeo fet s'hi puja sol
+  const [drive, setDrive] = useState<DriveStatus | null>(null);
+  const [up, setUp] = useState<Record<string, number>>({});
+  const [driveMsg, setDriveMsg] = useState<{ ok: boolean; text: string } | null>(() => {
+    if (typeof window === "undefined") return null;
+    const r = new URLSearchParams(window.location.search).get("drive");
+    return r === "ok" ? { ok: true, text: "Google Drive connectat ✓ Els vídeos de talls s'hi pujaran sols." }
+      : r === "error" ? { ok: false, text: "No s'ha pogut connectar el Google Drive. Torna-ho a provar." }
+      : r === "no" ? { ok: false, text: "No s'ha donat permís al Google Drive." } : null;
+  });
+  useEffect(() => {
+    let alive = true;
+    driveStatus().then((d) => alive && setDrive(d), () => {});
+    return () => { alive = false; };
+  }, []);
+  async function toDrive(v: SavedVideo, f: File) {
+    if (up[v.id] != null) return;
+    setUp((u) => ({ ...u, [v.id]: 0 }));
+    const release = await keepAwake();
+    try {
+      const link = await uploadToDrive(f, (p) => setUp((u) => ({ ...u, [v.id]: p })));
+      await markOnDrive(v.id, link).catch(() => {});
+      setSaved((l) => l.map((x) => (x.v.id === v.id ? { ...x, v: { ...x.v, drive: link } } : x)));
+      setDriveMsg({ ok: true, text: `Pujat al Drive: ${v.name}` });
+    } catch (e) {
+      setDriveMsg({ ok: false, text: `No s'ha pogut pujar al Drive: ${e instanceof Error ? e.message : String(e)} Ho pots tornar a provar amb «☁️ Pujar».` });
+      if (/connecta|caducat/i.test(String(e))) driveStatus().then(setDrive, () => {});
+    } finally {
+      release();
+      setUp((u) => { const n = { ...u }; delete n[v.id]; return n; });
+    }
+  }
+
   useEffect(() => {
     let alive = true;
     listVideos(match.id).then((l) => Promise.all(l.map(withFile))).then((l) => alive && setSaved(l), () => {});
@@ -170,6 +204,7 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
         setSaved((l) => [item, ...l]);
         f = item.file;
         kept = true;
+        if (drive?.connected) void toDrive(item.v, item.file); // es puja sol al Drive
       } else f = new File([blob!], name, { type: "video/mp4" });
       // Mòbil/iPad: cal un toc nou per compartir; ordinador: es descarrega directament.
       if (!canShareFile(f)) await deliverFile(f);
@@ -195,6 +230,13 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
             {saved.map(({ v, file: vf }) => (
               <li key={v.id}>
                 <span><b>{v.name.replace(/\.mp4$/, "")}</b><span className="muted small"> · {mb(v.size)} · {new Date(v.created).toLocaleString("ca-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</span></span>
+                {v.drive ? (
+                  <a className="btn small secondary" href={v.drive} target="_blank" rel="noreferrer">☁️ Al Drive</a>
+                ) : up[v.id] != null ? (
+                  <span className="chip">☁️ {Math.round(up[v.id] * 100)}%</span>
+                ) : drive?.connected ? (
+                  <button className="btn small secondary" onClick={() => toDrive(v, vf)}>☁️ Pujar</button>
+                ) : null}
                 <button className="btn small" onClick={() => deliverFile(vf)}>📤 Desar</button>
                 <button className="btn small secondary" aria-label={`Esborrar ${v.name}`}
                   onClick={() => window.confirm("Esborrar aquest vídeo del dispositiu?") && deleteVideo(v.id).then(() => setSaved((l) => l.filter((x) => x.v.id !== v.id)))}>🗑</button>
@@ -257,8 +299,26 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
           </button>
         )}
         <p className="muted small" style={{ margin: "6px 0 0" }}>
-          Es fa al teu dispositiu (el vídeo no es puja enlloc). Mentre es fa, deixa l&apos;app oberta (la pantalla no s&apos;apagarà). Quan acaba, queda guardat a «Vídeos fets» encara que surtis.
+          Es fa al teu dispositiu. Mentre es fa, deixa l&apos;app oberta (la pantalla no s&apos;apagarà). Quan acaba, queda guardat a «Vídeos fets» encara que surtis{drive?.connected ? " i es puja sol al teu Google Drive" : ""}.
         </p>
+        {drive?.configured && (
+          <div className="drive-row">
+            {drive.connected ? (
+              <>
+                <span>☁️ Google Drive connectat · carpeta «CE Europa · Talls»</span>
+                <button className="btn small secondary" disabled={busy}
+                  onClick={() => window.confirm("Desconnectar el Google Drive? Els vídeos ja pujats no s'esborren.") && disconnectDrive().then(() => setDrive({ configured: true, connected: false }), (e) => setDriveMsg({ ok: false, text: String(e instanceof Error ? e.message : e) }))}>
+                  Desconnectar
+                </button>
+              </>
+            ) : (
+              <button className="btn small" disabled={busy} onClick={() => connectDrive().catch((e) => setDriveMsg({ ok: false, text: e instanceof Error ? e.message : String(e) }))}>
+                ☁️ Connectar Google Drive
+              </button>
+            )}
+          </div>
+        )}
+        {driveMsg && <p className={`msg ${driveMsg.ok ? "ok" : "error"}`} role="status">{driveMsg.text}</p>}
 
         {job && (
           <div className="clip-progress" role="status">
