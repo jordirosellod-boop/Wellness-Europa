@@ -54,16 +54,26 @@ export async function GET(req: Request) {
     const page = await resolve(link.trim());
     const slug = page.pathname.match(/\/matches\/([^/]+)/)![1];
     const api = `https://app.veo.co/api/app/matches/${encodeURIComponent(slug)}`;
-    const [mRes, vRes] = await Promise.all([
-      fetch(`${api}/`, { headers: { "User-Agent": UA, Accept: "application/json" }, cache: "no-store" }),
-      fetch(`${api}/videos/`, { headers: { "User-Agent": UA, Accept: "application/json" }, cache: "no-store" }),
-    ]);
-    if (mRes.status === 401 || mRes.status === 403 || vRes.status === 401 || vRes.status === 403) {
+    const get = (path: string) => fetch(`${api}/${path}`, { headers: { "User-Agent": UA, Accept: "application/json" }, cache: "no-store" });
+    let [mRes, vRes] = await Promise.all([get(""), get("videos/")]);
+    // Si Veo diu que no a la primera (pot ser un error puntual), es torna a provar un cop
+    if (mRes.status >= 400 || vRes.status >= 400) {
+      await new Promise((r) => setTimeout(r, 800));
+      [mRes, vRes] = await Promise.all([get(""), get("videos/")]);
+    }
+    const match = mRes.ok ? ((await mRes.json().catch(() => ({}))) as Record<string, unknown>) : {};
+    const privacy = typeof match.privacy === "string" ? match.privacy : null;
+    if (privacy && privacy !== "public") {
       return Response.json({ error: "Aquest partit de Veo no és públic. A Veo, posa'l com a «Públic» (Compartir) i torna-ho a provar." }, { status: 403 });
     }
-    if (!vRes.ok) return Response.json({ error: "Veo no ha trobat aquest partit (o l'enllaç ha caducat)." }, { status: 404 });
-    const match = mRes.ok ? ((await mRes.json()) as Record<string, unknown>) : {};
-    const videos = findVideos(await vRes.json());
+    if (mRes.status === 404 || vRes.status === 404) return Response.json({ error: "Veo no ha trobat aquest partit (o l'enllaç ha caducat)." }, { status: 404 });
+    // Vídeos: de la llista de vídeos o, si no es pot llegir, de la mateixa fitxa del partit
+    const videos = findVideos(vRes.ok ? await vRes.json().catch(() => []) : []);
+    if (!videos.length) findVideos(match, videos);
+    if (!videos.length && (!mRes.ok || !vRes.ok)) {
+      console.error("veo", slug, mRes.status, vRes.status);
+      return Response.json({ error: `Veo no ens deixa llegir aquest partit ara mateix (resposta ${mRes.status}/${vRes.status}). Torna-ho a provar d'aquí a una estona.` }, { status: 502 });
+    }
     // La millor: la retransmissió (no la panoràmica), i de més resolució
     const best = videos.sort((a, b) => Number(a.pano) - Number(b.pano) || b.w - a.w)[0];
     if (!best) return Response.json({ error: "Aquest partit de Veo encara no té el vídeo disponible." }, { status: 404 });
