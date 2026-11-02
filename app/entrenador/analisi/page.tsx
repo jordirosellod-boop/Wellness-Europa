@@ -404,7 +404,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
 
   /** Enllaç de YouTube o de Veo. */
   async function openLink() {
-    const link = ytUrl.trim();
+    const link = ytUrl.replace(/\s+/g, ""); // en copiar del mòbil de vegades s'hi colen espais o salts de línia
     if (/veo\.(co|com)\/|veocdn\.com\//i.test(link)) {
       setVeoBusy(true);
       setMsg(null);
