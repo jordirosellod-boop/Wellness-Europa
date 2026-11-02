@@ -14,7 +14,7 @@ import { matchInsights } from "@/lib/analysis-insights";
 import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
 import { VideoPlayer, type VideoHandle } from "@/components/video-player";
 import {
-  ABUTTON_COLS, AEVENT_COLS, AMATCH_COLS, DEFAULT_BUTTONS, fetchAEvents, fetchAMatches, fetchButtons, fmtClock, fromVideo, halfOf,
+  ABUTTON_COLS, AEVENT_COLS, AMATCH_COLS, DEFAULT_BUTTONS, HIGHLIGHT_BUTTON, fetchAEvents, fetchAMatches, fetchButtons, fmtClock, fromVideo, halfOf,
   minuteOf, toVideo, youtubeId, type AButton, type AEvent, type AMatch,
 } from "@/lib/analysis";
 import { fetchConvocations, fetchRoster } from "@/lib/convo";
@@ -262,8 +262,15 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
       const [ev, bt, pl] = await Promise.all([fetchAEvents(id), fetchButtons(), fetchPlayers(mm.convocation_id)]);
       setEvents(ev);
       setPlayers(pl);
-      if (bt.length) setButtons(bt);
-      else {
+      if (bt.length) {
+        // Panells d'abans: s'hi afegeix el botó «A destacar» (un sol cop; si després l'esborres, no torna)
+        let added = false;
+        try { added = localStorage.getItem("boto-destacar") === "1"; localStorage.setItem("boto-destacar", "1"); } catch { /* sense emmagatzematge */ }
+        if (!added && !bt.some((b) => /destac/i.test(b.label))) {
+          const { data: hb } = await sb.from("analysis_buttons").insert({ ...HIGHLIGHT_BUTTON, sort: Math.max(...bt.map((b) => b.sort)) + 1 }).select(ABUTTON_COLS).maybeSingle();
+          setButtons(hb ? [...bt, hb as AButton] : bt);
+        } else setButtons(bt);
+      } else {
         // Primer cop: es crea el panell de botons per defecte.
         const { data: ins, error: be } = await sb.from("analysis_buttons").insert(DEFAULT_BUTTONS).select(ABUTTON_COLS);
         if (be) setError(be.message);

@@ -56,6 +56,22 @@ export type AButton = {
 };
 export const ABUTTON_COLS = "id, label, category, color, pre_s, post_s, ask_player, ask_result, ask_zone, sort";
 
+/** Botó per marcar jugades que val la pena ensenyar (surten al vídeo just abans dels gols). */
+export const HIGHLIGHT_BUTTON = { label: "A destacar", category: "Altres", color: "#c9a227", pre_s: 6, post_s: 6, ask_player: true, ask_result: false, ask_zone: false };
+
+/** Ordre dels apartats al vídeo de talls: sortida, pressió, transicions, a destacar i, per acabar, els gols.
+ *  La resta d'accions van després, en l'ordre dels botons. */
+export function videoRank(label: string): number {
+  const k = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (k.includes("sortida")) return 0;
+  if (k.includes("pressi")) return 1;
+  if (k.includes("transici") && k.includes("defens")) return 2;
+  if (k.includes("transici") && k.includes("ofens")) return 3;
+  if (k.includes("destac")) return 4;
+  if (/^gols?\b/.test(k)) return 5;
+  return 6;
+}
+
 /** Panell inicial (es pot canviar tot). */
 export const DEFAULT_BUTTONS: Omit<AButton, "id">[] = [
   { label: "Gol", category: "Finalització", color: "#1e7d3a", pre_s: 12, post_s: 6, ask_player: true, ask_result: false, ask_zone: true },
@@ -74,6 +90,7 @@ export const DEFAULT_BUTTONS: Omit<AButton, "id">[] = [
   { label: "Falta", category: "ABP", color: "#ad1457", pre_s: 5, post_s: 5, ask_player: true, ask_result: false, ask_zone: true },
   { label: "Fora de joc", category: "Altres", color: "#757575", pre_s: 6, post_s: 3, ask_player: true, ask_result: false, ask_zone: false },
   { label: "Targeta", category: "Altres", color: "#fbc02d", pre_s: 8, post_s: 4, ask_player: true, ask_result: false, ask_zone: false },
+  HIGHLIGHT_BUTTON,
 ].map((b, i) => ({ ...b, sort: i }));
 
 /** Rellotge (segons) → posició al vídeo, tenint en compte el desfasament de cada part. */
