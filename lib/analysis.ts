@@ -164,3 +164,19 @@ export function prettyTeam(name: string): string {
 export function teamLabels(m: Pick<AMatch, "kind" | "rival">): { us: string; rival: string } {
   return m.kind === "rival" ? { us: m.rival || "Rival", rival: "Contrari" } : { us: "CE Europa", rival: m.rival || "Rival" };
 }
+
+/** Apartats del vídeo de talls (mateix ordre que «Descarregar talls»): accions agrupades i ordenades, i dins de cada una per temps. */
+export function videoSections(events: AEvent[], buttons: AButton[], team: "us" | "rival" | "all"): { title: string; color: string; events: AEvent[] }[] {
+  const order = new Map(buttons.map((b) => [b.label, b.sort]));
+  const color = new Map(buttons.map((b) => [b.label, b.color]));
+  const HL = buttons.find((b) => videoRank(b.label) === 4)?.label ?? HIGHLIGHT_BUTTON.label;
+  const group = (a: string) => (videoRank(a) >= 4 && videoRank(a) !== 5 ? HL : a);
+  const list = events.filter((e) => team === "all" || e.team === team);
+  const keys = [...new Set(list.map((e) => group(e.action)))].sort(
+    (a, b) => videoRank(a) - videoRank(b) || (order.get(a) ?? 999) - (order.get(b) ?? 999) || a.localeCompare(b, "ca"),
+  );
+  return keys.map((k) => {
+    const evs = list.filter((e) => group(e.action) === k).sort((x, y) => x.t - y.t);
+    return { title: k, color: color.get(k) ?? (k === HL ? HIGHLIGHT_BUTTON.color : evs[0]?.color) ?? "#0a2ea0", events: evs };
+  });
+}

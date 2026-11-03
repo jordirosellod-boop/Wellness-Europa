@@ -16,6 +16,8 @@ import { VideoPlayer, type VideoHandle } from "@/components/video-player";
 import {
   ABUTTON_COLS, AEVENT_COLS, AMATCH_COLS, DEFAULT_BUTTONS, HIGHLIGHT_BUTTON, fetchAEvents, fetchAMatches, fetchButtons, fmtClock, fromVideo, halfOf,
   minuteOf, toVideo, youtubeId, type AButton, type AEvent, type AMatch,
+  videoSections,
+  teamLabels,
 } from "@/lib/analysis";
 import { fetchConvocations, fetchRoster } from "@/lib/convo";
 import { addDays } from "@/lib/dates";
@@ -257,6 +259,10 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [frozen, setFrozen] = useState<Shape[] | null>(null);
   const [drawEdit, setDrawEdit] = useState<AEvent | null>(null);
   const watch = useRef<{ ev: AEvent; shown: boolean } | null>(null);
+  // Mode gravació: el vídeo a pantalla completa reprodueix sol els talls (amb títols), per gravar la pantalla
+  type RecItem = { kind: "card"; title: string; sub: string; color: string } | { kind: "clip"; ev: AEvent; label: string; who: string; color: string };
+  const recPlan = useRef<{ items: RecItem[]; i: number; timer: ReturnType<typeof setTimeout> | null } | null>(null);
+  const [rec, setRec] = useState<{ phase: "ready" | "run" | "end"; item: RecItem | null; n: number; i: number; team: "us" | "rival" | "all" } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -321,6 +327,11 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
         player.current?.play();
       }, 4000);
     }
+    const rp = recPlan.current;
+    if (rp && match) {
+      const it = rp.items[rp.i];
+      if (it?.kind === "clip" && !rp.timer && t >= toVideo(match, it.ev.t) + Number(it.ev.post_s)) recStep(rp.i + 1);
+    }
     const q = queue.current;
     if (q && match) {
       const e = q.list[q.i];
@@ -345,6 +356,63 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     setFrozen(null);
     player.current?.seek(toVideo(match, e.t) - e.pre_s);
     player.current?.play();
+  }
+
+  function recBuild(teamSel: "us" | "rival" | "all"): RecItem[] {
+    if (!match) return [];
+    const secs = videoSections(events, buttons, teamSel);
+    const n = secs.reduce((a, s) => a + s.events.length, 0);
+    const items: RecItem[] = [{ kind: "card", title: match.title, sub: `${fmtDate(match.match_date)} · ${n} ${n === 1 ? "tall" : "talls"}`, color: "#0a2ea0" }];
+    for (const s of secs) {
+      items.push({ kind: "card", title: s.title, sub: `${s.events.length} ${s.events.length === 1 ? "tall" : "talls"}`, color: s.color });
+      for (const e of s.events) {
+        items.push({ kind: "clip", ev: e, color: s.color, label: `${e.action} · ${minuteOf(match, e.t)}`, who: [e.player_id ? name(e.player_id) : "", e.result === "ok" ? "✓" : e.result === "ko" ? "✗" : ""].filter(Boolean).join(" · ") });
+      }
+    }
+    return items;
+  }
+  function recOpen() {
+    queue.current = null;
+    setPlaying(null);
+    player.current?.pause();
+    setRec({ phase: "ready", item: null, n: 0, i: 0, team: team === "rival" ? "rival" : "us" });
+    document.documentElement.classList.add("rec-on");
+  }
+  function recClose() {
+    if (recPlan.current?.timer) clearTimeout(recPlan.current.timer);
+    recPlan.current = null;
+    player.current?.pause();
+    setRec(null);
+    document.documentElement.classList.remove("rec-on");
+  }
+  function recStart(teamSel: "us" | "rival" | "all") {
+    const items = recBuild(teamSel);
+    if (items.length < 2) return;
+    recPlan.current = { items, i: 0, timer: null };
+    player.current?.play(); // el primer «play» ha de venir d'un toc (iPad)
+    player.current?.pause();
+    recStep(0);
+  }
+  function recStep(i: number) {
+    const rp = recPlan.current;
+    if (!rp || !match) return;
+    if (rp.timer) { clearTimeout(rp.timer); rp.timer = null; }
+    if (i >= rp.items.length) {
+      player.current?.pause();
+      recPlan.current = null;
+      setRec((r) => r && { ...r, phase: "end", item: null });
+      return;
+    }
+    rp.i = i;
+    const it = rp.items[i];
+    setRec((r) => r && { ...r, phase: "run", item: it, i, n: rp.items.length });
+    if (it.kind === "card") {
+      player.current?.pause();
+      rp.timer = setTimeout(() => { if (recPlan.current === rp) { rp.timer = null; recStep(i + 1); } }, i === 0 ? 3200 : 2400);
+    } else {
+      player.current?.seek(Math.max(0, toVideo(match, it.ev.t) - Number(it.ev.pre_s)));
+      player.current?.play();
+    }
   }
 
   /** Desa canvis del partit; només actualitza la pantalla si el servidor ho confirma. */
@@ -535,8 +603,9 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                 </div>
               ) : (
                 <>
-                  <div className="an-stage">
+                  <div className={`an-stage${rec ? " rec" : ""}`}>
                     <VideoPlayer ref={player} kind={src.kind} src={src.url} onTick={onTick} />
+                    {rec && <RecOverlay rec={rec} title={match.title} onStart={recStart} onTeam={(t) => setRec((r) => r && { ...r, team: t })} onClose={recClose} labels={teamLabels(match)} />}
                     {frozen && !drawEdit && <DrawingOverlay shapes={frozen} />}
                     {drawEdit && (
                       <DrawingEditor
@@ -657,7 +726,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
           )}
 
           {tab === "clips" && (
-            <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")} />
+            <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")}
+              onRecord={src && mode === "video" ? recOpen : undefined} />
           )}
 
           {tab === "stats" && (
@@ -887,5 +957,57 @@ function Insights({ match, events, name }: { match: AMatch; events: AEvent[]; na
         {list.map((i, k) => <li key={k} className={i.tone}>{i.text}</li>)}
       </ul>
     </section>
+  );
+}
+
+/** Pantalla del mode gravació: instruccions, títols dels apartats, rètol de cada tall i final. */
+function RecOverlay({ rec, title, onStart, onTeam, onClose, labels }: {
+  rec: { phase: "ready" | "run" | "end"; item: { kind: "card"; title: string; sub: string; color: string } | { kind: "clip"; label: string; who: string; color: string } | null; n: number; i: number; team: "us" | "rival" | "all" };
+  title: string; onStart: (t: "us" | "rival" | "all") => void; onTeam: (t: "us" | "rival" | "all") => void; onClose: () => void; labels: { us: string; rival: string };
+}) {
+  const it = rec.item;
+  return (
+    <div className="rec-layer">
+      {rec.phase === "ready" && (
+        <div className="rec-card rec-ready">
+          <span className="rec-k">🎬 Mode gravació</span>
+          <h2>{title}</h2>
+          <ol>
+            <li>Comença a gravar la pantalla: obre el <b>Centre de control</b> (llisca des de dalt a la dreta) i toca <b>⏺</b>.</li>
+            <li>Torna aquí i toca <b>«Començar»</b>. Els talls es reproduiran sols, amb els títols de cada apartat.</li>
+            <li>Quan surti «Fi», atura la gravació. El vídeo queda a <b>Fotos</b>.</li>
+          </ol>
+          <div className="seg-toggle" role="group" aria-label="Equip">
+            {(["us", "rival", "all"] as const).map((t) => (
+              <button key={t} type="button" aria-pressed={rec.team === t} onClick={() => onTeam(t)}>{t === "us" ? labels.us : t === "rival" ? labels.rival : "Tots"}</button>
+            ))}
+          </div>
+          <button className="btn" onClick={() => onStart(rec.team)}>▶ Començar</button>
+        </div>
+      )}
+      {rec.phase === "run" && it?.kind === "card" && (
+        <div className="rec-card rec-title" style={{ "--c": it.color } as CSSProperties}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/escut.png" alt="" width={70} height={70} />
+          <h2>{it.title}</h2>
+          <span>{it.sub}</span>
+        </div>
+      )}
+      {rec.phase === "run" && it?.kind === "clip" && (
+        <div className="rec-tag" style={{ "--c": it.color } as CSSProperties}>
+          <b>{it.label}</b>{it.who && <span>{it.who}</span>}
+        </div>
+      )}
+      {rec.phase === "end" && (
+        <div className="rec-card rec-title">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/escut.png" alt="" width={70} height={70} />
+          <h2>Fi</h2>
+          <span>Ja pots aturar la gravació de pantalla 💙</span>
+        </div>
+      )}
+      <button type="button" className="rec-x" onClick={onClose} aria-label="Sortir del mode gravació">✕</button>
+      {rec.phase === "run" && <i className="rec-progress" style={{ width: `${((rec.i + 1) / Math.max(1, rec.n)) * 100}%` }} />}
+    </div>
   );
 }

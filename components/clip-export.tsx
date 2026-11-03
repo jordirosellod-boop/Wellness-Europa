@@ -67,8 +67,8 @@ function useRivalCard(match: AMatch, crest: string | null): { card: RivalCard | 
 }
 
 /** Descarregar els talls del vídeo: un per un, per apartats (accions) o tots junts. */
-export function ClipExport({ match, events, buttons, file, playerName }: {
-  match: AMatch; events: AEvent[]; buttons: AButton[]; file: File | string | null; playerName: (id: string | null) => string;
+export function ClipExport({ match, events, buttons, file, playerName, onRecord }: {
+  match: AMatch; events: AEvent[]; buttons: AButton[]; file: File | string | null; playerName: (id: string | null) => string; onRecord?: () => void;
 }) {
   const L = teamLabels(match);
   const [team, setTeam] = useState<TeamFilter>("us");
@@ -253,7 +253,8 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
     return (
       <><section className="card">
         <h3 className="esc" style={{ marginTop: 0 }}>Talls</h3>
-        <p className="muted">Els vídeos de YouTube no es poden retallar ni descarregar. Per fer talls, carrega el fitxer del partit (MP4 del Veo o del mòbil).</p>
+        <p className="muted">Els vídeos de YouTube no es poden descarregar, però sí gravar: amb el <b>mode gravació</b> el vídeo es posa a pantalla completa i reprodueix sol tots els talls en ordre (sortida, pressió, transicions, a destacar i gols), amb un títol a cada apartat. Tu només has de gravar la pantalla de l&apos;iPad.</p>
+        {onRecord && <button className="btn block" onClick={onRecord}>🎬 Mode gravació</button>}
       </section>
       {savedList}</>
     );
@@ -294,6 +295,11 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
           onClick={() => run("Tots junts", `Talls · ${base}`, sections, { intro: true, cards })}>
           ⬇ Tots junts, ordenats per accions ({all} talls · {mmss(totalSeconds(sections, { ...opts, intro: { title: "", sub: "" } }))})
         </button>
+        {onRecord && (
+          <button className="btn small secondary" style={{ marginTop: 6, marginRight: 6 }} disabled={busy} onClick={onRecord}>
+            🎬 Mode gravació (pantalla completa, per gravar o projectar al vestidor)
+          </button>
+        )}
         {rival && (
           <button className="btn small secondary" style={{ marginTop: 6 }} disabled={busy}
             onClick={() => run("Fitxa del rival", `Fitxa rival · ${base}`, [], { intro: true, cards: false, introSub: `${fmtDate(match.match_date)} · Fitxa del rival` })}>

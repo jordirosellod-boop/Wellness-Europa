@@ -2950,3 +2950,32 @@ svg.tick path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-line
 .rr-orig-add input { min-height: 44px; border-radius: 10px; border: 2px solid var(--vora); padding: 6px 10px; font: inherit; min-width: 0; }
 .rr-orig-refs { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; font-size: .85rem; }
 .rr-orig-refs li { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f3f5fa; border-radius: 8px; padding: 2px 4px 2px 10px; }
+
+/* ---------- Mode gravació (per gravar la pantalla: el vídeo a pantalla completa amb títols) ---------- */
+html.rec-on, html.rec-on body { overflow: hidden; }
+html.rec-on .splash { display: none !important; }
+html.rec-on .card, html.rec-on section, html.rec-on main, html.rec-on .an-stage, html.rec-on .an-video { animation: none !important; transform: none !important; filter: none !important; backdrop-filter: none !important; }
+html.rec-on .topbar, html.rec-on .bottom-nav, html.rec-on .undo-toast { visibility: hidden; }
+.an-stage.rec { position: fixed !important; inset: 0; z-index: 2000; background: #000; display: grid; place-items: center; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.an-stage.rec .an-video { width: min(100vw, calc(100vh * 16 / 9)); max-height: 100vh; border-radius: 0; }
+.an-stage.rec .an-video.yt .yt-box, .an-stage.rec .an-video.yt iframe { border-radius: 0; }
+.rec-layer { position: absolute; inset: 0; pointer-events: none; }
+.rec-layer button, .rec-ready { pointer-events: auto; }
+.rec-card { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; text-align: center; color: #fff; padding: 24px; }
+.rec-title { background: radial-gradient(70% 70% at 50% 40%, color-mix(in srgb, var(--c, #0a2ea0) 55%, #061847), #030c2e); }
+.rec-title h2 { margin: 0; font-family: var(--font-escapulada), var(--display); text-transform: uppercase; font-size: clamp(2.4rem, 8vw, 5.5rem); line-height: .95; color: #fff; text-shadow: 0 6px 24px rgba(0,0,0,.4); }
+.rec-title span { font-family: var(--display); letter-spacing: 1px; text-transform: uppercase; color: var(--or); font-size: clamp(1rem, 2.4vw, 1.5rem); }
+.rec-title img { filter: drop-shadow(0 6px 14px rgba(0,0,0,.5)); }
+.rec-ready { background: rgba(3, 12, 46, .94); }
+.rec-ready h2 { margin: 0; font-family: var(--font-escapulada), var(--display); text-transform: uppercase; font-size: clamp(1.8rem, 5vw, 3rem); color: #fff; }
+.rec-ready ol { text-align: left; max-width: 560px; display: grid; gap: 8px; margin: 4px 0 8px; line-height: 1.35; }
+.rec-ready .btn { min-width: 220px; font-size: 1.1rem; }
+.rec-k { color: var(--or); font-family: var(--display); letter-spacing: 1.2px; text-transform: uppercase; }
+.rec-tag { position: absolute; left: 24px; bottom: 28px; display: grid; gap: 2px; padding: 10px 16px 10px 14px; border-radius: 12px; color: #fff; background: rgba(3, 12, 46, .82); border-left: 6px solid var(--c, var(--or)); }
+.rec-tag b { font-family: var(--font-escapulada), var(--display); text-transform: uppercase; font-size: clamp(1.1rem, 2.6vw, 1.7rem); line-height: 1; }
+.rec-tag span { font-size: clamp(.85rem, 1.8vw, 1.05rem); opacity: .9; }
+.rec-x { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 12px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.14); color: #fff; font-size: 1.1rem; cursor: pointer; opacity: .55; }
+.rec-progress { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--or); transition: width .4s linear; }
+/* En mode gravació només es veu el vídeo (la resta de la pàgina queda amagada a sota) */
+html.rec-on body * { visibility: hidden; }
+html.rec-on .an-stage.rec, html.rec-on .an-stage.rec * { visibility: visible; }
