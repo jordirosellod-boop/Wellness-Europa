@@ -2979,3 +2979,6 @@ html.rec-on .topbar, html.rec-on .bottom-nav, html.rec-on .undo-toast { visibili
 /* En mode gravació només es veu el vídeo (la resta de la pàgina queda amagada a sota) */
 html.rec-on body * { visibility: hidden; }
 html.rec-on .an-stage.rec, html.rec-on .an-stage.rec * { visibility: visible; }
+.rec-lead { max-width: 560px; line-height: 1.4; margin: 4px 0 8px; }
+.rec-note { color: var(--or); font-weight: 700; margin: 4px 0 0; }
+.rec-ready .btn.secondary { background: transparent; color: #fff; border-color: rgba(255,255,255,.5); }

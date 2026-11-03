@@ -3,7 +3,7 @@
 // El vídeo s'hi va escrivint a trossos mentre es fa: així no cal tenir-lo sencer a la memòria
 // (un vídeo llarg sencer a la memòria fa que l'iPad recarregui la pàgina just al final).
 
-export type SavedVideo = { id: string; match_id: string; name: string; size: number; created: number; parts?: number; blob?: Blob; drive?: string };
+export type SavedVideo = { id: string; match_id: string; name: string; size: number; created: number; parts?: number; blob?: Blob; drive?: string; type?: string };
 type Part = { k: string; vid: string; blob: Blob };
 export type VideoChunk = { type: "write"; data: Uint8Array; position: number };
 
@@ -45,7 +45,7 @@ async function cleanOrphans() {
  * Comença a escriure un vídeo nou al dispositiu. `stream` rep els trossos en ordre (MP4 fragmentat);
  * `finish` el dona per acabat i el posa a la llista; `abort` esborra el que s'hagi escrit.
  */
-export async function createVideoWriter(match_id: string, name: string) {
+export async function createVideoWriter(match_id: string, name: string, type = "video/mp4") {
   navigator.storage?.persist?.().catch(() => {});
   await cleanOrphans().catch(() => {});
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -62,7 +62,7 @@ export async function createVideoWriter(match_id: string, name: string) {
   return {
     stream,
     async finish(): Promise<SavedVideo> {
-      const v: SavedVideo = { id, match_id, name, size, created: Date.now(), parts: i };
+      const v: SavedVideo = { id, match_id, name, size, created: Date.now(), parts: i, type };
       await tx([STORE], "readwrite", (t) => t.objectStore(STORE).put(v));
       return v;
     },
@@ -96,10 +96,10 @@ export const deleteVideo = (id: string) => tx([STORE, PARTS], "readwrite", (t) =
 
 /** El fitxer per desar o compartir (fet dels trossos guardats, sense carregar-lo sencer a la memòria). */
 export async function asFile(v: SavedVideo): Promise<File> {
-  if (v.blob) return new File([v.blob], v.name, { type: "video/mp4" });
+  if (v.blob) return new File([v.blob], v.name, { type: v.type ?? "video/mp4" });
   const parts = await tx<Part[]>([PARTS], "readonly", (t) => t.objectStore(PARTS).getAll(IDBKeyRange.bound(`${v.id}:`, `${v.id}:￿`)));
   parts.sort((a, b) => a.k.localeCompare(b.k));
-  return new File(parts.map((p) => p.blob), v.name, { type: "video/mp4" });
+  return new File(parts.map((p) => p.blob), v.name, { type: v.type ?? "video/mp4" });
 }
 
 /** Que la pantalla no s'apagui mentre es fa el vídeo (si el dispositiu ho permet). Retorna com alliberar-ho. */
@@ -111,3 +111,6 @@ export async function keepAwake(): Promise<() => void> {
     return () => {};
   }
 }
+
+/** Avís a la llista «Vídeos fets» que n'hi ha un de nou (fet fora d'aquesta pantalla, p. ex. amb el mode gravació). */
+export const announceVideo = (id: string) => window.dispatchEvent(new CustomEvent("video-fet", { detail: id }));

@@ -115,6 +115,21 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord 
     }
   }
 
+  // Vídeos fets fora d'aquí (mode gravació): es mostren i, si hi ha Drive, s'hi pugen
+  useEffect(() => {
+    const on = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      listVideos(match.id).then((l) => Promise.all(l.map(withFile))).then((l) => {
+        setSaved(l);
+        const it = l.find((x) => x.v.id === id);
+        if (it && drive?.connected) void toDrive(it.v, it.file);
+      }, () => {});
+    };
+    window.addEventListener("video-fet", on);
+    return () => window.removeEventListener("video-fet", on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match.id, drive?.connected]);
+
   useEffect(() => {
     let alive = true;
     listVideos(match.id).then((l) => Promise.all(l.map(withFile))).then((l) => alive && setSaved(l), () => {});
@@ -231,7 +246,7 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord 
           <ul>
             {saved.map(({ v, file: vf }) => (
               <li key={v.id}>
-                <span><b>{v.name.replace(/\.mp4$/, "")}</b><span className="muted small"> · {mb(v.size)} · {new Date(v.created).toLocaleString("ca-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</span></span>
+                <span><b>{v.name.replace(/\.(mp4|webm)$/, "")}</b><span className="muted small"> · {mb(v.size)} · {new Date(v.created).toLocaleString("ca-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</span></span>
                 {v.drive ? (
                   <a className="btn small secondary" href={v.drive} target="_blank" rel="noreferrer">☁️ Al Drive</a>
                 ) : up[v.id] != null ? (

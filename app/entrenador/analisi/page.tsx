@@ -28,6 +28,8 @@ import { Loading } from "@/components/loading";
 import { Ticked } from "@/components/feel";
 import { deleteWithUndo } from "@/lib/undo";
 import { crowd } from "@/lib/feel";
+import { canRecordTab, startTabRecording } from "@/lib/tab-recorder";
+import { safeName } from "@/lib/share-file";
 
 export default function AnalysisPage() {
   return (
@@ -262,7 +264,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   // Mode gravació: el vídeo a pantalla completa reprodueix sol els talls (amb títols), per gravar la pantalla
   type RecItem = { kind: "card"; title: string; sub: string; color: string } | { kind: "clip"; ev: AEvent; label: string; who: string; color: string };
   const recPlan = useRef<{ items: RecItem[]; i: number; timer: ReturnType<typeof setTimeout> | null } | null>(null);
-  const [rec, setRec] = useState<{ phase: "ready" | "run" | "end"; item: RecItem | null; n: number; i: number; team: "us" | "rival" | "all" } | null>(null);
+  const [rec, setRec] = useState<{ phase: "ready" | "run" | "end"; item: RecItem | null; n: number; i: number; team: "us" | "rival" | "all"; note?: string; auto?: boolean } | null>(null);
+  const recorder = useRef<Awaited<ReturnType<typeof startTabRecording>> | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -379,15 +382,28 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     document.documentElement.classList.add("rec-on");
   }
   function recClose() {
+    if (recorder.current) { void recorder.current.cancel(); recorder.current = null; }
     if (recPlan.current?.timer) clearTimeout(recPlan.current.timer);
     recPlan.current = null;
     player.current?.pause();
     setRec(null);
     document.documentElement.classList.remove("rec-on");
   }
-  function recStart(teamSel: "us" | "rival" | "all") {
+  async function recStart(teamSel: "us" | "rival" | "all", auto = false) {
     const items = recBuild(teamSel);
-    if (items.length < 2) return;
+    if (items.length < 2 || !match) return;
+    if (auto) {
+      // L'app mateixa grava la pestanya (ordinador). El navegador pregunta què es grava: cal triar aquesta pestanya.
+      try {
+        recorder.current = await startTabRecording(match.id, safeName(`Talls - ${match.title} - ${match.match_date}`));
+        recorder.current.onEnded(() => { if (recPlan.current) recClose(); });
+      } catch {
+        setRec((r) => r && { ...r, note: "No s'ha començat a gravar (cal donar permís i triar aquesta pestanya)." });
+        return;
+      }
+      setRec((r) => r && { ...r, auto: true });
+      await new Promise((ok) => setTimeout(ok, 600));
+    }
     recPlan.current = { items, i: 0, timer: null };
     player.current?.play(); // el primer «play» ha de venir d'un toc (iPad)
     player.current?.pause();
@@ -400,7 +416,19 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (i >= rp.items.length) {
       player.current?.pause();
       recPlan.current = null;
-      setRec((r) => r && { ...r, phase: "end", item: null });
+      const r0 = recorder.current;
+      setRec((r) => r && { ...r, phase: "end", item: null, note: r0 ? "Força Europa! 💙" : undefined });
+      if (r0) {
+        recorder.current = null;
+        // deixa veure el «Fi» un moment dins del vídeo i després atura i desa
+        setTimeout(() => {
+          setRec((r) => r && { ...r, note: "Desant el vídeo…" });
+          r0.stop().then(
+            () => setRec((r) => r && { ...r, note: "Fet! El vídeo és a «Vídeos fets» (pestanya Talls)." }),
+            (e) => setRec((r) => r && { ...r, note: `No s'ha pogut desar el vídeo: ${e instanceof Error ? e.message : String(e)}` }),
+          );
+        }, 2200);
+      }
       return;
     }
     rp.i = i;
@@ -605,7 +633,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                 <>
                   <div className={`an-stage${rec ? " rec" : ""}`}>
                     <VideoPlayer ref={player} kind={src.kind} src={src.url} onTick={onTick} />
-                    {rec && <RecOverlay rec={rec} title={match.title} onStart={recStart} onTeam={(t) => setRec((r) => r && { ...r, team: t })} onClose={recClose} labels={teamLabels(match)} />}
+                    {rec && <RecOverlay rec={rec} title={match.title} onStart={(t, auto) => void recStart(t, auto)} onTeam={(t) => setRec((r) => r && { ...r, team: t })} onClose={recClose} labels={teamLabels(match)} />}
                     {frozen && !drawEdit && <DrawingOverlay shapes={frozen} />}
                     {drawEdit && (
                       <DrawingEditor
@@ -962,8 +990,8 @@ function Insights({ match, events, name }: { match: AMatch; events: AEvent[]; na
 
 /** Pantalla del mode gravació: instruccions, títols dels apartats, rètol de cada tall i final. */
 function RecOverlay({ rec, title, onStart, onTeam, onClose, labels }: {
-  rec: { phase: "ready" | "run" | "end"; item: { kind: "card"; title: string; sub: string; color: string } | { kind: "clip"; label: string; who: string; color: string } | null; n: number; i: number; team: "us" | "rival" | "all" };
-  title: string; onStart: (t: "us" | "rival" | "all") => void; onTeam: (t: "us" | "rival" | "all") => void; onClose: () => void; labels: { us: string; rival: string };
+  rec: { phase: "ready" | "run" | "end"; item: { kind: "card"; title: string; sub: string; color: string } | { kind: "clip"; label: string; who: string; color: string } | null; n: number; i: number; team: "us" | "rival" | "all"; note?: string; auto?: boolean };
+  title: string; onStart: (t: "us" | "rival" | "all", auto?: boolean) => void; onTeam: (t: "us" | "rival" | "all") => void; onClose: () => void; labels: { us: string; rival: string };
 }) {
   const it = rec.item;
   return (
@@ -972,17 +1000,23 @@ function RecOverlay({ rec, title, onStart, onTeam, onClose, labels }: {
         <div className="rec-card rec-ready">
           <span className="rec-k">🎬 Mode gravació</span>
           <h2>{title}</h2>
-          <ol>
-            <li>Comença a gravar la pantalla: obre el <b>Centre de control</b> (llisca des de dalt a la dreta) i toca <b>⏺</b>.</li>
-            <li>Torna aquí i toca <b>«Començar»</b>. Els talls es reproduiran sols, amb els títols de cada apartat.</li>
-            <li>Quan surti «Fi», atura la gravació. El vídeo queda a <b>Fotos</b>.</li>
-          </ol>
+          {canRecordTab() ? (
+            <p className="rec-lead">L&apos;app gravarà ella mateixa els talls amb els títols i desarà el vídeo a «Vídeos fets». El navegador et preguntarà què vols compartir: tria <b>aquesta pestanya</b> (i marca «compartir l&apos;àudio»).</p>
+          ) : (
+            <ol>
+              <li>Comença a gravar la pantalla: obre el <b>Centre de control</b> (llisca des de dalt a la dreta) i toca <b>⏺</b>. (A l&apos;iPad, Apple no deixa que cap web es gravi sola.)</li>
+              <li>Torna aquí i toca <b>«Començar»</b>. Els talls es reproduiran sols, amb els títols de cada apartat.</li>
+              <li>Quan surti «Fi», atura la gravació. El vídeo queda a <b>Fotos</b>.</li>
+            </ol>
+          )}
           <div className="seg-toggle" role="group" aria-label="Equip">
             {(["us", "rival", "all"] as const).map((t) => (
               <button key={t} type="button" aria-pressed={rec.team === t} onClick={() => onTeam(t)}>{t === "us" ? labels.us : t === "rival" ? labels.rival : "Tots"}</button>
             ))}
           </div>
-          <button className="btn" onClick={() => onStart(rec.team)}>▶ Començar</button>
+          {canRecordTab() && <button className="btn" onClick={() => onStart(rec.team, true)}>⏺ Gravar i fer el vídeo</button>}
+          <button className={`btn${canRecordTab() ? " secondary" : ""}`} onClick={() => onStart(rec.team)}>▶ Començar{canRecordTab() ? " sense gravar" : ""}</button>
+          {rec.note && <p className="rec-note">{rec.note}</p>}
         </div>
       )}
       {rec.phase === "run" && it?.kind === "card" && (
@@ -1003,10 +1037,10 @@ function RecOverlay({ rec, title, onStart, onTeam, onClose, labels }: {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/escut.png" alt="" width={70} height={70} />
           <h2>Fi</h2>
-          <span>Ja pots aturar la gravació de pantalla 💙</span>
+          <span>{rec.note ?? "Ja pots aturar la gravació de pantalla 💙"}</span>
         </div>
       )}
-      <button type="button" className="rec-x" onClick={onClose} aria-label="Sortir del mode gravació">✕</button>
+      {!(rec.auto && rec.phase === "run") && <button type="button" className="rec-x" onClick={onClose} aria-label="Sortir del mode gravació">✕</button>}
       {rec.phase === "run" && <i className="rec-progress" style={{ width: `${((rec.i + 1) / Math.max(1, rec.n)) * 100}%` }} />}
     </div>
   );
