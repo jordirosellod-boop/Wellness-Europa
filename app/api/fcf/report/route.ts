@@ -13,7 +13,11 @@ export async function GET(req: Request) {
   const { data: me } = await db.from("profiles").select("role").eq("id", u.user.id).maybeSingle();
   if (me?.role !== "coach") return Response.json({ error: "Només el staff." }, { status: 403 });
   try {
-    return Response.json(await leagueRaw(db, 14));
+    const [raw, refs] = await Promise.all([
+      leagueRaw(db, 14),
+      db.from("rival_ref_actas").select("id, rival_key, acta_id, team, label, data").order("created_at").range(0, 999),
+    ]);
+    return Response.json({ ...raw, refs: refs.data ?? [] });
   } catch (e) {
     return Response.json({ error: `No s'ha pogut llegir la FCF: ${e instanceof Error ? e.message : e}` }, { status: 502 });
   }

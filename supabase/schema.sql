@@ -417,6 +417,20 @@ create table if not exists public.calendar_tokens (
   created_at timestamptz not null default now()
 );
 
+-- ACTES DE REFERÈNCIA DEL RIVAL: actes de temporades passades que enganxa el staff (de la FCF, públiques),
+-- per saber quines jugadores del rival ja hi eren l'any passat. Només el servidor hi accedeix.
+create table if not exists public.rival_ref_actas (
+  id         uuid primary key default gen_random_uuid(),
+  rival_key  text not null check (char_length(rival_key) between 1 and 120),
+  acta_id    text not null check (acta_id ~ '^[0-9]{1,12}$'),
+  team       text not null check (char_length(team) between 1 and 120),
+  label      text check (label is null or char_length(label) <= 60),
+  data       jsonb not null check (jsonb_typeof(data) = 'object' and octet_length(data::text) < 200000),
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (rival_key, acta_id)
+);
+
 -- GOOGLE DRIVE: el permís perquè els vídeos de talls es pugin sols al Drive del staff que l'ha connectat.
 -- Només el fa servir el servidor (ningú el pot llegir des de l'app). Només dona accés als fitxers que crea l'app.
 create table if not exists public.google_drive_links (
@@ -1672,6 +1686,7 @@ alter table public.task_library       enable row level security;
 alter table public.player_photos      enable row level security;
 alter table public.calendar_tokens    enable row level security;
 alter table public.google_drive_links enable row level security;
+alter table public.rival_ref_actas    enable row level security;
 alter table public.oauth_states       enable row level security;
 alter table public.match_minutes      enable row level security;
 alter table public.training_plans     enable row level security;
@@ -1699,7 +1714,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
-  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.calendar_tokens, public.google_drive_links, public.oauth_states, public.match_minutes, public.training_plans,
+  public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.calendar_tokens, public.google_drive_links, public.oauth_states, public.rival_ref_actas, public.match_minutes, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
   public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
@@ -1731,7 +1746,7 @@ grant all on public.task_library to service_role;
 grant select, insert, update, delete on public.task_library to authenticated;
 grant all on public.player_photos to service_role;
 grant select, insert, update, delete on public.player_photos to authenticated;
-grant all on public.google_drive_links, public.oauth_states to service_role; -- només el servidor
+grant all on public.google_drive_links, public.oauth_states, public.rival_ref_actas to service_role; -- només el servidor
 grant all on public.calendar_tokens to service_role; -- les persones no hi accedeixen directament (només amb my_calendar_token)
 grant all on public.match_minutes to service_role;
 grant select, insert, update, delete on public.match_minutes to authenticated;

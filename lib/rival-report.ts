@@ -173,3 +173,54 @@ export function buildReport(L: League, raw: BigRaw, teamId: string): RivalReport
     periodsFor: T.forBy, periodsAgainst: T.againstBy, summary, strengths, weaknesses, keys, watch,
   };
 }
+
+// ---------- Procedència: comparació amb actes de temporades passades (enganxades pel staff) ----------
+
+export type RefActa = { id: string; rival_key: string; acta_id: string; team: string; label: string | null; data: { players: { id: string; name: string; dorsal: string; titular: boolean; gk: boolean }[] } };
+export type Origins = {
+  refs: RefActa[];
+  teams: { team: string; label: string; n: number }[]; // equips de l'any passat i quantes d'aquest any hi eren
+  stayed: { p: RPlayer; where: string[] }[];
+  fresh: RPlayer[];
+  left: { name: string; where: string }[];
+};
+
+export function origins(r: RivalReport, all: RefActa[]): Origins | null {
+  const key = rivalKey(r.team.full);
+  const refs = all.filter((x) => x.rival_key === key);
+  if (!refs.length) return null;
+  const tag = (x: RefActa) => x.label || prettyTeamName(x.team);
+  // Jugadores de l'any passat: per número de fitxa i, per si de cas, pel nom
+  const past = new Map<string, { name: string; where: Set<string> }>();
+  for (const x of refs) for (const p of x.data.players ?? []) {
+    const e = past.get(p.id) ?? { name: p.name, where: new Set<string>() };
+    e.where.add(tag(x));
+    past.set(p.id, e);
+  }
+  const nameKey = (pretty: string) => normalize(pretty);
+  const prettyKeys = new Map([...past.entries()].map(([id, e]) => [nameKey(prettyFromFull(e.name)), id]));
+  const stayed: Origins["stayed"] = [], fresh: RPlayer[] = [];
+  const used = new Set<string>();
+  for (const p of r.players) {
+    const id = past.has(p.id) ? p.id : prettyKeys.get(nameKey(p.name));
+    if (id) { used.add(id); stayed.push({ p, where: [...past.get(id)!.where] }); } else fresh.push(p);
+  }
+  const left = [...past.entries()].filter(([id]) => !used.has(id)).map(([, e]) => ({ name: prettyFromFull(e.name), where: [...e.where].join(", ") }));
+  const counts = new Map<string, number>();
+  for (const s of stayed) for (const w of s.where) counts.set(w, (counts.get(w) ?? 0) + 1);
+  const teams = [...new Set(refs.map(tag))].map((t) => ({ team: t, label: t, n: counts.get(t) ?? 0 }));
+  return { refs, teams, stayed, fresh, left };
+}
+
+/** «PREMIA DALT, C.D. A» → «Premià Dalt A» (aprox.). */
+function prettyTeamName(s: string) {
+  const letter = s.trim().match(/\s([A-Z])$/)?.[1];
+  const base = s.split(",")[0].toLowerCase().replace(/(^|\s)(\p{L})/gu, (_m, a: string, b: string) => a + b.toUpperCase());
+  return letter ? `${base} ${letter}` : base;
+}
+/** «COGNOM1 COGNOM2, NOM» → «Nom Cognom1» (com a les estadístiques). */
+function prettyFromFull(full: string) {
+  const [sur, given = ""] = full.split(",").map((x) => x.trim());
+  const cap = (x: string) => x.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_m, a: string, b: string) => a + b.toUpperCase());
+  return [cap(given.split(/\s+/)[0] ?? ""), cap(sur.split(/\s+/)[0] ?? "")].filter(Boolean).join(" ") || cap(full);
+}

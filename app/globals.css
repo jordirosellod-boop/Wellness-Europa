@@ -2940,3 +2940,13 @@ svg.tick path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-line
 .rr-foot { text-align: center; margin: 4px 0 0; }
 .rr-sheet.pdf-mode { width: 820px; box-shadow: none; border-radius: 0; }
 .rr-sheet.pdf-mode .rr-two { grid-template-columns: 1fr 1fr; }
+.rr-origins h4 { margin: 4px 0 6px; font-size: .9rem; color: var(--blau); }
+.rr-orig-big { font-size: 1rem; margin: 0 0 6px; }
+.rr-orig-big b { color: var(--blau); font-size: 1.15rem; }
+.rr-orig-teams { list-style: none; padding: 0; margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.rr-orig-teams li { background: #eef3ff; border-radius: 999px; padding: 4px 10px; font-size: .85rem; }
+.rr-orig-add { display: grid; grid-template-columns: 2fr 1fr auto; gap: 6px; margin-top: 8px; }
+@media (max-width: 640px) { .rr-orig-add { grid-template-columns: 1fr; } }
+.rr-orig-add input { min-height: 44px; border-radius: 10px; border: 2px solid var(--vora); padding: 6px 10px; font: inherit; min-width: 0; }
+.rr-orig-refs { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; font-size: .85rem; }
+.rr-orig-refs li { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f3f5fa; border-radius: 8px; padding: 2px 4px 2px 10px; }

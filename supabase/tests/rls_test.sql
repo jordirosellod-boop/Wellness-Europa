@@ -862,6 +862,14 @@ select pg_temp.expect_error($$select public.my_calendar_token()$$, 'Anònim tamp
 reset role;
 select pg_temp.check((select count(distinct token) from public.calendar_tokens) = 2, 'Cada persona té un enllaç diferent');
 
+-- =============== ACTES DE REFERÈNCIA DEL RIVAL ===============
+insert into public.rival_ref_actas (rival_key, acta_id, team, data) values ('premia dalt', '3900001', 'PREMIA DALT, C.D. A', '{"players": [], "goals": []}');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.expect_error($$select * from public.rival_ref_actas$$, 'Les actes de referència només les llegeix el servidor');
+reset role;
+select pg_temp.expect_error($$insert into public.rival_ref_actas (rival_key, acta_id, team, data) values ('x', 'abc', 'X', '{}')$$, 'El número d''acta ha de ser un número');
+select pg_temp.expect_error($$insert into public.rival_ref_actas (rival_key, acta_id, team, data) values ('premia dalt', '3900001', 'PREMIA DALT, C.D. A', '{}')$$, 'La mateixa acta no es guarda dos cops per al mateix rival');
+
 -- =============== GOOGLE DRIVE ===============
 insert into public.google_drive_links (profile_id, refresh_token) values ('00000000-0000-0000-0000-00000000000a', '1//secret-refresh-token');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;

@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "@/components/loading";
+import { Ticked } from "@/components/feel";
 import { compute, PERIODS, type BigRaw, type TeamStat } from "@/lib/bigdata";
-import { buildReport, nextRival, type RivalReport, type RPlayer } from "@/lib/rival-report";
+import { buildReport, nextRival, origins, type RefActa, type RivalReport, type RPlayer } from "@/lib/rival-report";
 import { reportPdf } from "@/lib/report-pdf";
 import { deliverFile, safeName } from "@/lib/share-file";
 import { supabase } from "@/lib/supabase";
@@ -13,7 +14,8 @@ const n1 = (x: number) => x.toFixed(1).replace(".", ",");
 
 /** Informe del rival: es fa sol amb les dades públiques de la FCF d'aquesta temporada. */
 export function RivalReportView() {
-  const [raw, setRaw] = useState<BigRaw | null>(null);
+  const [raw, setRaw] = useState<(BigRaw & { refs?: RefActa[] }) | null>(null);
+  const [refs, setRefs] = useState<RefActa[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sel, setSel] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("equip")));
   const [busy, setBusy] = useState(false);
@@ -27,7 +29,7 @@ export function RivalReportView() {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? `Error ${r.status}`);
       return j as BigRaw;
-    })().then((r) => alive && setRaw(r), (e) => alive && setError(e instanceof Error ? e.message : String(e)));
+    })().then((r) => { if (alive) { setRaw(r); setRefs((r as { refs?: RefActa[] }).refs ?? []); } }, (e) => alive && setError(e instanceof Error ? e.message : String(e)));
     return () => { alive = false; };
   }, []);
 
@@ -60,12 +62,14 @@ export function RivalReportView() {
         <button className="btn small" disabled={!rep || busy} onClick={pdf}>{busy ? "Fent el PDF…" : "⬇ PDF"}</button>
       </div>
       {raw.pending > 0 && <p className="muted small no-print">Encara falten {raw.pending} actes per llegir de la FCF: torna a obrir l&apos;informe d&apos;aquí a una estona i serà més complet.</p>}
-      {!rep ? <p className="muted">Tria un equip.</p> : <Sheet r={rep} raw={raw} sheetRef={sheet} />}
+      {!rep ? <p className="muted">Tria un equip.</p> : <Sheet r={rep} raw={raw} sheetRef={sheet} refs={refs} setRefs={setRefs} />}
     </div>
   );
 }
 
-function Sheet({ r, raw, sheetRef }: { r: RivalReport; raw: BigRaw; sheetRef: React.RefObject<HTMLDivElement | null> }) {
+function Sheet({ r, raw, sheetRef, refs, setRefs }: {
+  r: RivalReport; raw: BigRaw; sheetRef: React.RefObject<HTMLDivElement | null>; refs: RefActa[]; setRefs: (f: (l: RefActa[]) => RefActa[]) => void;
+}) {
   const T = r.team, U = r.us;
   return (
     <article className="rr-sheet" ref={sheetRef}>
@@ -131,6 +135,8 @@ function Sheet({ r, raw, sheetRef }: { r: RivalReport; raw: BigRaw; sheetRef: Re
         <Squad list={r.players} />
         <p className="muted small rr-legend">🔥 en ratxa (gols a les 3 últimes jornades) · 🆕 cara nova · ❓ habitual que no va jugar l&apos;últim partit · ⛔ sanció · C capitana</p>
       </section>
+
+      <OriginsBlock r={r} refs={refs} setRefs={setRefs} />
 
       {r.keepers.length > 0 && (
         <section className="rr-block">
@@ -237,5 +243,76 @@ function Squad({ list }: { list: RPlayer[] }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+async function call(method: "POST" | "DELETE", url: string, body?: unknown) {
+  const { data } = await supabase().auth.getSession();
+  const res = await fetch(url, {
+    method, cache: "no-store", body: body ? JSON.stringify(body) : undefined,
+    headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+  return j;
+}
+
+/** Procedència: amb actes de l'any passat que enganxa el staff, quines jugadores ja hi eren i quines són noves. */
+function OriginsBlock({ r, refs, setRefs }: { r: RivalReport; refs: RefActa[]; setRefs: (f: (l: RefActa[]) => RefActa[]) => void }) {
+  const [link, setLink] = useState("");
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const o = origins(r, refs);
+  async function add() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const row = (await call("POST", "/api/fcf/ref-acta", { rival: r.team.full, link, label })) as RefActa;
+      setRefs((l) => [...l.filter((x) => x.id !== row.id), row]);
+      setLink("");
+      setMsg({ ok: true, text: `Acta afegida: ${row.team} (${row.data.players.length} jugadores) ✓` });
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(id: string) {
+    await call("DELETE", `/api/fcf/ref-acta?id=${id}`).catch(() => {});
+    setRefs((l) => l.filter((x) => x.id !== id));
+  }
+  return (
+    <section className="rr-block rr-origins">
+      <h3>Procedència (temporada passada)</h3>
+      {o ? (
+        <>
+          <p className="rr-orig-big">
+            De les <b>{r.players.length}</b> jugadores d&apos;aquest any, <b>{o.stayed.length}</b> ja eren al club l&apos;any passat i <b>{o.fresh.length}</b> són noves
+            {r.players.length ? ` (${Math.round((o.fresh.length / r.players.length) * 100)}% de plantilla nova)` : ""}.
+          </p>
+          <ul className="rr-orig-teams">{o.teams.map((t) => <li key={t.team}><b>{t.n}</b> venen de {t.team}</li>)}</ul>
+          <div className="rr-two">
+            <div><h4>Ja hi eren</h4><ul className="rr-list">{o.stayed.map(({ p, where }) => <li key={p.id}>{p.dorsal ? `${p.dorsal} · ` : ""}{p.name} <span className="muted small">({where.join(", ")})</span></li>)}</ul></div>
+            <div><h4>Noves</h4>{o.fresh.length ? <ul className="rr-list">{o.fresh.map((p) => <li key={p.id}>{p.dorsal ? `${p.dorsal} · ` : ""}{p.name}{p.starts ? <span className="muted small"> ({p.starts} {p.starts === 1 ? "titularitat" : "titularitats"})</span> : null}</li>)}</ul> : <p className="muted small">Cap.</p>}</div>
+          </div>
+          {o.left.length > 0 && <p className="small"><b>Ja no hi són</b> ({o.left.length}): {o.left.map((x) => x.name).join(", ")}.</p>}
+          <p className="muted small">Comparat amb {o.refs.length} {o.refs.length === 1 ? "acta" : "actes"} de l&apos;any passat. Com més actes (del juvenil i del cadet), més exacte.</p>
+        </>
+      ) : (
+        <p className="muted small">Enganxa aquí enllaços d&apos;actes de l&apos;any passat del {r.team.name} (del seu juvenil i, si en té, del cadet) i et diré quines jugadores ja hi eren i quines són noves. Amb 3 o 4 actes de cada equip n&apos;hi ha prou.</p>
+      )}
+      <div className="rr-orig-add no-print">
+        <input type="url" inputMode="url" placeholder="https://www.fcf.cat/ca/competicio/acta/…" value={link} onChange={(e) => setLink(e.target.value)} aria-label="Enllaç de l'acta" />
+        <input type="text" maxLength={60} placeholder="Etiqueta (opcional): Cadet A 25/26" value={label} onChange={(e) => setLabel(e.target.value)} aria-label="Etiqueta" />
+        <button className="btn small" disabled={busy || !link.trim()} onClick={add}>{busy ? "Llegint…" : "Afegir acta"}</button>
+      </div>
+      {msg && <p className={`msg ${msg.ok ? "ok" : "error"} no-print`}><Ticked text={msg.text} /></p>}
+      {o && (
+        <ul className="rr-orig-refs no-print">
+          {o.refs.map((x) => <li key={x.id}><span>{x.label || x.team} · acta {x.acta_id}</span><button type="button" className="an-ic" aria-label="Treure" onClick={() => remove(x.id)}>✕</button></li>)}
+        </ul>
+      )}
+    </section>
   );
 }
