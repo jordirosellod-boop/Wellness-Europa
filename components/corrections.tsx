@@ -5,6 +5,7 @@ import { AEVENT_COLS, AMATCH_COLS, minuteOf, type AEvent, type AMatch } from "@/
 import { fetchAll, supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Ticked } from "@/components/feel";
 
 export const CORR_CATS = ["Atac", "Defensa", "Transicions", "ABP", "Porteria", "Individual", "Equip"] as const;
 export type Correction = {
@@ -154,7 +155,7 @@ export function CorrectionsPanel() {
         </div>
         <button className="btn" onClick={create}>Crear correcció</button>
         <p className="muted small" style={{ margin: 0 }}>També en pots crear des d&apos;una acció del vídeo (botó ✎ → «Afegir a correccions»), i així hi queda el clip.</p>
-        {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}>{msg.text}</p>}
+        {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}><Ticked text={msg.text} /></p>}
       </section>
 
       <div className="row between" style={{ margin: "6px 0" }}>

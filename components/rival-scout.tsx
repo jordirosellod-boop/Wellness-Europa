@@ -9,6 +9,7 @@ import type { GroupMatch, StandingRow } from "@/lib/fcf";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
 import { Empty } from "@/components/empty";
+import { Ticked } from "@/components/feel";
 
 type RivalData = {
   next: (GroupMatch & { is_home: boolean; rival_id: string; rival: string }) | null;
@@ -306,7 +307,7 @@ export function RivalPanel({ onOpen }: { onOpen: (id: string) => void }) {
           <button className="btn secondary" onClick={() => window.print()}>🖨 Desar en PDF / Imprimir</button>
           {dirty && <span className="muted small">Canvis sense desar</span>}
         </div>
-        {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}>{msg.text}</p>}
+        {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}><Ticked text={msg.text} /></p>}
       </section>
 
       {/* Full per imprimir */}

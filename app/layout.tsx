@@ -1,4 +1,5 @@
 import { OfflineBanner, PullToRefresh } from "@/components/app-chrome";
+import { HapticTouches, UndoToast } from "@/components/feel";
 import type { Metadata, Viewport } from "next";
 import { Anton, Poppins } from "next/font/google";
 import "./globals.css";
@@ -62,6 +63,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         <PullToRefresh />
         <OfflineBanner />
+        <HapticTouches />
+        <UndoToast />
       </body>
     </html>
   );

@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Shirt, useDorsals } from "@/components/shirt";
 import type { Convocation, RosterRow } from "@/lib/convo";
 import { fetchAll, supabase } from "@/lib/supabase";
+import { Ticked } from "@/components/feel";
+import { whistle } from "@/lib/feel";
+import { SoundToggle } from "@/components/feel";
 
 // Minuts jugats, apuntats en directe: el rellotge del partit i qui és al camp.
 // Tot es guarda al mòbil mentre dura (si es tanca l'app, continua on era) i a la base de dades a cada canvi.
@@ -92,6 +95,8 @@ export function MinutesLive({ c, roster }: { c: Convocation; roster: RosterRow[]
   const now = clockNow(st);
 
   function setPhase(p: Phase) {
+    if (p === "h1" || p === "h2") whistle();
+    if (p === "ht" || p === "end") whistle(true);
     const s = { ...st!, phase: p };
     const running = p === "h1" || p === "h2";
     if (running && !s.runningSince) {
@@ -142,7 +147,7 @@ export function MinutesLive({ c, roster }: { c: Convocation; roster: RosterRow[]
     <section className="card minutes-live">
       <div className="row between">
         <h2 style={{ margin: 0 }}>⏱️ Minuts en directe</h2>
-        <span className="chip">Només staff</span>
+        <span className="row" style={{ gap: 6 }}><SoundToggle /><span className="chip">Només staff</span></span>
       </div>
       <div className={`ml-clock${st.runningSince ? " run" : ""}`}>
         <b>{mmss(now)}</b>
@@ -156,7 +161,7 @@ export function MinutesLive({ c, roster }: { c: Convocation; roster: RosterRow[]
         {st.phase !== "pre" && <button className="btn secondary" onClick={reset}>Tornar a començar</button>}
       </div>
       {st.phase === "pre" && <p className="muted small" style={{ textAlign: "center", margin: "6px 0 0" }}>Revisa qui comença al camp (l&apos;onze inicial ja hi és) i toca «Comença el partit».</p>}
-      {msg && <p className={`small ${msg.ok ? "muted" : "msg error"}`} style={{ textAlign: "center" }}>{msg.text}</p>}
+      {msg && <p className={`small ${msg.ok ? "muted" : "msg error"}`} style={{ textAlign: "center" }}><Ticked text={msg.text} /></p>}
 
       <h3 className="ml-h">Al camp <span>{onField.length}</span></h3>
       <ul className="ml-list">{onField.map((r) => row(r, true))}</ul>

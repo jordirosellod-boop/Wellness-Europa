@@ -20,6 +20,8 @@ import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 import { LibraryPicker, SaveToLibrary } from "@/components/task-library";
 import { taskMinutes } from "@/lib/task-library";
+import { Ticked } from "@/components/feel";
+import { deleteWithUndo } from "@/lib/undo";
 
 export default function PlansPage() {
   return (
@@ -386,7 +388,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
       </div>
 
       <div className="plan-savebar no-print">
-        <span className={status && !status.ok ? "err" : ""}>{status ? status.text : dirty ? "Canvis sense desar" : "Tot desat"}</span>
+        <span className={status && !status.ok ? "err" : ""}>{status ? <Ticked text={status.text} /> : dirty ? "Canvis sense desar" : "Tot desat"}</span>
         <span className="row" style={{ gap: 6 }}>
           <button className="btn small" disabled={saving || !dirty} onClick={save}>{saving ? "Desant…" : "Desar"}</button>
           <button className="btn small secondary" disabled={pubBusy || saving} onClick={publish} title="Que les jugadores el vegin a l'app (sense lesions ni baixes)">
@@ -518,7 +520,7 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
               arr.splice(i + d, 0, x);
               upd({ tasks: arr });
             }}
-            onRemove={() => window.confirm(`Esborrar la tasca ${i + 1}?`) && upd({ tasks: plan.tasks.filter((_, j) => j !== i) })}
+            onRemove={() => { const before = plan.tasks; deleteWithUndo(`Tasca ${i + 1} esborrada`, { hide: () => upd({ tasks: before.filter((_, j) => j !== i) }), restore: () => upd({ tasks: before }), commit: () => {} }); }}
           />
         ))}
         <div className="row" style={{ gap: 8 }}>

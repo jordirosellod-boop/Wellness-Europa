@@ -9,6 +9,7 @@ import { canShareFile, safeName } from "@/lib/share-file";
 import { supabase } from "@/lib/supabase";
 import { fmtDate } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Ticked } from "@/components/feel";
 
 type Kit = "home" | "away" | "third";
 type Lineup = { formation: string; slots: Record<string, string>; kit: Kit };
@@ -172,7 +173,7 @@ export function LineupBoard({ c, roster }: { c: Convocation; roster: RosterRow[]
         <button className="btn small secondary" disabled={pdfBusy} onClick={makePdf}>{pdfBusy ? "Fent el PDF…" : "🖨 Imprimir (PDF)"}</button>
         {pdf && <button className="btn small" onClick={() => deliverPdf(pdf).then(() => setPdf(null))}>📤 Obrir el PDF</button>}
       </div>
-      {status && <p className={`small ${status.ok ? "muted" : "msg error"} no-print`} role="status" style={{ margin: "0 0 6px" }}>{status.text}</p>}
+      {status && <p className={`small ${status.ok ? "muted" : "msg error"} no-print`} role="status" style={{ margin: "0 0 6px" }}><Ticked text={status.text} /></p>}
 
       <div className="print-lineup" ref={sheet}>
         <div className="print-head">

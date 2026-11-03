@@ -6,12 +6,37 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { outcome, recentResult } from "@/lib/matchday";
+import { todayMadrid } from "@/lib/wellness";
+
+/** Si ahir o avui hem guanyat (es mira un cop per sessió): l'escut porta una estrelleta daurada. */
+function useVictory(): boolean {
+  const [win, setWin] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const today = todayMadrid();
+    try {
+      const c = JSON.parse(sessionStorage.getItem("victoria") ?? "null") as { day: string; win: boolean } | null;
+      if (c?.day === today) { Promise.resolve().then(() => alive && setWin(c.win)); return () => { alive = false; }; }
+    } catch { /* res */ }
+    // Sense sessió (pantalla d'entrada) no es mira res: ja es mirarà quan s'hagi entrat
+    supabase().auth.getSession().then(({ data }) => (data.session ? recentResult(today, 1) : Promise.reject())).then((r) => {
+      const w = !!r && outcome(r) === "G";
+      try { sessionStorage.setItem("victoria", JSON.stringify({ day: today, win: w })); } catch { /* res */ }
+      if (alive) setWin(w);
+    }, () => {});
+    return () => { alive = false; };
+  }, []);
+  return win;
+}
 
 export function Brand() {
+  const win = useVictory();
   return (
-    <span className="brand">
+    <span className={`brand${win ? " won" : ""}`} title={win ? "Hem guanyat! 💙" : undefined}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="brand-logo" src="/escut.png" alt="Escut del CE Europa" width={40} height={40} />
+      {win && <span className="brand-star" aria-label="Victòria">★</span>}
       <span>Juvenil C 2026/2027</span>
     </span>
   );

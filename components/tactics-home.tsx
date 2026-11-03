@@ -15,6 +15,8 @@ import { loadImg, sceneImage, scenesVideo, type RenderOpts } from "@/lib/tactics
 import { parseIdea } from "@/lib/tactics-vestidor";
 import { fmtDate, todayMadrid } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Ticked } from "@/components/feel";
+import { deleteWithUndo } from "@/lib/undo";
 
 type BoardRow = { id: string; title: string; rival_key: string | null; match_date: string | null; updated_at: string };
 type Ctx = {
@@ -352,7 +354,7 @@ function TacticsEditor({ id, onBack }: { id: string; onBack: () => void }) {
       </div>
       <div className="plan-savebar">
         <input type="text" className="tb-title" maxLength={120} value={row.title} onChange={(e) => upd(row.data, e.target.value)} aria-label="Títol" />
-        <span className={status && !status.ok ? "err" : ""}>{status ? status.text : dirty ? "Canvis sense desar" : "Tot desat"}</span>
+        <span className={status && !status.ok ? "err" : ""}>{status ? <Ticked text={status.text} /> : dirty ? "Canvis sense desar" : "Tot desat"}</span>
         <button className="btn small" disabled={busy === "save" || !dirty} onClick={save}>{busy === "save" ? "Desant…" : "Desar"}</button>
       </div>
 
@@ -384,9 +386,12 @@ function TacticsEditor({ id, onBack }: { id: string; onBack: () => void }) {
             <button className="btn small secondary" onClick={present} title="Pantalla completa">⛶</button>
             {scenes.length > 1 && (
               <button className="btn small secondary" onClick={() => {
-                if (!window.confirm(`Esborrar l'escena «${scene.title}»?`)) return;
-                upd({ ...row.data, scenes: scenes.filter((s) => s.id !== scene.id) });
-                setSi(0);
+                const data = row.data;
+                deleteWithUndo(`Escena «${scene.title}» esborrada`, {
+                  hide: () => { upd({ ...data, scenes: scenes.filter((s) => s.id !== scene.id) }); setSi(0); },
+                  restore: () => upd(data),
+                  commit: () => {},
+                });
               }}>Esborrar escena</button>
             )}
           </div>

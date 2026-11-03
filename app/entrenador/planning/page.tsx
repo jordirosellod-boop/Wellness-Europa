@@ -15,6 +15,7 @@ import {
 } from "@/lib/weekly";
 import { fmtDateTime, todayMadrid } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Ticked } from "@/components/feel";
 
 export default function PlanningPage() {
   return (
@@ -205,7 +206,7 @@ function Planning() {
       </div>
       {week !== thisWeek && <button type="button" className="btn small secondary" onClick={() => changeWeek(thisWeek)} style={{ marginBottom: 8 }}>Tornar a aquesta setmana</button>}
 
-      {status && <p className={`msg${status.ok ? "" : " error"}`}>{status.text}</p>}
+      {status && <p className={`msg${status.ok ? "" : " error"}`}><Ticked text={status.text} /></p>}
       {saved === undefined && <Loading />}
 
       {saved !== undefined && !draft && (

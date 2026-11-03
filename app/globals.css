@@ -2831,3 +2831,48 @@ body:has(.bottom-nav) .offline { bottom: calc(84px + env(safe-area-inset-bottom,
 .saved-videos li > span { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.2; }
 .drive-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: #eef3ff; font-size: .85rem; }
 .drive-row span { flex: 1; min-width: 0; }
+
+/* ---------- Detalls premium ---------- */
+/* Botons que s'enfonsen i tornen amb un petit rebot */
+.btn, .tabs button, .toggle button, .weekdays button, .scale button, .an-ic, .tag-btn, .roll-btn, .ml-p {
+  transition: background-color .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease), transform .38s cubic-bezier(.3, 1.9, .5, 1), box-shadow .25s var(--ease);
+}
+.btn:not(:disabled):active, .tabs button:active, .toggle button:active, .weekdays button:active, .scale button:active, .an-ic:active, .tag-btn:active, .roll-btn:not(:disabled):active, .ml-p:not(:disabled):active {
+  transform: scale(.95); transition-duration: .2s, .2s, .2s, .07s, .25s;
+}
+
+/* El ✓ es dibuixa */
+svg.tick { display: inline-block; vertical-align: -.15em; margin: 0 .1em; overflow: visible; }
+svg.tick path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 16; stroke-dashoffset: 16; animation: tick-draw .45s cubic-bezier(.65, 0, .35, 1) .08s forwards; }
+@keyframes tick-draw { to { stroke-dashoffset: 0; } }
+
+/* «Esborrat · Desfer» */
+.undo-toast {
+  position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 90;
+  display: flex; align-items: center; gap: 14px; padding: 12px 14px 12px 18px; border-radius: 14px; overflow: hidden;
+  background: #0b1846; color: #fff; font-weight: 600; box-shadow: 0 12px 30px rgba(0,0,30,.35); max-width: calc(100vw - 32px);
+  animation: undo-in .35s cubic-bezier(.3, 1.6, .5, 1) both;
+}
+.undo-toast button { border: 0; background: none; color: var(--or); font: inherit; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; padding: 6px 4px; cursor: pointer; }
+.undo-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--or); transform-origin: left; animation: undo-time 5s linear forwards; }
+@keyframes undo-in { from { opacity: 0; transform: translate(-50%, 20px) scale(.96); } }
+@keyframes undo-time { to { transform: scaleX(0); } }
+
+/* Botó dels sons */
+.sound-toggle { border: 0; background: #eef2fb; border-radius: 999px; width: 34px; height: 34px; font-size: 1rem; cursor: pointer; }
+
+/* Estrelleta de victòria a l'escut */
+.brand { position: relative; }
+.brand-star {
+  position: absolute; left: 28px; top: -4px; font-size: 15px; line-height: 1; color: #f6d77a;
+  text-shadow: 0 0 6px rgba(246, 215, 122, .9), 0 1px 1px rgba(0,0,0,.4); animation: star-in .8s cubic-bezier(.3, 1.8, .5, 1) .4s both, star-glow 2.6s ease-in-out 1.4s infinite;
+  pointer-events: none;
+}
+@keyframes star-in { from { opacity: 0; transform: scale(0) rotate(-90deg); } }
+@keyframes star-glow { 50% { text-shadow: 0 0 12px rgba(246, 215, 122, 1), 0 1px 1px rgba(0,0,0,.4); } }
+
+@media (prefers-reduced-motion: reduce) {
+  svg.tick path { animation: none; stroke-dashoffset: 0; }
+  .undo-toast, .undo-bar, .brand-star { animation: none; }
+  .btn, .tabs button, .toggle button, .weekdays button, .scale button, .an-ic, .tag-btn, .roll-btn, .ml-p { transition-duration: .01s; }
+}

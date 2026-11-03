@@ -23,6 +23,9 @@ import { escapulada } from "@/lib/fonts";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fmtDate, todayMadrid, type Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
+import { Ticked } from "@/components/feel";
+import { deleteWithUndo } from "@/lib/undo";
+import { crowd } from "@/lib/feel";
 
 export default function AnalysisPage() {
   return (
@@ -374,6 +377,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     const ev = { ...(data as AEvent), t: Number((data as AEvent).t) };
     setEvents((x) => [...x, ev].sort((a, b2) => a.t - b2.t));
     setMsg({ ok: true, text: `${b.label} · ${minuteOf(match, t)} ✓` });
+    if (/^gols?\b/i.test(b.label) && team === "us") crowd();
     if ((b.ask_player && match.kind !== "rival") || b.ask_result || b.ask_zone) setDetail(ev.id);
   }
 
@@ -384,11 +388,19 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     setEvents((x) => x.map((y) => (y.id === eid ? { ...ev, t: Number(ev.t), zx: ev.zx == null ? null : Number(ev.zx), zy: ev.zy == null ? null : Number(ev.zy) } : y)).sort((a, b) => a.t - b.t));
   }
 
-  async function delEvent(eid: string) {
-    const { data, error: e } = await supabase().from("analysis_events").delete().eq("id", eid).select("id");
-    if (e || !data?.length) return setMsg({ ok: false, text: `No s'ha pogut esborrar: ${e?.message ?? ""}` });
-    setEvents((x) => x.filter((y) => y.id !== eid));
-    if (detail === eid) setDetail(null);
+  // S'esborra amb «Desfer» (5 segons per penedir-se'n)
+  function delEvent(eid: string) {
+    const ev = events.find((y) => y.id === eid);
+    if (!ev) return;
+    const back = () => setEvents((x) => (x.some((y) => y.id === eid) ? x : [...x, ev].sort((a, b) => a.t - b.t)));
+    deleteWithUndo(`Acció esborrada (${ev.action})`, {
+      hide: () => { setEvents((x) => x.filter((y) => y.id !== eid)); if (detail === eid) setDetail(null); },
+      restore: back,
+      commit: async () => {
+        const { data, error: e } = await supabase().from("analysis_events").delete().eq("id", eid).select("id");
+        if (e || !data?.length) { back(); setMsg({ ok: false, text: `No s'ha pogut esborrar: ${e?.message ?? ""}` }); }
+      },
+    });
   }
 
   function openFile(e: ChangeEvent<HTMLInputElement>) {
@@ -580,7 +592,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
               <button className="btn small secondary" onClick={() => markHalf(2)}>Inici 2a part</button>
             </span>
           </div>
-          {msg && <p className={`msg ${msg.ok ? "ok" : "error"} an-msg`} role="status">{msg.text}</p>}
+          {msg && <p className={`msg ${msg.ok ? "ok" : "error"} an-msg`} role="status"><Ticked text={msg.text} /></p>}
           {target && (
             <p className="msg info an-msg">
               Clip de la correcció: {target.action} · {minuteOf(match, target.t)}.{" "}
@@ -759,7 +771,7 @@ function EventList({ match, events, players, name, canPlay, onSeek, onEdit, onDe
                 {e.result && <span className={`res ${e.result}`}>{e.result === "ok" ? "✓" : "✗"}</span>}
               </button>
               <button className="an-ic" onClick={() => onEdit(e.id)} aria-label="Editar">✎</button>
-              <button className="an-ic" onClick={() => window.confirm("Esborrar aquesta acció?") && onDelete(e.id)} aria-label="Esborrar">🗑</button>
+              <button className="an-ic" onClick={() => onDelete(e.id)} aria-label="Esborrar">🗑</button>
             </li>
           ))}
         </ul>
@@ -806,7 +818,7 @@ function EventDetail({ ev, match, players, button, onChange, onDelete, onClose, 
         <ZonePitch points={ev.zx != null ? [{ x: ev.zx, y: ev.zy!, color: ev.color ?? "#0a2ea0" }] : []} onPick={(x, y) => onChange({ zx: x, zy: y })} height={160} />
         <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: "nowrap" }}>
           <input type="text" maxLength={500} placeholder="Nota (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ev.notes ?? "") && onChange({ notes: notes || null })} />
-          <button className="btn small secondary" onClick={() => window.confirm("Esborrar aquesta acció?") && onDelete()}>Esborrar</button>
+          <button className="btn small secondary" onClick={() => onDelete()}>Esborrar</button>
         </div>
         <div className="row" style={{ gap: 6, marginTop: 8 }}>
           <button className="btn small" disabled={!canDraw} onClick={onDraw}>

@@ -12,6 +12,8 @@ import { canShareFile, deliverFile, safeName } from "@/lib/share-file";
 import { fmtDate } from "@/lib/wellness";
 import { asFile, createVideoWriter, deleteVideo, keepAwake, listVideos, markOnDrive, type SavedVideo } from "@/lib/saved-videos";
 import { connectDrive, disconnectDrive, driveStatus, uploadToDrive, type DriveStatus } from "@/lib/drive-upload";
+import { Ticked } from "@/components/feel";
+import { deleteWithUndo } from "@/lib/undo";
 
 type TeamFilter = "us" | "rival" | "all";
 type Job = { label: string; progress: number; ctrl: AbortController };
@@ -239,7 +241,7 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
                 ) : null}
                 <button className="btn small" onClick={() => deliverFile(vf)}>📤 Desar</button>
                 <button className="btn small secondary" aria-label={`Esborrar ${v.name}`}
-                  onClick={() => window.confirm("Esborrar aquest vídeo del dispositiu?") && deleteVideo(v.id).then(() => setSaved((l) => l.filter((x) => x.v.id !== v.id)))}>🗑</button>
+                  onClick={() => { const item = saved.find((x) => x.v.id === v.id)!; deleteWithUndo("Vídeo esborrat", { hide: () => setSaved((l) => l.filter((x) => x.v.id !== v.id)), restore: () => setSaved((l) => [item, ...l].sort((a, b) => b.v.created - a.v.created)), commit: () => deleteVideo(v.id).then(() => {}) }); }}>🗑</button>
               </li>
             ))}
           </ul>
@@ -318,7 +320,7 @@ export function ClipExport({ match, events, buttons, file, playerName }: {
             )}
           </div>
         )}
-        {driveMsg && <p className={`msg ${driveMsg.ok ? "ok" : "error"}`} role="status">{driveMsg.text}</p>}
+        {driveMsg && <p className={`msg ${driveMsg.ok ? "ok" : "error"}`} role="status"><Ticked text={driveMsg.text} /></p>}
 
         {job && (
           <div className="clip-progress" role="status">

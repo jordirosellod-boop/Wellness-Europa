@@ -14,6 +14,7 @@ import { fmtDateSmart, todayMadrid } from "@/lib/wellness";
 import { rivalKey } from "@/lib/analysis";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
+import { Ticked } from "@/components/feel";
 
 export default function ConvoPage() {
   return (
@@ -504,7 +505,7 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
           <button className="btn small secondary" onClick={remove}>Esborrar</button>
         </div>
         {c.published && <p className="muted small" style={{ marginBottom: 0 }}>Els canvis de la llista es veuen a l&apos;instant a l&apos;app de les jugadores.</p>}
-        {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
+        {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status"><Ticked text={msg.text} /></p>}
       </section>
 
       {editInfo && (

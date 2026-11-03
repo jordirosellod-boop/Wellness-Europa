@@ -6,6 +6,7 @@ import { Shirt, useDorsals } from "@/components/shirt";
 import { avatarFrom, cutoutFromFile, thumbFrom, type Crop } from "@/lib/cutout";
 import { deletePhoto, fetchCutout, fetchPosterIds, fetchThumbs, savePhoto } from "@/lib/player-photos";
 import type { Profile } from "@/lib/wellness";
+import { Ticked } from "@/components/feel";
 
 // Pujar: 1) retallar el tros de la foto, 2) treure el fons, 3) col·locar-la. Les ja pujades es poden tornar a col·locar.
 type Draft =
@@ -102,7 +103,7 @@ export function PhotosAdmin({ players }: { players: Profile[] }) {
         Cada jugadora té dues fotos: la de l&apos;app (quadradets i avatar; millor de cara) i la <b>foto en acció</b> 🏃‍♀️ (cartell, cromo, fitxa gran i stories; millor jugant).
         En pujar-ne una de nova pots triar si també ha de ser la foto en acció.
       </p>
-      {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}>{msg.text}</p>}
+      {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}><Ticked text={msg.text} /></p>}
       {draft?.kind === "crop" && <CropStep key={draft.url} src={draft.url} name={name(draft.pid)} onCancel={() => setDraft(null)} onDone={cut} />}
       {draft?.kind === "place" && draft.fresh && (
         <label className="poster-also">

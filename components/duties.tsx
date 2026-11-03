@@ -5,6 +5,7 @@ import { addDays, startOfWeek, weekRange } from "@/lib/dates";
 import { dutyOf, fetchDuties, fetchDutyMembers, fetchDutySettings, firstNames, groupName, TASK_LABEL, type DutyGroup, type DutySettings } from "@/lib/duties";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { todayMadrid } from "@/lib/wellness";
+import { Ticked } from "@/components/feel";
 
 /** Qui porta el material i les porteries aquesta setmana (per a les jugadores i el planning). */
 export function DutiesCard({ week, meId, title = "Aquesta setmana" }: { week?: string; meId?: string; title?: string }) {
@@ -83,7 +84,7 @@ export function DutiesAdmin({ week }: { week: string }) {
     <section className="card duties-admin">
       <h2 style={{ marginTop: 0 }}>🧺 Material i 🥅 porteria</h2>
       <p className="muted small" style={{ marginTop: -4 }}>Cada setmana roten: el grup de material passa al següent, i el de porteria també.</p>
-      {msg && <p className={`msg${msg.ok ? "" : " error"}`}>{msg.text}</p>}
+      {msg && <p className={`msg${msg.ok ? "" : " error"}`}><Ticked text={msg.text} /></p>}
       {cfg && (
         <div className="row" style={{ gap: 8, alignItems: "center" }}>
           <span>{weekRange(week)}:</span>
