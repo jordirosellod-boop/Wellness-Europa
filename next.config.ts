@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
         ],
       },
+      {
+        // L'anàlisi incrusta vídeos de YouTube: YouTube exigeix saber des de quina web es mira
+        // (només l'adreça principal de l'app, mai la pàgina ni els paràmetres).
+        source: "/entrenador/analisi",
+        headers: [{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }],
+      },
     ];
   },
 };

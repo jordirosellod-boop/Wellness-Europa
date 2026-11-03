@@ -48,7 +48,7 @@ export const VideoPlayer = forwardRef<VideoHandle, { kind: "file" | "youtube"; s
     const video = useRef<HTMLVideoElement>(null);
     const ytBox = useRef<HTMLDivElement>(null);
     const yt = useRef<YTPlayer | null>(null);
-    const [ytError, setYtError] = useState(false);
+    const [ytError, setYtError] = useState<number | null>(null);
 
     useImperativeHandle(ref, () => ({
       time: () => (kind === "file" ? video.current?.currentTime ?? 0 : yt.current?.getCurrentTime?.() ?? 0),
@@ -69,8 +69,8 @@ export const VideoPlayer = forwardRef<VideoHandle, { kind: "file" | "youtube"; s
         if (!alive) return;
         yt.current = new YT.Player(box, {
           videoId: src,
-          playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
-          events: { onError: () => setYtError(true) },
+          playerVars: { rel: 0, modestbranding: 1, playsinline: 1, origin: window.location.origin },
+          events: { onError: (e: { data: number }) => setYtError(e.data) },
         });
       });
       return () => {
@@ -96,7 +96,13 @@ export const VideoPlayer = forwardRef<VideoHandle, { kind: "file" | "youtube"; s
     ) : (
       <div className="an-video yt">
         <div ref={ytBox} className="yt-box" />
-        {ytError && <p className="msg error">No s&apos;ha pogut obrir aquest vídeo de YouTube (pot ser privat o no permetre&apos;s incrustar).</p>}
+        {ytError != null && (
+          <p className="msg error">
+            {ytError === 100 ? "Aquest vídeo de YouTube és privat o s'ha esborrat."
+              : ytError === 101 || ytError === 150 ? "Qui ha penjat aquest vídeo no deixa que es miri fora de YouTube. Demana-li que ho permeti (YouTube Studio → vídeo → «Permet la inserció») o que et passi el fitxer."
+              : `YouTube no deixa reproduir aquest vídeo aquí (error ${ytError}). Torna-ho a provar; si continua, obre'l a YouTube.`}
+          </p>
+        )}
       </div>
     );
   },
