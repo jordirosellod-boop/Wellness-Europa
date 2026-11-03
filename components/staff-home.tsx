@@ -159,6 +159,11 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
         </Link>
       )}
       {info?.next && <NextUp s={info.next} today={today} />}
+      <Link href="/entrenador/informe-rival" className="wk-banner rival">
+        <span className="wk-banner-k">📋 Informe del rival</span>
+        <b>El proper rival, analitzat: dades, jugadores i claus del partit.</b>
+        <span className="wk-banner-more">Obrir l&apos;informe ›</span>
+      </Link>
 
       {info && (alerts.length > 0 || info.injured.length > 0 || info.away.length > 0) && (
         <section className="card sh-alerts">

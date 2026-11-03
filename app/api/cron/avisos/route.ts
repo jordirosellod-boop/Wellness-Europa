@@ -4,7 +4,12 @@ import { addDays, isoDow, startOfWeek } from "@/lib/dates";
 import { madridEpoch } from "@/lib/matchday";
 import { claimPush, adminClient, pushTo, pushToStaff } from "@/lib/server-admin";
 import { fetchAll } from "@/lib/supabase";
+import { leagueRaw } from "@/lib/league-raw";
+import { nextRival } from "@/lib/rival-report";
+import { prettyTeam } from "@/lib/analysis";
 import { nowMadridHHMM, todayMadrid } from "@/lib/wellness";
+
+export const maxDuration = 60;
 
 // L'executa la base de dades (pg_cron) cada 15 minuts. Mira si toca enviar algun avís i,
 // si toca, l'envia una sola vegada (queda apuntat a push_log):
@@ -13,6 +18,7 @@ import { nowMadridHHMM, todayMadrid } from "@/lib/wellness";
 //  · el dia de partit, 2 h abans de la quedada: a les convocades
 //  · cada dia a les 22 h: a qui encara no ha fet l'RPE d'avui (menys les absents o que han avisat)
 //  · diumenge a les 20 h: resum de la setmana al staff
+//  · dilluns a les 9 h: l'informe del proper rival ja està fet (abans es llegeixen les actes noves de la FCF)
 export async function POST(req: Request) {
   const db = adminClient();
   const { data: secret } = await db.from("app_secrets").select("value").eq("name", "cron_secret").maybeSingle();
@@ -40,6 +46,7 @@ export async function POST(req: Request) {
   await step("quedada", () => meetReminder(db, today));
   if (hour === 22) await step("rpe", () => rpeReminder(db, today));
   if (dow === 7 && hour >= 20 && hour < 23) await step("resum", () => weeklySummary(db, today));
+  if (dow === 1 && hour >= 9 && hour < 12) await step("informe-rival", () => rivalReportReady(db, today));
 
   return Response.json({ done, errors }, { status: errors.length ? 500 : 200 });
 }
@@ -156,5 +163,20 @@ async function weeklySummary(db: SupabaseClient, today: string): Promise<number 
     title: `📊 Resum de la setmana · ${trainings.size} ${trainings.size === 1 ? "entreno" : "entrenos"}`,
     body: parts.join(" · "),
     url: "/entrenador",
+  });
+}
+
+/** Dilluns: es llegeixen les actes noves de la FCF i s'avisa el staff que l'informe del proper rival està a punt. */
+async function rivalReportReady(db: SupabaseClient, today: string): Promise<number | null> {
+  if (!(await claimPush(db, `informe-rival:${today}`))) return null;
+  const raw = await leagueRaw(db, 24);
+  const nr = nextRival(raw);
+  if (!nr) return 0;
+  const name = prettyTeam(nr.match.home_id === nr.id ? nr.match.home : nr.match.away);
+  const when = nr.match.kickoff ? ` (J${nr.match.jornada})` : "";
+  return pushToStaff(db, {
+    title: "📋 Informe del rival a punt",
+    body: `${name}${when}: dades, jugadores a vigilar i claus del partit.`,
+    url: "/entrenador/informe-rival",
   });
 }
