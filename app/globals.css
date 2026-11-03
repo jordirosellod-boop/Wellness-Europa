@@ -2864,12 +2864,14 @@ svg.tick path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-line
 /* Estrelleta de victòria a l'escut */
 .brand { position: relative; }
 .brand-star {
-  position: absolute; left: 28px; top: -4px; font-size: 15px; line-height: 1; color: #f6d77a;
-  text-shadow: 0 0 6px rgba(246, 215, 122, .9), 0 1px 1px rgba(0,0,0,.4); animation: star-in .8s cubic-bezier(.3, 1.8, .5, 1) .4s both, star-glow 2.6s ease-in-out 1.4s infinite;
+  position: absolute; left: 26px; top: -6px; padding: 2px 5px 1px; border-radius: 999px; line-height: 1;
+  font-family: var(--font-kit), var(--display); font-size: 11px; letter-spacing: .3px; color: var(--navy);
+  background: linear-gradient(135deg, #fbe7a6, var(--or)); box-shadow: 0 0 0 1.5px #fff, 0 0 10px rgba(246, 215, 122, .8);
+  animation: star-in .8s cubic-bezier(.3, 1.8, .5, 1) .4s both, star-glow 2.6s ease-in-out 1.4s infinite;
   pointer-events: none;
 }
 @keyframes star-in { from { opacity: 0; transform: scale(0) rotate(-90deg); } }
-@keyframes star-glow { 50% { text-shadow: 0 0 12px rgba(246, 215, 122, 1), 0 1px 1px rgba(0,0,0,.4); } }
+@keyframes star-glow { 50% { box-shadow: 0 0 0 1.5px #fff, 0 0 16px rgba(246, 215, 122, 1); } }
 
 @media (prefers-reduced-motion: reduce) {
   svg.tick path { animation: none; stroke-dashoffset: 0; }

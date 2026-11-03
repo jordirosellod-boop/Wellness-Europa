@@ -36,7 +36,7 @@ export function Brand() {
     <span className={`brand${win ? " won" : ""}`} title={win ? "Hem guanyat! 💙" : undefined}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="brand-logo" src="/escut.png" alt="Escut del CE Europa" width={40} height={40} />
-      {win && <span className="brand-star" aria-label="Victòria">★</span>}
+      {win && <span className="brand-star" aria-label="Victòria: +3 punts">+3</span>}
       <span>Juvenil C 2026/2027</span>
     </span>
   );
