@@ -111,7 +111,9 @@ export function CompactTitle() {
       const top = document.querySelector<HTMLElement>(".topbar");
       if (top !== bar) setBar(top);
       const h1 = document.querySelector<HTMLElement>("main h1");
-      if (!top || !h1 || h1.offsetParent === null) return setTitle(null);
+      // Si la barra ja té el menú (staff), no hi ha lloc per al títol
+      const nav = top?.querySelector<HTMLElement>(".nav");
+      if (!top || !h1 || h1.offsetParent === null || (nav && nav.offsetWidth > 0 && nav.childElementCount > 0)) return setTitle(null);
       const gone = h1.getBoundingClientRect().bottom < top.getBoundingClientRect().bottom - 4;
       setTitle(gone ? (h1.textContent ?? "").trim().slice(0, 40) || null : null);
     };
