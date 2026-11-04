@@ -1,5 +1,5 @@
 import { weekRange } from "@/lib/dates";
-import { adminClient, pushToPlayers } from "@/lib/server-admin";
+import { adminClient, pushToPlayers, pushToStaff } from "@/lib/server-admin";
 
 // El staff ho crida en publicar el planning de la setmana: avisa totes les jugadores
 // que tenen les notificacions activades. Només el staff (amb la seva sessió).
@@ -28,7 +28,13 @@ export async function POST(req: Request) {
       body: changed ? `Hi ha canvis al planning ${range}. Entra a mirar-ho!` : `Ja tens el planning ${range}. Entra a veure'l!`,
       url: "/j?s=planning",
     });
-    return Response.json(r);
+    // La resta del staff també se n'assabenta (qui l'ha penjat, no)
+    const staff = await pushToStaff(db, {
+      title: changed ? "📅 Planning actualitzat" : "📅 Planning penjat",
+      body: changed ? `S'ha canviat el planning ${range}.` : `Ja està penjat el planning ${range}.`,
+      url: "/entrenador/planning-setmana",
+    }, u.user.id).catch(() => 0);
+    return Response.json({ ...r, staff });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

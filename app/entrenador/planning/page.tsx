@@ -153,7 +153,7 @@ function Planning() {
     setDraft({ ...draft, days, published: data.published as boolean, published_at: data.published_at as string | null });
     setSaved({ week_start: week, days, footer: row.footer, published: data.published as boolean, published_at: data.published_at as string | null, updated_at: data.updated_at as string });
     setDirty(false);
-    if (published && !draft.published) return notify(false, "Publicat ✓ Les jugadores ja el veuen a l'app.");
+    if (published && !draft.published) return notify(false, "Publicat ✓ Les jugadores i l'staff ja el veuen a l'app.");
     setStatus({ ok: true, text: published ? "Desat ✓ Les jugadores ja veuen els canvis. Si vols que els mirin, toca «🔔 Avisar dels canvis»." : draft.published ? "Desat ✓ Ja no és visible per a les jugadores." : "Desat ✓ (encara no publicat)" });
   }
 
@@ -169,7 +169,7 @@ function Planning() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error ?? `Error ${res.status}`);
-      setStatus({ ok: true, text: `${prefix ? `${prefix} ` : ""}Avís enviat a ${json.sent} ${json.sent === 1 ? "mòbil" : "mòbils"}. (Només el reben les jugadores que tenen els avisos activats.)` });
+      setStatus({ ok: true, text: `${prefix ? `${prefix} ` : ""}Avís enviat a ${json.sent} ${json.sent === 1 ? "mòbil" : "mòbils"} de jugadores${json.staff ? ` i a ${json.staff} de l'staff` : ""}. (Només el reben qui té els avisos activats.)` });
     } catch (e) {
       setStatus({ ok: false, text: `${prefix ? `${prefix} Però l'avís` : "L'avís"} no s'ha pogut enviar: ${e instanceof Error ? e.message : e}` });
     } finally {

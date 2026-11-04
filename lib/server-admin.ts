@@ -47,9 +47,9 @@ export async function pushToPlayers(db: SupabaseClient, msg: { title: string; bo
   return { sent: await pushTo(db, ids, msg), players: ids.length };
 }
 
-/** Avís al staff (només als que l'han activat al seu mòbil). */
-export async function pushToStaff(db: SupabaseClient, msg: { title: string; body: string; url: string }): Promise<number> {
-  return pushTo(db, await idsOf(db, "coach"), msg);
+/** Avís al staff (només als que l'han activat al seu mòbil). `except`: qui ho ha fet (no cal avisar-lo). */
+export async function pushToStaff(db: SupabaseClient, msg: { title: string; body: string; url: string }, except?: string): Promise<number> {
+  return pushTo(db, (await idsOf(db, "coach")).filter((id) => id !== except), msg);
 }
 
 /** Apunta un avís com a enviat. Torna false si ja ho estava (així cada avís surt una sola vegada). */

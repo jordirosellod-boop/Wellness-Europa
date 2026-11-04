@@ -159,6 +159,13 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
         </Link>
       )}
       {info?.next && <NextUp s={info.next} today={today} />}
+      {info?.planPublished === true && (
+        <Link href="/entrenador/planning-setmana" className="wk-banner">
+          <span className="wk-banner-k">📅 Planning de la setmana</span>
+          <b>Penjat. Mira&apos;l tal com el veuen les jugadores.</b>
+          <span className="wk-banner-more">Veure el planning ›</span>
+        </Link>
+      )}
       <Link href="/entrenador/informe-rival" className="wk-banner rival">
         <span className="wk-banner-k">📋 Informe del rival</span>
         <b>El proper rival, analitzat: dades, jugadores i claus del partit.</b>

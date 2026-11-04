@@ -43,7 +43,7 @@ export function WeekDays({ weekStart, days, footer, bibs }: { weekStart: string;
 }
 
 /** Pantalla de la jugadora: el planning d'aquesta setmana (i el de la que ve, si ja està publicat). */
-export function PlayerPlanning({ meId }: { meId?: string }) {
+export function PlayerPlanning({ meId, staff = false }: { meId?: string; staff?: boolean }) {
   const thisWeek = startOfWeek(todayMadrid());
   const [week, setWeek] = useState(thisWeek);
   const [plans, setPlans] = useState<Record<string, WeeklyPlan | null>>({});
@@ -53,7 +53,8 @@ export function PlayerPlanning({ meId }: { meId?: string }) {
   useEffect(() => {
     fetchBibs(thisWeek, addDays(thisWeek, 13)).then((l) => setBibs(new Map(l.map((b) => [b.day, bibName(b)]))), () => {});
     Promise.all([fetchWeeklyPlan(thisWeek), fetchWeeklyPlan(addDays(thisWeek, 7))]).then(
-      ([a, b]) => setPlans({ [thisWeek]: a, [addDays(thisWeek, 7)]: b }),
+      // El staff també veu els esborranys a la base de dades: aquí només el que s'ha penjat
+      ([a, b]) => setPlans({ [thisWeek]: a?.published ? a : null, [addDays(thisWeek, 7)]: b?.published ? b : null }),
       (e) => setError(e instanceof Error ? e.message : String(e)),
     );
   }, [thisWeek]);
@@ -74,7 +75,7 @@ export function PlayerPlanning({ meId }: { meId?: string }) {
         </div>
       )}
       {!loaded && !error && <Loading />}
-      {loaded && !plan && <Empty art="calendar" title="El planning d&apos;aquesta setmana encara no està penjat" hint="Quan es publiqui, t&apos;arribarà un avís al mòbil (si els tens activats)." />}
+      {loaded && !plan && <Empty art="calendar" title="El planning d&apos;aquesta setmana encara no està penjat" hint={staff ? "Quan es publiqui, t'arribarà un avís al mòbil (si els tens activats). Per fer-lo o canviar-lo, ves a Planning." : "Quan es publiqui, t'arribarà un avís al mòbil (si els tens activats)."} />}
       {loaded && <DutiesCard key={week} week={week} meId={meId} title={week === thisWeek ? "Material i porteria · aquesta setmana" : "Material i porteria · la setmana que ve"} />}
       {plan && <WeekDays weekStart={plan.week_start} days={plan.days} footer={plan.footer} bibs={bibs} />}
     </>
