@@ -70,8 +70,8 @@ export function PlayerPlanning({ meId, staff = false }: { meId?: string; staff?:
       {error && <p className="msg error">{error}</p>}
       {(next || week !== thisWeek) && (
         <div className="tabs" style={{ marginBottom: 12 }}>
-          <button aria-pressed={week === thisWeek} onClick={() => setWeek(thisWeek)}>Aquesta setmana</button>
-          {next && <button aria-pressed={week !== thisWeek} onClick={() => setWeek(addDays(thisWeek, 7))}>La setmana que ve</button>}
+          <button aria-pressed={week === thisWeek} data-swipe="prev" onClick={() => setWeek(thisWeek)}>Aquesta setmana</button>
+          {next && <button aria-pressed={week !== thisWeek} data-swipe="next" onClick={() => setWeek(addDays(thisWeek, 7))}>La setmana que ve</button>}
         </div>
       )}
       {!loaded && !error && <Loading />}

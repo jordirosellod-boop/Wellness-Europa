@@ -64,6 +64,11 @@ function useNow(ms = 1000) {
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Xifres que giren quan canvien (com un marcador antic). */
+function Flip({ v }: { v: string }) {
+  return <>{[...v].map((ch, i) => <span key={`${i}-${ch}`} className="flip">{ch}</span>)}</>;
+}
 const mapsUrl = (q: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 
 /** El dia del partit, a dalt de tot de l'inici: cartell, compte enrere i com arribar. */
@@ -94,9 +99,9 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
         <div className="md-count" role="timer" aria-live="off">
           <span className="md-count-k">{phase === "abans" && meet ? "Falta per a la quedada" : "Falta perquè comenci"}</span>
           <div className="md-digits">
-            <span><b>{pad(left.h)}</b><small>h</small></span><em>:</em>
-            <span><b>{pad(left.m)}</b><small>min</small></span><em>:</em>
-            <span><b key={left.s} className="tick">{pad(left.s)}</b><small>s</small></span>
+            <span><b><Flip v={pad(left.h)} /></b><small>h</small></span><em>:</em>
+            <span><b><Flip v={pad(left.m)} /></b><small>min</small></span><em>:</em>
+            <span><b><Flip v={pad(left.s)} /></b><small>s</small></span>
           </div>
         </div>
       )}

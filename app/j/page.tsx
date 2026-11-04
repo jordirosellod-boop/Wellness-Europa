@@ -491,7 +491,7 @@ function MeAvatar({ meId, onClick }: { meId: string; onClick: (el: HTMLElement) 
   return (
     <button type="button" className={`greet-me${thumb ? " photo" : ""}${me?.gk ? " gk" : ""}`} onClick={(e) => onClick(e.currentTarget)} aria-label="El meu cromo">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {thumb ? <img src={thumb} alt="" /> : <Shirt n={me?.n} gk={me?.gk} size={40} />}
+      {thumb ? <img className="photo-in" src={thumb} alt="" /> : <Shirt n={me?.n} gk={me?.gk} size={40} />}
     </button>
   );
 }

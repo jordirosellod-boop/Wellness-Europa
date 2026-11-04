@@ -196,13 +196,13 @@ function Planning() {
         {draft && <span className={`chip${draft.published ? "" : " muted"}`}>{draft.published ? "Publicat" : "Esborrany"}</span>}
       </div>
       <div className="wk-nav">
-        <button type="button" className="btn small secondary" onClick={() => goWeek(-1)} aria-label="Setmana anterior">‹</button>
+        <button type="button" className="btn small secondary" onClick={() => goWeek(-1)} data-swipe="prev" aria-label="Setmana anterior">‹</button>
         <div>
           <b key={week} className="wk-range">{weekRange(week)}</b>
           {week === thisWeek && <span className="muted small"> · aquesta setmana</span>}
           {week === addDays(thisWeek, 7) && <span className="muted small"> · la setmana que ve</span>}
         </div>
-        <button type="button" className="btn small secondary" onClick={() => goWeek(1)} aria-label="Setmana següent">›</button>
+        <button type="button" className="btn small secondary" onClick={() => goWeek(1)} data-swipe="next" aria-label="Setmana següent">›</button>
       </div>
       {week !== thisWeek && <button type="button" className="btn small secondary" onClick={() => changeWeek(thisWeek)} style={{ marginBottom: 8 }}>Tornar a aquesta setmana</button>}
 

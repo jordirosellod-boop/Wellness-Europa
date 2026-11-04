@@ -60,6 +60,7 @@ export async function sheetPdf(el: HTMLElement, fileName: string): Promise<File>
   await document.fonts.ready;
   // «pdf-mode»: el full es mostra com en paper (capçalera visible, sense les ajudes de la pantalla)
   el.classList.add("pdf-mode");
+  document.documentElement.classList.add("pdf-capture"); // els PDF sempre en clar, encara que el mòbil vagi en mode fosc
   let canvas: HTMLCanvasElement;
   try {
     const w0 = el.offsetWidth, h0 = el.offsetHeight;
@@ -69,6 +70,7 @@ export async function sheetPdf(el: HTMLElement, fileName: string): Promise<File>
     });
   } finally {
     el.classList.remove("pdf-mode");
+    document.documentElement.classList.remove("pdf-capture");
   }
   const w = canvas.width, h = canvas.height;
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });

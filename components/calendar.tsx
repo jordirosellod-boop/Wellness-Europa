@@ -109,12 +109,12 @@ export function Calendar({
       </div>
 
       <div className="cal-nav">
-        <button type="button" className="btn small secondary" aria-label="Anterior" onClick={() => go(moveAnchor(view, anchor, -1))}>‹</button>
+        <button type="button" className="btn small secondary" data-swipe="prev" aria-label="Anterior" onClick={() => go(moveAnchor(view, anchor, -1))}>‹</button>
         <div className={`cal-title slide-${dir}`} key={`${view}-${title}`}>
           <b>{title}</b>
           {loading && <span className="muted small"> · carregant…</span>}
         </div>
-        <button type="button" className="btn small secondary" aria-label="Següent" onClick={() => go(moveAnchor(view, anchor, 1))}>›</button>
+        <button type="button" className="btn small secondary" data-swipe="next" aria-label="Següent" onClick={() => go(moveAnchor(view, anchor, 1))}>›</button>
       </div>
       {anchor !== today && (
         <button type="button" className="linkbtn" onClick={() => go(today)}>Tornar a avui</button>

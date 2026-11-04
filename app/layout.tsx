@@ -1,5 +1,5 @@
 import { OfflineBanner, PullToRefresh } from "@/components/app-chrome";
-import { HapticTouches, UndoToast } from "@/components/feel";
+import { CompactTitle, HapticTouches, SwipeNav, UndoToast } from "@/components/feel";
 import type { Metadata, Viewport } from "next";
 import { Anton, Poppins } from "next/font/google";
 import "./globals.css";
@@ -13,6 +13,15 @@ export const metadata: Metadata = {
   title: "Juvenil C 2026/2027 · CE Europa",
   description: "Juvenil C 2026/2027 del CE Europa: wellness, RPE, calendari, multes i estadístiques",
   robots: { index: false, follow: false },
+  // Targeta quan s'envia l'enllaç (WhatsApp…): escut, nom i la foto de la grada (app/opengraph-image.jpg)
+  metadataBase: new URL("https://wellness-europa.vercel.app"),
+  openGraph: {
+    title: "Juvenil C · CE Europa",
+    description: "L'app de l'equip: wellness, entrenaments, convocatòries i partits.",
+    siteName: "Juvenil C · CE Europa",
+    locale: "ca_ES",
+    type: "website",
+  },
   // A l'iPhone, l'app afegida a la pantalla d'inici s'obre a pantalla completa (necessari per als avisos).
   // «black-translucent»: la zona de l'hora és transparent (la foto de l'entrada i la barra blava hi arriben; l'hora surt en blanc).
   // L'iPhone ho llegeix quan s'afegeix l'app a la pantalla d'inici.
@@ -64,6 +73,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <PullToRefresh />
         <OfflineBanner />
         <HapticTouches />
+        <SwipeNav />
+        <CompactTitle />
         <UndoToast />
       </body>
     </html>

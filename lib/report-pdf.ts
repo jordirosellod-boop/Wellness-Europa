@@ -4,6 +4,7 @@ export async function reportPdf(el: HTMLElement, fileName: string): Promise<File
   const [{ toCanvas }, { jsPDF }] = await Promise.all([import("html-to-image"), import("jspdf")]);
   await document.fonts.ready;
   el.classList.add("pdf-mode");
+  document.documentElement.classList.add("pdf-capture"); // els PDF sempre en clar, encara que el mòbil vagi en mode fosc
   let canvas: HTMLCanvasElement;
   let cuts: number[];
   try {
@@ -18,6 +19,7 @@ export async function reportPdf(el: HTMLElement, fileName: string): Promise<File
     });
   } finally {
     el.classList.remove("pdf-mode");
+    document.documentElement.classList.remove("pdf-capture");
   }
   const M = 10, PW = 210 - 2 * M, PH = 297 - 2 * M;
   const pageH = Math.floor(canvas.width * (PH / PW)); // alçada d'una pàgina en píxels del dibuix

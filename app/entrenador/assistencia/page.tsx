@@ -129,9 +129,9 @@ function Roll() {
       </p>
 
       <div className="row between card" style={{ padding: "8px 10px" }}>
-        <button className="btn small secondary" onClick={() => setDay(addDays(day, -1))} aria-label="Dia anterior">‹</button>
+        <button className="btn small secondary" onClick={() => setDay(addDays(day, -1))} data-swipe="prev" aria-label="Dia anterior">‹</button>
         <b className="center" style={{ flex: 1 }}>{day === today ? "Avui · " : ""}{fmtDate(day)}</b>
-        <button className="btn small secondary" onClick={() => setDay(addDays(day, 1))} aria-label="Dia següent">›</button>
+        <button className="btn small secondary" onClick={() => setDay(addDays(day, 1))} data-swipe="next" aria-label="Dia següent">›</button>
       </div>
       {day !== today && (
         <p className="center" style={{ marginTop: -4 }}>

@@ -41,9 +41,9 @@ export function PlayerAttendance({ meId }: { meId: string }) {
       <p className="muted" style={{ marginTop: -6 }}>Només tu veus la teva assistència. La passa el staff a cada sessió.</p>
 
       <div className="row between card" style={{ padding: "8px 10px" }}>
-        <button className="btn small secondary" onClick={() => setMonth(addMonths(month, -1))} aria-label="Mes anterior">‹</button>
+        <button className="btn small secondary" onClick={() => setMonth(addMonths(month, -1))} data-swipe="prev" aria-label="Mes anterior">‹</button>
         <b>{monthName(month, true)}</b>
-        <button className="btn small secondary" disabled={isCurrent} onClick={() => setMonth(addMonths(month, 1))} aria-label="Mes següent">›</button>
+        <button className="btn small secondary" disabled={isCurrent} onClick={() => setMonth(addMonths(month, 1))} data-swipe="next" aria-label="Mes següent">›</button>
       </div>
 
       {error && <p className="msg error">{error}</p>}
