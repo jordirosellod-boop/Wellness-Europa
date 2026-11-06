@@ -3347,3 +3347,28 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
 .splash > b { animation-delay: 2.3s; }
 .splash > span { animation-delay: 2.45s; }
 .splash .sp-match { animation-delay: 2.55s; }
+
+/* Entrada (v5): la vora i el dibuix de dins es tracen en daurat (com un esbós màgic) i després l'escut s'omple de color */
+.splash { animation-duration: 4.4s; }
+.splash::before { animation-duration: 4.4s; }
+.splash .sp-crest { animation: sp-crest-pop .55s cubic-bezier(.3, 1.8, .5, 1) 2.55s both; }
+.splash .sp-outline path { animation: sp-draw 1.3s cubic-bezier(.5, .05, .35, 1) .3s forwards; }
+.splash .sp-outline .sp-spark { animation: sp-spark 1.3s cubic-bezier(.5, .05, .35, 1) .3s both; }
+.splash .sp-outline { animation: sp-outline-out .5s ease 2.35s both; }
+.splash .sp-lines { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; overflow: visible; filter: drop-shadow(0 0 3px rgba(246, 215, 122, .8)); animation: sp-outline-out .5s ease 2.3s both; }
+.splash .sp-lines path {
+  fill: none; stroke: #f6d77a; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: sp-draw 1s cubic-bezier(.5, .05, .35, 1) calc(.55s + var(--i) * 30ms) forwards;
+}
+/* l'escut «cobra vida»: apareix des de la llum quan el dibuix està fet */
+.splash .sp-crest img.sp-fill { -webkit-mask: none; mask: none; animation: sp-come-alive .75s cubic-bezier(.2, .7, .2, 1) 2.05s both; }
+@keyframes sp-come-alive {
+  from { opacity: 0; filter: brightness(2.4) saturate(0) blur(3px); transform: scale(.96); }
+  45% { opacity: 1; filter: brightness(1.5) saturate(.6) blur(.5px); }
+  to { opacity: 1; filter: none; transform: scale(1); }
+}
+.splash .sp-shine { animation: sp-shine .85s ease-in-out 2.8s both; }
+.splash > b { animation-delay: 2.7s; }
+.splash > span { animation-delay: 2.85s; }
+.splash .sp-match { animation-delay: 2.95s; }
