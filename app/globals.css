@@ -3249,10 +3249,42 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
   animation: sp-shine .75s ease-in-out 1.75s both;
 }
 @keyframes sp-draw { to { stroke-dashoffset: 0; } }
-@keyframes sp-fill { from { clip-path: inset(100% -40% -40% -40%); filter: brightness(1.6) saturate(.4); } to { clip-path: inset(-40% -40% -40% -40%); filter: drop-shadow(0 10px 24px rgba(0,0,0,.45)); } }
+@keyframes sp-fill { from { clip-path: inset(100% -40% -40% -40%); filter: brightness(1.6) saturate(.4); } to { clip-path: inset(-40% -40% -40% -40%); filter: none; } }
 @keyframes sp-outline-out { to { opacity: 0; transform: scale(1.06); } }
 @keyframes sp-crest-pop { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
 @keyframes sp-shine { from { background-position: 140% 0; opacity: 1; } to { background-position: -40% 0; opacity: 1; } }
 /* els textos, quan l'escut ja està fet */
 .splash > b { animation-delay: 1.45s; }
 .splash > span { animation-delay: 1.6s; }
+
+/* Entrada (v2): l'ombra la porta el conjunt (així cap retall talla l'ombra) */
+.splash .sp-crest { filter: drop-shadow(0 10px 24px rgba(0,0,0,.45)); }
+@property --sp-r { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+@property --sp-d { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+/* A · Floració: des del centre cap enfora, vora suau, de borrós a nítid */
+.splash .sp-crest[data-fill="bloom"] img {
+  clip-path: none;
+  -webkit-mask: radial-gradient(circle at 50% 56%, #000 calc(var(--sp-r) - 24%), transparent var(--sp-r));
+  mask: radial-gradient(circle at 50% 56%, #000 calc(var(--sp-r) - 24%), transparent var(--sp-r));
+  animation: sp-bloom 1s cubic-bezier(.2, .7, .2, 1) .9s both;
+}
+@keyframes sp-bloom {
+  from { --sp-r: 0%; filter: blur(9px) brightness(1.7) saturate(.5); transform: scale(.88); }
+  60% { filter: blur(1px) brightness(1.15) saturate(.9); }
+  to { --sp-r: 140%; filter: none; transform: scale(1); }
+}
+/* B · Escombrat diagonal, en la direcció de les ratlles, amb un fil de llum daurada al davant */
+.splash .sp-crest[data-fill="diag"] img {
+  clip-path: none;
+  -webkit-mask: linear-gradient(225deg, transparent calc(100% - var(--sp-d)), #000 calc(100% - var(--sp-d) + 14%));
+  mask: linear-gradient(225deg, transparent calc(100% - var(--sp-d)), #000 calc(100% - var(--sp-d) + 14%));
+  animation: sp-diag .95s cubic-bezier(.65, 0, .25, 1) .95s both;
+}
+@keyframes sp-diag { from { --sp-d: -14%; filter: brightness(1.4); } to { --sp-d: 114%; filter: none; } }
+.splash .sp-crest[data-fill="diag"]::after {
+  content: ""; position: absolute; inset: -10%; z-index: 4; pointer-events: none;
+  background: linear-gradient(225deg, transparent calc(100% - var(--sp-d) - 2%), rgba(246, 215, 122, .95) calc(100% - var(--sp-d) + 4%), transparent calc(100% - var(--sp-d) + 9%));
+  -webkit-mask: url(/escut.png) center / 83% no-repeat; mask: url(/escut.png) center / 83% no-repeat;
+  animation: sp-diag-line .95s cubic-bezier(.65, 0, .25, 1) .95s both;
+}
+@keyframes sp-diag-line { from { --sp-d: -14%; opacity: 1; } 85% { opacity: 1; } to { --sp-d: 114%; opacity: 0; } }
