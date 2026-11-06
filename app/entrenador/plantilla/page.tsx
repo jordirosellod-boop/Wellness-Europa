@@ -271,8 +271,23 @@ function PlanEditor({ id, onBack, onOpen }: { id: string; onBack: () => void; on
       .maybeSingle();
     setPubBusy(false);
     if (e || !data) return setStatus({ ok: false, text: `No s'ha pogut penjar: ${e?.message ?? "torna-ho a provar"}` });
+    const wasPublished = published;
     setPublished(true);
     setStatus({ ok: true, text: "Penjat a l'app ✓ Les jugadores ja el poden veure (sense lesionades, baixes ni motius)." });
+    // Avís al mòbil de les jugadores (i de la resta del staff)
+    try {
+      const { data: s } = await supabase().auth.getSession();
+      const res = await fetch("/api/push/training", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+        body: JSON.stringify({ plan_id: plan.id, changed: wasPublished }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+      setStatus({ ok: true, text: `Penjat a l'app ✓ Avís enviat a ${j.sent} ${j.sent === 1 ? "mòbil" : "mòbils"} de jugadores${j.staff ? ` i a ${j.staff} de l'staff` : ""}. (Sense lesionades, baixes ni motius.)` });
+    } catch (err) {
+      setStatus({ ok: true, text: `Penjat a l'app ✓ Però l'avís al mòbil no s'ha pogut enviar: ${err instanceof Error ? err.message : err}` });
+    }
   }
   async function unpublish() {
     if (!plan || !window.confirm("Treure l'entreno de l'app? Les jugadores ja no el veuran.")) return;
