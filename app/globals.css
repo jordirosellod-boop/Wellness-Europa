@@ -3312,3 +3312,15 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
 /* en acabar l'escombrat, fora màscares i capes (no canvia res a la vista i evita el quadrat de darrere) */
 @keyframes sp-diag-plain { 0% { --sp-d: -14%; } 99.9% { --sp-d: 114%; } 100% { --sp-d: 114%; -webkit-mask: none; mask: none; } }
 @keyframes sp-diag-line { from { --sp-d: -14%; opacity: 1; visibility: visible; } 85% { opacity: 1; } 99.9% { --sp-d: 114%; opacity: 0; visibility: visible; } 100% { opacity: 0; visibility: hidden; } }
+/* l'escombrat de l'escut: la màscara es manté (si es treia, el navegador la treia a mig camí i l'escut sortia de cop) */
+@keyframes sp-diag-plain2 { from { --sp-d: -14%; } to { --sp-d: 114%; } }
+.splash .sp-crest[data-fill="diag"] img { animation: sp-diag-plain2 1.9s cubic-bezier(.45, 0, .3, 1) 1.05s both; }
+/* ombra de l'escut: una taca suau al darrere (l'ombra amb «filter» feia aparèixer un quadrat) */
+.splash .sp-crest { filter: none; }
+.splash .sp-crest::before {
+  content: ""; position: absolute; z-index: -1; left: 6%; right: 6%; top: 18%; bottom: -6%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(0, 0, 20, .55), rgba(0, 0, 20, 0)); filter: blur(10px);
+  animation: sp-shadow-in 1.9s ease 1.05s both;
+}
+@keyframes sp-shadow-in { from { opacity: 0; } to { opacity: 1; } }
+.splash .sp-crest img { filter: none; }
