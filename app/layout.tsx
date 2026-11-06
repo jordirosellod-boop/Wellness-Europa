@@ -54,6 +54,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </defs>
               <image href="/escut.png" width="192" height="192" mask="url(#sp-brush-mask)" />
             </svg>
+            {/* la punta daurada del pinzell, que va davant mentre pinta (només dins l'escut) */}
+            <svg className="sp-tip" viewBox="0 0 192 192" aria-hidden="true"><path pathLength={1} d="M-12 2 L2 -12 L36 -12 L-12 36 L-12 70 L70 -12 L104 -12 L-12 104 L-12 138 L138 -12 L172 -12 L-12 172 L-10 204 L204 -10 L204 24 L24 204 L58 204 L204 58 L204 92 L92 204 L126 204 L204 126 L204 160 L160 204" /></svg>
             <i className="sp-shine" />
           </div>
           <b id="splash-hello" suppressHydrationWarning>Juvenil C</b>
