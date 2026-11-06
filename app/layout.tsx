@@ -44,18 +44,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="splash" aria-hidden="true">
           {/* L'escut es dibuixa: el contorn daurat es traça, s'omple de baix a dalt i hi passa un reflex de llum */}
           <div className="sp-crest">
-            <svg className="sp-outline" viewBox="0 0 192 192" aria-hidden="true"><path pathLength={1} d="M58.5 7.5 L72.5 7.5 L73.5 8.5 L77.5 8.5 L86.5 11.5 L94.5 15.5 L99.5 19.5 L101.5 19.5 L106.5 15.5 L114.5 11.5 L124.5 8.5 L143.5 8.5 L153.5 11.5 L165.5 18.5 L173.5 26.5 L181.5 38.5 L188.5 55.5 L188.5 58.5 L190.5 63.5 L190.5 68.5 L191.5 69.5 L191.5 88.5 L190.5 89.5 L190.5 94.5 L184.5 113.5 L178.5 124.5 L172.5 132.5 L157.5 146.5 L139.5 156.5 L121.5 161.5 L106.5 162.5 L102.5 162.5 L101.5 161.5 L97.5 166.5 L88.5 174.5 L75.5 181.5 L68.5 183.5 L64.5 183.5 L63.5 184.5 L43.5 183.5 L34.5 180.5 L19.5 171.5 L13.5 165.5 L8.5 158.5 L2.5 144.5 L0.5 129.5 L1.5 128.5 L8.5 128.5 L15.5 126.5 L27.5 119.5 L37.5 108.5 L41.5 100.5 L42.5 93.5 L43.5 92.5 L43.5 79.5 L42.5 78.5 L41.5 71.5 L35.5 60.5 L25.5 50.5 L16.5 45.5 L18.5 37.5 L25.5 26.5 L33.5 18.5 L47.5 10.5 L57.5 8.5 L58.5 7.5 Z" /></svg>
-            {/* l'escut es pinta amb pinzellades (una màscara que es va traçant) */}
-            <svg className="sp-paint" viewBox="0 0 192 192" aria-hidden="true">
-              <defs>
-                <mask id="sp-brush-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="192" height="192">
-                  <path className="sp-brush" pathLength={1} d="M-12 2 L2 -12 L36 -12 L-12 36 L-12 70 L70 -12 L104 -12 L-12 104 L-12 138 L138 -12 L172 -12 L-12 172 L-10 204 L204 -10 L204 24 L24 204 L58 204 L204 58 L204 92 L92 204 L126 204 L204 126 L204 160 L160 204" />
-                </mask>
-              </defs>
-              <image href="/escut.png" width="192" height="192" mask="url(#sp-brush-mask)" />
-            </svg>
-            {/* la punta daurada del pinzell, que va davant mentre pinta (només dins l'escut) */}
-            <svg className="sp-tip" viewBox="0 0 192 192" aria-hidden="true"><path pathLength={1} d="M-12 2 L2 -12 L36 -12 L-12 36 L-12 70 L70 -12 L104 -12 L-12 104 L-12 138 L138 -12 L172 -12 L-12 172 L-10 204 L204 -10 L204 24 L24 204 L58 204 L204 58 L204 92 L92 204 L126 204 L204 126 L204 160 L160 204" /></svg>
+            <svg className="sp-outline" viewBox="0 0 192 192" aria-hidden="true"><path pathLength={1} d="M58.5 7.5 L72.5 7.5 L73.5 8.5 L77.5 8.5 L86.5 11.5 L94.5 15.5 L99.5 19.5 L101.5 19.5 L106.5 15.5 L114.5 11.5 L124.5 8.5 L143.5 8.5 L153.5 11.5 L165.5 18.5 L173.5 26.5 L181.5 38.5 L188.5 55.5 L188.5 58.5 L190.5 63.5 L190.5 68.5 L191.5 69.5 L191.5 88.5 L190.5 89.5 L190.5 94.5 L184.5 113.5 L178.5 124.5 L172.5 132.5 L157.5 146.5 L139.5 156.5 L121.5 161.5 L106.5 162.5 L102.5 162.5 L101.5 161.5 L97.5 166.5 L88.5 174.5 L75.5 181.5 L68.5 183.5 L64.5 183.5 L63.5 184.5 L43.5 183.5 L34.5 180.5 L19.5 171.5 L13.5 165.5 L8.5 158.5 L2.5 144.5 L0.5 129.5 L1.5 128.5 L8.5 128.5 L15.5 126.5 L27.5 119.5 L37.5 108.5 L41.5 100.5 L42.5 93.5 L43.5 92.5 L43.5 79.5 L42.5 78.5 L41.5 71.5 L35.5 60.5 L25.5 50.5 L16.5 45.5 L18.5 37.5 L25.5 26.5 L33.5 18.5 L47.5 10.5 L57.5 8.5 L58.5 7.5 Z" /><path className="sp-spark" pathLength={1} d="M58.5 7.5 L72.5 7.5 L73.5 8.5 L77.5 8.5 L86.5 11.5 L94.5 15.5 L99.5 19.5 L101.5 19.5 L106.5 15.5 L114.5 11.5 L124.5 8.5 L143.5 8.5 L153.5 11.5 L165.5 18.5 L173.5 26.5 L181.5 38.5 L188.5 55.5 L188.5 58.5 L190.5 63.5 L190.5 68.5 L191.5 69.5 L191.5 88.5 L190.5 89.5 L190.5 94.5 L184.5 113.5 L178.5 124.5 L172.5 132.5 L157.5 146.5 L139.5 156.5 L121.5 161.5 L106.5 162.5 L102.5 162.5 L101.5 161.5 L97.5 166.5 L88.5 174.5 L75.5 181.5 L68.5 183.5 L64.5 183.5 L63.5 184.5 L43.5 183.5 L34.5 180.5 L19.5 171.5 L13.5 165.5 L8.5 158.5 L2.5 144.5 L0.5 129.5 L1.5 128.5 L8.5 128.5 L15.5 126.5 L27.5 119.5 L37.5 108.5 L41.5 100.5 L42.5 93.5 L43.5 92.5 L43.5 79.5 L42.5 78.5 L41.5 71.5 L35.5 60.5 L25.5 50.5 L16.5 45.5 L18.5 37.5 L25.5 26.5 L33.5 18.5 L47.5 10.5 L57.5 8.5 L58.5 7.5 Z" /></svg>
+            {/* l'interior apareix al mateix ritme que el traç daurat: una escombrada que gira darrere seu */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="sp-fill" src="/escut.png" alt="" width={112} height={112} />
+            <i className="sp-edge" />
             <i className="sp-shine" />
           </div>
           <b id="splash-hello" suppressHydrationWarning>Juvenil C</b>
@@ -80,7 +73,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               // El dia de partit: els dos escuts i «Avui partit · hora» (guardat per l'app a SplashMatchSaver)
               "try{var m=JSON.parse(localStorage.getItem('splash-match')||'null'),d=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid'}).format(new Date());if(m&&m.d===d){var r=document.getElementById('sp-rival'),t=document.getElementById('sp-today');if(r&&typeof m.c==='string'&&m.c.indexOf('/api/fcf/crest?f=')===0)r.src=m.c;if(t)t.textContent='Avui partit'+(m.t?' · '+m.t+' h':'');document.documentElement.setAttribute('data-matchday',m.h===false?'away':'home')}}catch(e){}" +
               // A l'iPhone, la franja de l'hora pren el color de l'app (blau): mentre dura l'entrada, el de dalt de la foto
-              "try{var tc=document.querySelector('meta[name=theme-color]');if(tc&&!document.documentElement.hasAttribute('data-nosplash')&&!matchMedia('(prefers-reduced-motion: reduce)').matches){var tc0=tc.getAttribute('content');tc.setAttribute('content','#5f6b89');setTimeout(function(){tc.setAttribute('content',tc0)},4600)}}catch(e){}",
+              "try{var tc=document.querySelector('meta[name=theme-color]');if(tc&&!document.documentElement.hasAttribute('data-nosplash')&&!matchMedia('(prefers-reduced-motion: reduce)').matches){var tc0=tc.getAttribute('content');tc.setAttribute('content','#5f6b89');setTimeout(function(){tc.setAttribute('content',tc0)},4200)}}catch(e){}",
           }}
         />
         {children}

@@ -3315,3 +3315,35 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
 }
 @keyframes sp-tip { from { stroke-dashoffset: .018; } to { stroke-dashoffset: -.982; } }
 @keyframes sp-tip-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* Entrada (v4): l'interior apareix al mateix ritme que el traç daurat (escombrada que gira darrere seu) */
+@property --sw { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+@keyframes sp-sweep { 0% { --sw: 0.0deg; } 5% { --sw: 17.7deg; } 10% { --sw: 35.4deg; } 15% { --sw: 52.5deg; } 20% { --sw: 69.6deg; } 25% { --sw: 87.1deg; } 30% { --sw: 105.0deg; } 35% { --sw: 124.2deg; } 40% { --sw: 145.3deg; } 45% { --sw: 169.3deg; } 50% { --sw: 196.6deg; } 55% { --sw: 215.3deg; } 60% { --sw: 233.1deg; } 65% { --sw: 250.6deg; } 70% { --sw: 268.1deg; } 75% { --sw: 274.5deg; } 80% { --sw: 290.2deg; } 85% { --sw: 320.1deg; } 90% { --sw: 326.7deg; } 95% { --sw: 342.1deg; } 100% { --sw: 384deg; } }
+.splash { animation-duration: 4.2s; }
+.splash::before { animation-duration: 4.2s; }
+.splash .sp-crest { --sw: 0deg; animation: sp-sweep 1.8s linear .3s both, sp-crest-pop .55s cubic-bezier(.3, 1.8, .5, 1) 2.15s both; }
+.splash .sp-outline path { animation: sp-draw 1.8s linear .3s forwards; }
+/* l'espurna: un punt de llum a la punta del traç */
+.splash .sp-outline .sp-spark { stroke: #fff6d8; stroke-width: 9; stroke-dasharray: .004 2; stroke-dashoffset: .004; filter: drop-shadow(0 0 5px #ffe28c) drop-shadow(0 0 12px #f6d77a); animation: sp-spark 1.8s linear .3s both; }
+@keyframes sp-spark { 0% { stroke-dashoffset: .004; opacity: 0; } 3% { opacity: 1; } 97% { opacity: 1; } 100% { stroke-dashoffset: -.996; opacity: 0; } }
+.splash .sp-outline { animation: sp-outline-out .6s ease 2.1s both; }
+/* l'escut, darrere del traç: de lluminós i borrós a nítid */
+.splash .sp-crest img.sp-fill {
+  position: absolute; inset: 0; width: 100%; height: 100%; clip-path: none;
+  -webkit-mask: conic-gradient(from 338deg at 50% 52%, #000 0deg, #000 max(0deg, calc(var(--sw) - 14deg)), transparent var(--sw));
+  mask: conic-gradient(from 338deg at 50% 52%, #000 0deg, #000 max(0deg, calc(var(--sw) - 14deg)), transparent var(--sw));
+  animation: sp-fill-glow 2.1s ease-out .3s both;
+}
+@keyframes sp-fill-glow { from { filter: brightness(1.9) saturate(.3) blur(2px); } 70% { filter: brightness(1.25) saturate(.85) blur(0); } to { filter: none; } }
+/* vora de llum daurada que segueix l'escombrada, només dins l'escut */
+.splash .sp-edge {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: conic-gradient(from 338deg at 50% 52%, transparent max(0deg, calc(var(--sw) - 22deg)), rgba(255, 226, 140, .85) calc(var(--sw) - 2deg), transparent var(--sw));
+  -webkit-mask: url(/escut.png) center / contain no-repeat; mask: url(/escut.png) center / contain no-repeat;
+  animation: sp-edge-out .4s ease 2.1s both;
+}
+@keyframes sp-edge-out { to { opacity: 0; } }
+.splash .sp-shine { animation: sp-shine .85s ease-in-out 2.4s both; }
+.splash > b { animation-delay: 2.3s; }
+.splash > span { animation-delay: 2.45s; }
+.splash .sp-match { animation-delay: 2.55s; }
