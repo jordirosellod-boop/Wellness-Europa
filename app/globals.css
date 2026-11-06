@@ -3301,3 +3301,14 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
 .splash > b { animation-delay: 2.95s; }
 .splash > span { animation-delay: 3.1s; }
 .splash .sp-match { animation-delay: 3.2s; }
+
+/* Entrada: línia més fina i l'escut sempre amb la mateixa qualitat (sense escalats ni canvis de brillantor que el facin «saltar» al final) */
+.splash .sp-outline path { stroke-width: 1.8; }
+.splash .sp-outline { filter: drop-shadow(0 0 3px rgba(246, 215, 122, .85)); animation: sp-outline-fade .6s ease 2.85s both; }
+@keyframes sp-outline-fade { to { opacity: 0; } }
+.splash .sp-crest { animation: none; }
+.splash .sp-crest[data-fill="diag"] img { animation: sp-diag-plain 1.9s cubic-bezier(.45, 0, .3, 1) 1.05s both; }
+@keyframes sp-diag-plain { from { --sp-d: -14%; } to { --sp-d: 114%; } }
+/* en acabar l'escombrat, fora màscares i capes (no canvia res a la vista i evita el quadrat de darrere) */
+@keyframes sp-diag-plain { 0% { --sp-d: -14%; } 99.9% { --sp-d: 114%; } 100% { --sp-d: 114%; -webkit-mask: none; mask: none; } }
+@keyframes sp-diag-line { from { --sp-d: -14%; opacity: 1; visibility: visible; } 85% { opacity: 1; } 99.9% { --sp-d: 114%; opacity: 0; visibility: visible; } 100% { opacity: 0; visibility: hidden; } }
