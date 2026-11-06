@@ -3331,3 +3331,14 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
 .splash > b { animation-delay: 1.5s; }
 .splash > span { animation-delay: 1.75s; }
 .splash .sp-match { animation-delay: 2s; }
+
+/* Informe del rival al mòbil: escuts i posició a dalt, el nom a tota l'amplada a sota */
+@media (max-width: 640px) {
+  .rr-head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 12px; }
+  .rr-crests { grid-column: 1; grid-row: 1; }
+  .rr-crests img, .rr-crest-ph { width: 56px; height: 56px; }
+  .rr-pos { grid-column: 2; grid-row: 1; }
+  .rr-title { grid-column: 1 / -1; grid-row: 2; }
+  .rr-title h2 { font-size: clamp(1.3rem, 6.4vw, 1.7rem); line-height: 1.02; }
+}
+.rr select { padding-right: 34px; text-overflow: ellipsis; }
