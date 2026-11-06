@@ -3327,3 +3327,7 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
 /* la benvinguda aguanta un segon més */
 .splash { animation-duration: 5.4s; }
 .splash::before { animation-duration: 5.4s; }
+/* la salutació surt mentre es pinta l'escut (abans quedava massa poc temps a la vista) */
+.splash > b { animation-delay: 1.5s; }
+.splash > span { animation-delay: 1.75s; }
+.splash .sp-match { animation-delay: 2s; }
