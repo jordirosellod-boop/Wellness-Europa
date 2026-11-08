@@ -10,8 +10,8 @@ import { fetchActaFull, fetchScorers, fetchSanctions, type ActaFull, type Scorer
 import snapshot from "@/lib/fcf-snapshot.json";
 
 /** Si les dades no són d'ara: de quan són (ISO). */
-export type Freshness = { stale_at: string | null };
-export const fresh = (): Freshness => ({ stale_at: null });
+export type Freshness = { stale_at: string | null; unread?: number };
+export const fresh = (): Freshness => ({ stale_at: null, unread: 0 });
 
 const SNAP = snapshot as { grup_id: string; at: string; matches: GroupMatch[]; scorers: Scorer[]; sanctions: Sanction[] };
 
@@ -87,7 +87,9 @@ export async function groupMatches(db: SupabaseClient, grup: string, f: Freshnes
   const saved = new Map<string, ActaFull>();
   const { data } = await db.from("fcf_league_actas").select("acta_id, data").in("acta_id", due.map((m) => m.acta_id));
   for (const r of data ?? []) saved.set(r.acta_id as string, r.data as ActaFull);
-  const toRead = due.filter((m) => !saved.has(m.acta_id)).slice(0, maxReads);
+  const unread = due.filter((m) => !saved.has(m.acta_id));
+  const toRead = unread.slice(0, maxReads);
+  f.unread = (f.unread ?? 0) + (unread.length - toRead.length); // en queden per a la propera crida
   for (let i = 0; i < toRead.length; i += 4) {
     const part = toRead.slice(i, i + 4);
     const got = await Promise.allSettled(part.map((m) => fetchActaFull(m.acta_id)));

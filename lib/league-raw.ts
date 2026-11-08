@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchActaFull, type ActaFull } from "@/lib/fcf-bigdata";
-import { fresh, groupMatches, sanctionsCached, scorersCached } from "@/lib/fcf-cache";
+import { fetchActaFull, type ActaFull, type Scorer } from "@/lib/fcf-bigdata";
+import type { GroupMatch } from "@/lib/fcf";
+import { fresh, groupMatches, rivalKey, sanctionsCached, scorersCached } from "@/lib/fcf-cache";
 import type { BigRaw } from "@/lib/bigdata";
 
 // Totes les dades públiques de la lliga (partits, actes, golejadores, sancions) per al Big Data i l'informe del rival.
@@ -10,7 +11,7 @@ export async function leagueRaw(db: SupabaseClient, batch = 14): Promise<BigRaw>
   if (!cfg) throw new Error("Falta la configuració de la FCF.");
   const grup = String(cfg.grup_id);
   const f = fresh();
-  const [matches, scorers, sanctions] = await Promise.all([groupMatches(db, grup, f), scorersCached(db, grup, f), sanctionsCached(db, grup, f)]);
+  const [matches, official, sanctions] = await Promise.all([groupMatches(db, grup, f, 21), scorersCached(db, grup, f), sanctionsCached(db, grup, f)]);
   const closed = matches.filter((m) => m.closed);
   const cached = new Map<string, ActaFull>();
   for (let from = 0; ; from += 500) {
@@ -30,14 +31,43 @@ export async function leagueRaw(db: SupabaseClient, batch = 14): Promise<BigRaw>
       rows.forEach((r) => cached.set(r.acta_id, r.data));
     }
   }
+  // Si la FCF no deixa llegir la llista oficial de golejadores, es fa amb els gols de les actes
+  const scorers = f.stale_at ? scorersFromAllActas(matches, cached) ?? official : official;
   return {
     us_id: String(cfg.team_id),
     matches,
     actas: Object.fromEntries(closed.filter((m) => cached.has(m.acta_id)).map((m) => [m.acta_id, cached.get(m.acta_id)!])),
     scorers,
     sanctions,
-    pending: closed.filter((m) => !cached.has(m.acta_id)).length,
+    // actes que encara falten: les dels partits tancats i les dels partits jugats que encara no s'han pogut llegir
+    pending: closed.filter((m) => !cached.has(m.acta_id)).length + (f.unread ?? 0),
     stale_at: f.stale_at,
     updated_at: new Date().toISOString(),
   };
+}
+
+/** Golejadores de tota la lliga a partir dels gols de les actes (sense els gols en pròpia). */
+function scorersFromAllActas(matches: GroupMatch[], actas: Map<string, ActaFull>): Scorer[] | null {
+  const closed = matches.filter((m) => m.closed);
+  if (!closed.length) return null;
+  const key = (s: string) => rivalKey(s);
+  const tally = new Map<string, Scorer>();
+  for (const m of closed) {
+    const a = actas.get(m.acta_id);
+    if (!a) continue;
+    for (const g of a.goals) {
+      if (g.kind === "GOL EN PRÒPIA") continue;
+      const k = key(g.team), hk = key(m.home), ak = key(m.away);
+      const home = k === hk || hk.startsWith(k) || k.startsWith(hk);
+      const away = !home && (k === ak || ak.startsWith(k) || k.startsWith(ak));
+      if (!home && !away) continue;
+      const team_id = home ? m.home_id : m.away_id;
+      const crest = (home ? m.home_crest : m.away_crest) ?? null;
+      const cur = tally.get(g.id) ?? { id: g.id, name: g.name, team_id, team: home ? m.home : m.away, goals: 0, penalties: 0, crest };
+      cur.goals++;
+      if (g.kind === "GOL PENAL") cur.penalties++;
+      tally.set(g.id, cur);
+    }
+  }
+  return [...tally.values()].sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name, "ca"));
 }
