@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CREST_PATH } from "@/lib/crest-path";
+import { haptic } from "@/lib/feel";
 
-const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const PULL = 70; // px que cal estirar per actualitzar
 
-/** Estirar cap avall des de dalt de tot per actualitzar, amb l'escut que gira. */
+/** Estirar cap avall des de dalt de tot per actualitzar: el contorn de l'escut es va dibuixant i, en arribar, s'omple. */
 export function PullToRefresh() {
   const [pull, setPull] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -23,7 +24,9 @@ export function PullToRefresh() {
       if (start.current == null) return;
       const dy = e.touches[0].clientY - start.current;
       if (dy <= 0 || window.scrollY > 0) { cur.current = 0; setPull(0); return; }
+      const before = cur.current;
       cur.current = Math.min(110, dy * 0.5);
+      if (before < PULL && cur.current >= PULL) haptic();
       setPull(cur.current);
     };
     const up = () => {
@@ -52,8 +55,11 @@ export function PullToRefresh() {
   const k = Math.min(1, pull / PULL);
   return (
     <div className={`ptr${busy ? " busy" : ""}${k >= 1 ? " ready" : ""}`} style={{ transform: `translate(-50%, ${busy ? 54 : pull * 0.8}px)`, opacity: busy ? 1 : k }} role="status" aria-label={busy ? "Actualitzant" : "Estira per actualitzar"}>
+      <svg className="ptr-outline" viewBox="0 0 192 192" aria-hidden="true">
+        <path pathLength={1} d={CREST_PATH} style={{ strokeDashoffset: busy ? 0 : 1 - k }} />
+      </svg>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/escut.png" alt="" width={34} height={34} style={busy || reduced() ? undefined : { transform: `rotate(${pull * 4}deg)` }} />
+      <img src="/escut.png" alt="" width={34} height={34} />
     </div>
   );
 }

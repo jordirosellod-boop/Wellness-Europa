@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
+import { haptic } from "@/lib/feel";
 import { Scale } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import {
@@ -35,6 +37,26 @@ function SavedBurst({ text }: { text: string }) {
       <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23" /><path d="M15 27l7 7 15-16" /></svg>
       <b>{text}</b>
     </div>
+  );
+}
+
+/** En enviar el wellness: l'escut cau com un segell al mig de la pantalla i desapareix. */
+function CrestStamp() {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const t1 = setTimeout(() => haptic(), 380);
+    const t2 = setTimeout(() => setOn(false), 1700);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+  if (!on || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="crest-stamp" aria-hidden="true">
+      <span className="cs-ring" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/escut.png" alt="" width={150} height={150} />
+      <b>FET ✓</b>
+    </div>,
+    document.body,
   );
 }
 
@@ -182,6 +204,7 @@ export function WellnessForm({
         </button>
       )}
       {burst && <SavedBurst text="Wellness enviat · +1 🔥 a la ratxa" />}
+      {burst && <CrestStamp />}
       {status.kind === "ok" && <p className="msg ok" role="status">✓ {status.text}</p>}
       {status.kind === "error" && <p className="msg error" role="alert">{status.text}</p>}
     </form>

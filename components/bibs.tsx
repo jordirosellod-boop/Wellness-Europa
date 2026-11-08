@@ -19,7 +19,8 @@ export function BibsCard({ meId, today }: { meId: string; today: string }) {
   const when = first.day === today ? "Avui" : fmtShort(first.day);
   const myNext = list.find((b) => b.player_id === meId);
   return (
-    <section className={`card bibs-card${mine ? " mine" : ""}`}>
+    <section className={`card bibs-card${mine ? " mine" : ""}${mine && first.day === today ? " today" : ""}`}>
+      {mine && first.day === today && <i className="bibs-shine" aria-hidden="true" />}
       <h2>🦺 Petos</h2>
       <p className="bibs-now">
         <Shirt n={first.dorsal} gk={dorsals.get(first.player_id)?.gk} size={40} tone={mine ? "gold" : "home"} />

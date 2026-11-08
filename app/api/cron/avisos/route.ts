@@ -13,7 +13,7 @@ export const maxDuration = 60;
 
 // L'executa la base de dades (pg_cron) cada 15 minuts. Mira si toca enviar algun avís i,
 // si toca, l'envia una sola vegada (queda apuntat a push_log):
-//  · la vigília a les 19 h: a qui li toquen els petos l'endemà
+//  · la vigília a les 19 h: a qui li toquen els petos l'endemà (i el mateix dia a les 8 h, un recordatori)
 //  · dilluns a les 9 h: als grups de material i de porteria de la setmana
 //  · el dia de partit, 2 h abans de la quedada: a les convocades
 //  · cada dia a les 22 h: a qui encara no ha fet l'RPE d'avui (menys les absents o que han avisat)
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
   };
 
   if (hour >= 19 && hour < 22) await step("petos", () => bibsTomorrow(db, addDays(today, 1)));
+  if (hour >= 8 && hour < 11) await step("petos-avui", () => bibsToday(db, today));
   if (dow === 1 && hour >= 9 && hour < 13) await step("grups", () => dutyGroups(db, today));
   await step("quedada", () => meetReminder(db, today));
   if (hour === 22) await step("rpe", () => rpeReminder(db, today));
@@ -62,6 +63,19 @@ async function bibsTomorrow(db: SupabaseClient, day: string): Promise<number | n
   return pushTo(db, [row.player_id], {
     title: "🦺 Demà et toquen els petos",
     body: `${first(row.display_name)}, demà els portes tu. Que no se t'oblidin!`,
+    url: "/j",
+  });
+}
+
+/** El mateix dia al matí: recordatori a la jugadora que porta els petos avui. */
+async function bibsToday(db: SupabaseClient, day: string): Promise<number | null> {
+  const { data, error } = await db.rpc("bib_schedule", { p_from: day, p_to: day });
+  if (error) throw new Error(error.message);
+  const row = ((data ?? []) as { player_id: string; display_name: string }[])[0];
+  if (!row || !(await claimPush(db, `petos-avui:${day}`))) return null;
+  return pushTo(db, [row.player_id], {
+    title: "🦺 Avui et toquen els petos",
+    body: `${first(row.display_name)}, avui els portes tu. Posa'ls a la bossa!`,
     url: "/j",
   });
 }

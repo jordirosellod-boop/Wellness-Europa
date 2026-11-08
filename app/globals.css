@@ -2013,7 +2013,7 @@ input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(.9)
   background: radial-gradient(90% 60% at 50% 30%, var(--c3), transparent 70%), linear-gradient(160deg, var(--c1), var(--c2));
   box-shadow: 0 22px 44px rgba(1,20,70,.4), inset 0 0 0 3px var(--edge), inset 0 0 0 7px rgba(255,255,255,.12);
   transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry)); transition: transform .25s var(--ease);
-  animation: pcard-in .8s var(--ease-back) both;
+  animation: pcard-in .8s var(--ease-back) backwards;
 }
 .pcard.gold { --c1: #7a5a12; --c2: #c79a2e; --c3: #f6e3a8; --ink: #1d1503; --edge: #fff1c2; }
 .pcard.silver { --c1: #5d6a86; --c2: #a9b4cc; --c3: #eef2fb; --ink: #0b1a45; --edge: #ffffff; }
@@ -2710,10 +2710,15 @@ body { overscroll-behavior-y: none; } /* el gest d'estirar el fem nosaltres (amb
   position: fixed; left: 50%; top: calc(var(--top-safe) + 4px); z-index: 60; width: 52px; height: 52px; border-radius: 50%;
   display: grid; place-items: center; background: #fff; box-shadow: 0 6px 18px rgba(1,20,70,.3); pointer-events: none;
 }
-.ptr img { width: 34px; height: 34px; }
+.ptr img { width: 34px; height: 34px; grid-area: 1 / 1; opacity: 0; transform: scale(.9); transition: opacity .25s ease, transform .3s var(--ease-back); }
+.ptr .ptr-outline { grid-area: 1 / 1; width: 36px; height: 36px; overflow: visible; }
+.ptr .ptr-outline path { fill: none; stroke: var(--or); stroke-width: 7; stroke-linejoin: round; stroke-dasharray: 1; }
+.ptr.ready img, .ptr.busy img { opacity: 1; transform: none; }
+.ptr.ready .ptr-outline, .ptr.busy .ptr-outline { opacity: 0; transition: opacity .25s ease; }
 .ptr.ready { box-shadow: 0 0 0 3px var(--or), 0 6px 18px rgba(1,20,70,.3); }
-@keyframes ptr-spin { to { transform: rotate(360deg); } }
-.ptr.busy img { animation: ptr-spin .8s linear infinite; }
+@keyframes ptr-beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+.ptr.busy img { animation: ptr-beat .9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .ptr.busy img { animation: none; } }
 .offline {
   position: fixed; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 70;
   padding: 10px 14px; border-radius: 14px; background: var(--navy); color: #fff; font-size: .88rem; text-align: center;
@@ -3126,3 +3131,39 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
 .bibs-nums li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line, #e3e8f5); }
 .bibs-nums li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bibs-nums input { width: 56px; text-align: center; padding: 6px; }
+
+/* Cromo hologràfic: reflex daurat que segueix el dit o la inclinació del mòbil */
+.pcard .pcard-glare {
+  position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit; mix-blend-mode: soft-light;
+  background:
+    radial-gradient(circle at var(--mx) var(--my), rgba(255,240,190,.9), rgba(246,215,122,.35) 22%, transparent 50%),
+    linear-gradient(105deg, transparent 38%, rgba(255,226,150,.55) 47%, rgba(255,255,255,.7) 50%, rgba(255,226,150,.55) 53%, transparent 62%);
+  background-size: 100% 100%, 300% 100%;
+  background-position: 0 0, var(--mx) 0;
+}
+.pcard.gyro { transition: transform .1s linear; }
+.pcard-hint { margin: -2px 0 0; font-size: .85rem; font-weight: 600; color: #8a6412; animation: card-in .5s var(--ease) .9s both; }
+@media (prefers-reduced-motion: reduce) { .pcard .pcard-glare { background-position: 0 0, 50% 0; } }
+
+/* Petos: el dia que et toca, el requadre brilla en daurat */
+.bibs-card.today { position: relative; overflow: hidden; background: linear-gradient(160deg, #fff8e6, #fbe9b7); border-color: #c79a2e; }
+.bibs-card.today .bibs-shine { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.75) 50%, transparent 65%); background-size: 260% 100%; animation: bibs-shine 3.2s ease-in-out .6s infinite; }
+@keyframes bibs-shine { 0% { background-position: 130% 0; } 45%, 100% { background-position: -30% 0; } }
+.bibs-card.today > :not(.bibs-shine) { position: relative; }
+@media (prefers-reduced-motion: reduce) { .bibs-card.today .bibs-shine { animation: none; display: none; } }
+
+/* Segell de l'escut en enviar el wellness */
+.crest-stamp { position: fixed; inset: 0; z-index: 9000; display: grid; place-content: center; justify-items: center; gap: 10px; pointer-events: none; animation: cs-out .35s ease 1.35s forwards; }
+.crest-stamp img { width: 150px; height: 150px; filter: drop-shadow(0 14px 22px rgba(1,20,70,.35)); animation: cs-drop .5s cubic-bezier(.5,0,.75,0) both, cs-settle .35s var(--ease-back) .5s both; }
+.crest-stamp b { font-family: var(--display); font-weight: 400; font-size: 1.6rem; letter-spacing: .06em; color: var(--navy); background: #fff; padding: 4px 14px; border-radius: 99px; box-shadow: 0 6px 18px rgba(1,20,70,.2); animation: card-in .35s var(--ease) .55s both; }
+.crest-stamp .cs-ring { position: absolute; left: 50%; top: 50%; width: 150px; height: 150px; margin: -95px 0 0 -75px; border-radius: 50%; border: 3px solid #dbb34d; opacity: 0; animation: cs-ring .6s ease-out .48s both; }
+@keyframes cs-drop { from { opacity: 0; transform: translateY(-40px) rotate(-14deg) scale(1.6); } to { opacity: 1; transform: rotate(-6deg) scale(.94); } }
+@keyframes cs-settle { from { transform: rotate(-6deg) scale(.94); } to { transform: rotate(-6deg) scale(1); } }
+@keyframes cs-ring { from { opacity: .9; transform: scale(.8); } to { opacity: 0; transform: scale(1.9); } }
+@keyframes cs-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .crest-stamp { display: none; } }
+
+/* Microdetalls: selecció i cursor del color del club, i números de la mateixa amplada */
+::selection { background: rgba(219,179,77,.45); color: inherit; }
+input, textarea, [contenteditable] { caret-color: #c79a2e; }
+body { font-variant-numeric: tabular-nums; }

@@ -74,9 +74,55 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
     return () => { alive = false; };
   }, [meId, today]);
 
+  // Inclinació amb el mòbil (giroscopi): el cromo es mou i el reflex daurat segueix el moviment.
+  const touching = useRef(false);
+  // (el cromo només es pinta al navegador, quan ja se sap qui és la jugadora)
+  const [gyro, setGyro] = useState<"off" | "ask" | "on">(() => {
+    if (typeof window === "undefined" || !("DeviceOrientationEvent" in window)) return "off";
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return "off";
+    const DOE = window.DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
+    return typeof DOE.requestPermission === "function" ? "ask" : "on";
+  });
+  useEffect(() => {
+    if (gyro !== "on") return;
+    let base: { b: number; g: number } | null = null;
+    let target = { x: 0, y: 0 }, cur = { x: 0, y: 0 }, raf = 0;
+    const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+    const onOri = (e: DeviceOrientationEvent) => {
+      if (e.beta == null || e.gamma == null) return;
+      if (!base) base = { b: e.beta, g: e.gamma };
+      // La posició de partida es va adaptant a poc a poc (si canvia com aguanta el mòbil)
+      base.b += (e.beta - base.b) * 0.01; base.g += (e.gamma - base.g) * 0.01;
+      target = { x: clamp((e.gamma - base.g) / 22), y: clamp((e.beta - base.b) / 22) };
+    };
+    const step = () => {
+      cur = { x: cur.x + (target.x - cur.x) * 0.12, y: cur.y + (target.y - cur.y) * 0.12 };
+      const el = ref.current;
+      if (el && !touching.current) {
+        el.style.setProperty("--rx", `${(-cur.y * 9).toFixed(2)}deg`);
+        el.style.setProperty("--ry", `${(cur.x * 11).toFixed(2)}deg`);
+        el.style.setProperty("--mx", `${(50 + cur.x * 45).toFixed(1)}%`);
+        el.style.setProperty("--my", `${(30 + cur.y * 45).toFixed(1)}%`);
+      }
+      raf = requestAnimationFrame(step);
+    };
+    window.addEventListener("deviceorientation", onOri);
+    raf = requestAnimationFrame(step);
+    ref.current?.classList.add("gyro");
+    return () => { window.removeEventListener("deviceorientation", onOri); cancelAnimationFrame(raf); };
+  }, [gyro]);
+  async function askGyro() {
+    if (gyro !== "ask") return;
+    try {
+      const r = await (window.DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission();
+      setGyro(r === "granted" ? "on" : "off");
+    } catch { setGyro("off"); }
+  }
+
   function tilt(e: PointerEvent<HTMLDivElement>) {
     const el = ref.current;
     if (!el) return;
+    touching.current = true;
     const r = el.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
     el.style.setProperty("--rx", `${(0.5 - y) * 16}deg`);
@@ -85,8 +131,9 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
     el.style.setProperty("--my", `${y * 100}%`);
   }
   function reset() {
+    touching.current = false;
     const el = ref.current;
-    if (!el) return;
+    if (!el || gyro === "on") return;
     for (const p of ["--rx", "--ry"]) el.style.setProperty(p, "0deg");
     el.style.setProperty("--mx", "50%"); el.style.setProperty("--my", "30%");
   }
@@ -123,8 +170,9 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
       </section>
     )}
     <div className="pcard-wrap">
-      <div ref={ref} className={`pcard ${tier} ${kitFont.variable}${d ? "" : " loading"}${cutout ? " has-photo" : ""}`} onPointerMove={tilt} onPointerLeave={reset} onPointerUp={reset} onPointerCancel={reset}>
+      <div ref={ref} className={`pcard ${tier} ${kitFont.variable}${d ? "" : " loading"}${cutout ? " has-photo" : ""}`} onPointerDown={askGyro} onPointerMove={tilt} onPointerLeave={reset} onPointerUp={reset} onPointerCancel={reset}>
         <div className="pcard-holo" aria-hidden="true" />
+        <div className="pcard-glare" aria-hidden="true" />
         <div className="pcard-top">
           <span className="pcard-num">{d?.dorsal ?? "–"}</span>
           <span className="pcard-team">
@@ -149,6 +197,7 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
         <StoryCard label="📸 Compartir el meu cromo" busyLabel="Preparant el cromo…" alt="El teu cromo per compartir" fname={`cromo-${season(today).replace("/", "-")}.png`}
           make={() => drawCardStory({ tier: tier as "gold" | "silver" | "blue", dorsal: d.dorsal, name, season: season(today), stats, photo: cutout })} />
       )}
+      {gyro === "ask" && <p className="pcard-hint">✨ Toca el cromo i mou el mòbil</p>}
       <p className="muted small pcard-legend">
         PJ partits · TIT titular · GOL gols · ENT entrenaments aquesta temporada · 🔥 wellness seguits · LLI lliga interna.
         {d && !d.linked && " Els números de partit sortiran quan el staff et relacioni amb la fitxa de la FCF."}

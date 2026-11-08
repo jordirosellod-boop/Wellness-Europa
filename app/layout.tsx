@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from "next";
 import { Anton, Poppins } from "next/font/google";
 import "./globals.css";
 import { escapulada, kitFont } from "@/lib/fonts";
+import { CREST_PATH } from "@/lib/crest-path";
 
 // Tipografia com la de ceeuropa.cat: títols estrets en majúscules i text en Poppins.
 const display = Anton({ weight: "400", subsets: ["latin", "latin-ext"], variable: "--font-display", display: "swap" });
@@ -44,7 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="splash" aria-hidden="true">
           {/* L'escut es dibuixa: el contorn daurat es traça, s'omple de baix a dalt i hi passa un reflex de llum */}
           <div className="sp-crest" data-fill="diag">
-            <svg className="sp-outline" viewBox="0 0 192 192" aria-hidden="true"><path pathLength={1} d="M58.5 7.5 L72.5 7.5 L73.5 8.5 L77.5 8.5 L86.5 11.5 L94.5 15.5 L99.5 19.5 L101.5 19.5 L106.5 15.5 L114.5 11.5 L124.5 8.5 L143.5 8.5 L153.5 11.5 L165.5 18.5 L173.5 26.5 L181.5 38.5 L188.5 55.5 L188.5 58.5 L190.5 63.5 L190.5 68.5 L191.5 69.5 L191.5 88.5 L190.5 89.5 L190.5 94.5 L184.5 113.5 L178.5 124.5 L172.5 132.5 L157.5 146.5 L139.5 156.5 L121.5 161.5 L106.5 162.5 L102.5 162.5 L101.5 161.5 L97.5 166.5 L88.5 174.5 L75.5 181.5 L68.5 183.5 L64.5 183.5 L63.5 184.5 L43.5 183.5 L34.5 180.5 L19.5 171.5 L13.5 165.5 L8.5 158.5 L2.5 144.5 L0.5 129.5 L1.5 128.5 L8.5 128.5 L15.5 126.5 L27.5 119.5 L37.5 108.5 L41.5 100.5 L42.5 93.5 L43.5 92.5 L43.5 79.5 L42.5 78.5 L41.5 71.5 L35.5 60.5 L25.5 50.5 L16.5 45.5 L18.5 37.5 L25.5 26.5 L33.5 18.5 L47.5 10.5 L57.5 8.5 L58.5 7.5 Z" /></svg>
+            <svg className="sp-outline" viewBox="0 0 192 192" aria-hidden="true"><path pathLength={1} d={CREST_PATH} /></svg>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/escut.png" alt="" width={112} height={112} />
             <i className="sp-shine" />
