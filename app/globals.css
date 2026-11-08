@@ -3120,3 +3120,9 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
   .rr-title h2 { font-size: clamp(1.3rem, 6.4vw, 1.7rem); line-height: 1.02; }
 }
 .rr select { padding-right: 34px; text-overflow: ellipsis; }
+
+/* Petos: dorsals fixos */
+.bibs-nums { list-style: none; padding: 0; margin: 0 0 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; }
+.bibs-nums li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line, #e3e8f5); }
+.bibs-nums li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bibs-nums input { width: 56px; text-align: center; padding: 6px; }

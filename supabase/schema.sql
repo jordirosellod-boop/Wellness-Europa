@@ -616,6 +616,14 @@ create table if not exists public.bib_overrides (
   updated_at timestamptz not null default now()
 );
 
+-- DORSALS DELS PETOS: el número fix de cada jugadora per a l'ordre dels petos (no canvia encara que a la
+-- convocatòria porti un altre dorsal). Si una jugadora no en té, s'agafa el dorsal normal.
+create table if not exists public.bib_numbers (
+  player_id  uuid primary key references public.profiles(id) on delete cascade,
+  dorsal     smallint not null unique check (dorsal between 0 and 99),
+  updated_at timestamptz not null default now()
+);
+
 -- GRUPS DE MATERIAL I PORTERIA: cada setmana (de dilluns a diumenge) un grup porta el material i un altre
 -- les porteries, i es va rotant (material 4 → 1 → 2 → 3…, porteria 1 → 2 → 3 → 4…).
 create table if not exists public.duty_groups (
@@ -1322,19 +1330,25 @@ begin
     into ids, names, dorsals
   from (
     select p.id, p.display_name,
-           coalesce(nn.dorsal, (select case when f.dorsal ~ '^[0-9]{1,2}$' then f.dorsal::smallint end
+           coalesce(bn.dorsal, nn.dorsal, (select case when f.dorsal ~ '^[0-9]{1,2}$' then f.dorsal::smallint end
                                 from public.fcf_players f where f.profile_id = p.id limit 1)) as dorsal
     from public.profiles p left join public.player_numbers nn on nn.profile_id = p.id
+    left join public.bib_numbers bn on bn.player_id = p.id
     where p.role = 'player'
   ) x;
   n := coalesce(array_length(ids, 1), 0);
   if n = 0 then return; end if;
   pos := array_position(ids, cfg.start_player);
   nxt := coalesce(pos, 1);
+  -- Dies d'entreno o partit (també els partits que només tenen la convocatòria publicada)
   for d in
-    select distinct s.session_date from public.sessions s
-    where not s.cancelled and s.session_date between cfg.start_date and p_to
-    order by 1
+    select x.dd from (
+      select s.session_date as dd from public.sessions s
+      where not s.cancelled and s.session_date between cfg.start_date and p_to
+      union
+      select c.match_date from public.convocations c
+      where c.published and c.match_date between cfg.start_date and p_to
+    ) x order by 1
   loop
     found_i := null;
     select o.player_id into ov from public.bib_overrides o where o.day = d;
@@ -1345,6 +1359,10 @@ begin
         c := ((nxt - 1 + k) % n) + 1;
         -- Se la salta si està lesionada, si ha avisat que no vindrà o si a la llista d'aquell dia consta absent (i no present).
         if public.is_injured_on(ids[c], d) then continue; end if;
+        -- El dia de partit, si no està convocada, li toca a la següent.
+        if exists (select 1 from public.convocations cv where cv.published and cv.match_date = d)
+           and not exists (select 1 from public.convocations cv join public.convocation_players cp on cp.convocation_id = cv.id
+                           where cv.published and cv.match_date = d and cp.player_id = ids[c] and cp.called) then continue; end if;
         if exists (select 1 from public.absence_notices an join public.sessions s on s.id = an.session_id
                    where an.player_id = ids[c] and s.session_date = d and not s.cancelled) then continue; end if;
         if exists (select 1 from public.attendance a join public.sessions s on s.id = a.session_id
@@ -1703,6 +1721,7 @@ alter table public.duty_settings      enable row level security;
 alter table public.published_trainings enable row level security;
 alter table public.bib_settings       enable row level security;
 alter table public.bib_overrides      enable row level security;
+alter table public.bib_numbers        enable row level security;
 alter table public.fcf_league_actas   enable row level security;
 alter table public.scouting_targets   enable row level security;
 alter table public.corrections        enable row level security;
@@ -1716,7 +1735,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.calendar_tokens, public.google_drive_links, public.oauth_states, public.rival_ref_actas, public.match_minutes, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
-  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
+  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
@@ -1755,10 +1774,10 @@ grant all on public.analysis_matches, public.analysis_events, public.analysis_bu
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
 grant all on public.weekly_plans to service_role;
 grant select, insert, update, delete on public.weekly_plans to authenticated;
-grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings to service_role;
+grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings to service_role;
 grant select, insert, update, delete on public.duty_groups to authenticated;
 grant select, update on public.duty_settings to authenticated;
-grant select, insert, update, delete on public.published_trainings, public.bib_overrides to authenticated;
+grant select, insert, update, delete on public.published_trainings, public.bib_overrides, public.bib_numbers to authenticated;
 grant select, update on public.bib_settings to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;
 grant select, insert, update, delete on public.scouting_targets to authenticated;
@@ -2026,6 +2045,9 @@ create policy bib_settings_coach on public.bib_settings for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 drop policy if exists bib_overrides_coach on public.bib_overrides;
 create policy bib_overrides_coach on public.bib_overrides for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists bib_numbers_coach on public.bib_numbers;
+create policy bib_numbers_coach on public.bib_numbers for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 
 drop policy if exists tactic_boards_owner on public.tactic_boards;

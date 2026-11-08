@@ -650,6 +650,30 @@ select pg_temp.check((select array_agg(player_id order by day) from public.bib_s
 reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
 select pg_temp.expect_error($$select * from public.bib_schedule(current_date, current_date + 7)$$, 'Anònim no veu els petos');
 reset role;
+-- Dorsals dels petos (fixos, no els de la convocatòria) i dies de partit amb només la convocatòria
+delete from public.bib_overrides;
+update public.bib_settings set start_date = (select today from vars) + 300, start_player = (select ids[2] from bibp);
+insert into public.sessions (session_date, kind, name) values ((select today from vars) + 300, 'Entrenament', 'PB1');
+insert into public.convocations (id, match_date, rival, published) values ('00000000-0000-0000-0000-0000000b1b01', (select today from vars) + 301, 'Rival petos', true);
+insert into public.convocation_players (convocation_id, player_id, called)
+select '00000000-0000-0000-0000-0000000b1b01'::uuid, ids[1], false from bibp union all
+select '00000000-0000-0000-0000-0000000b1b01'::uuid, ids[3], true from bibp;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.bib_numbers (player_id, dorsal) select ids[2], 1 from bibp;
+insert into public.bib_numbers (player_id, dorsal) select ids[1], 2 from bibp;
+select pg_temp.check((select count(*) from public.bib_numbers) = 2, 'El staff posa els dorsals dels petos');
+select pg_temp.expect_error($$insert into public.bib_numbers (player_id, dorsal) values ('00000000-0000-0000-0000-0000000000b2', 1)$$, 'Dos jugadores no poden tenir el mateix dorsal de petos');
+select pg_temp.check((select array_agg(player_id order by day) from public.bib_schedule((select today from vars) + 300, (select today from vars) + 301))
+  = (select array[ids[2], ids[3]] from bibp), 'Petos per dorsal de petos; el dia de partit també, i si no està convocada li toca a la següent');
+select pg_temp.check((select dorsal from public.bib_schedule((select today from vars) + 300, (select today from vars) + 300)) = 1, 'Surt el dorsal dels petos, no el de la convocatòria');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.bib_numbers) = 0, 'La jugadora no veu la taula de dorsals dels petos');
+select pg_temp.expect_error($$insert into public.bib_numbers (player_id, dorsal) values ('00000000-0000-0000-0000-0000000000b2', 77)$$, 'La jugadora no pot posar dorsals dels petos');
+reset role;
+delete from public.convocations where id = '00000000-0000-0000-0000-0000000b1b01';
+delete from public.bib_numbers;
+update public.bib_settings set start_date = (select today from vars) + 100, start_player = (select ids[1] from bibp);
+insert into public.bib_overrides (day, player_id) values ((select today from vars) + 100, (select ids[2] from bibp));
 
 -- =============== CÒPIA DE LA FCF (només el servidor) ===============
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;

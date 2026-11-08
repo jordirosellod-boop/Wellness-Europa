@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { addDays, fmtShort } from "@/lib/dates";
 import { Shirt, useDorsals } from "@/components/shirt";
-import { bibName, fetchBibPlayers, fetchBibs, fetchBibSettings, type BibDay, type BibSettings } from "@/lib/bibs";
+import { bibName, fetchBibPlayers, fetchBibs, fetchBibSettings, type BibDay, type BibPlayer, type BibSettings } from "@/lib/bibs";
 import { supabase } from "@/lib/supabase";
 
 /** Targeta de la jugadora: qui porta els petos avui (o el proper dia) i els següents. */
@@ -40,7 +40,7 @@ export function BibsCard({ meId, today }: { meId: string; today: string }) {
 /** Staff: qui els porta cada dia de la setmana, canviar-ho a mà i on comença l'ordre. */
 export function BibsAdmin({ weekStart, onChanged }: { weekStart: string; onChanged?: () => void }) {
   const [list, setList] = useState<BibDay[] | null>(null);
-  const [players, setPlayers] = useState<{ id: string; name: string; dorsal: number | null }[]>([]);
+  const [players, setPlayers] = useState<BibPlayer[]>([]);
   const [cfg, setCfg] = useState<BibSettings | null>(null);
   const [version, setVersion] = useState(0);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -84,7 +84,7 @@ export function BibsAdmin({ weekStart, onChanged }: { weekStart: string; onChang
     <section className="card bibs-admin">
       <h2 style={{ marginTop: 0 }}>🦺 Petos</h2>
       <p className="muted small" style={{ marginTop: -4 }}>
-        Cada dia d&apos;entreno o partit els porta una jugadora, per ordre de dorsal. Si a la llista consta absent (o està lesionada), li toca a la següent.
+        Cada dia d&apos;entreno o partit els porta una jugadora, per ordre del dorsal dels petos (no canvia encara que a la convocatòria en porti un altre). Si consta absent, està lesionada o el dia de partit no està convocada, li toca a la següent.
       </p>
       {msg && <p className={`msg${msg.ok ? "" : " error"}`}>{msg.text}</p>}
       {list && list.length === 0 && <p className="muted">Aquesta setmana no hi ha cap sessió (o encara no s&apos;ha triat on comença l&apos;ordre).</p>}
@@ -105,6 +105,12 @@ export function BibsAdmin({ weekStart, onChanged }: { weekStart: string; onChang
         <details className="bibs-start">
           <summary>On comença l&apos;ordre</summary>
           <StartForm cfg={cfg} players={players} label={label} busy={busy} onSave={setStart} />
+        </details>
+      )}
+      {players.length > 0 && (
+        <details className="bibs-start">
+          <summary>Dorsals dels petos</summary>
+          <BibNumbers players={players} onSaved={() => done("Desat ✓ Dorsals dels petos.")} onError={(text) => setMsg({ ok: false, text })} />
         </details>
       )}
     </section>
@@ -128,6 +134,53 @@ function StartForm({ cfg, players, label, busy, onSave }: {
         {players.map((x) => <option key={x.id} value={x.id}>{label(x)}</option>)}
       </select>
       <button type="button" className="btn small" disabled={busy || !d || !p} onClick={() => onSave(d, p)}>Desar</button>
+    </div>
+  );
+}
+
+/** Staff: el dorsal fix de cada jugadora per a l'ordre dels petos. */
+function BibNumbers({ players, onSaved, onError }: { players: BibPlayer[]; onSaved: () => void; onError: (t: string) => void }) {
+  const [vals, setVals] = useState<Record<string, string>>(() => Object.fromEntries(players.map((p) => [p.id, p.bib != null ? String(p.bib) : ""])));
+  const [busy, setBusy] = useState(false);
+  const sorted = [...players].sort((a, b) => a.name.localeCompare(b.name, "ca"));
+
+  async function save() {
+    const parsed = players.map((p) => ({ id: p.id, v: (vals[p.id] ?? "").trim() }));
+    if (parsed.some((x) => x.v !== "" && !/^\d{1,2}$/.test(x.v))) return onError("Els dorsals han de ser números del 0 al 99.");
+    const used = parsed.filter((x) => x.v !== "").map((x) => Number(x.v));
+    if (new Set(used).size !== used.length) return onError("Hi ha dos jugadores amb el mateix dorsal.");
+    setBusy(true);
+    const sb = supabase();
+    const now = new Date().toISOString();
+    // Primer s'esborren els que canvien (perquè dos números no xoquin mentre s'intercanvien) i després es desen.
+    const changed = parsed.filter((x) => x.v !== (players.find((p) => p.id === x.id)?.bib?.toString() ?? ""));
+    const del = changed.map((x) => x.id);
+    if (del.length) {
+      const { error } = await sb.from("bib_numbers").delete().in("player_id", del);
+      if (error) { setBusy(false); return onError(`No s'ha pogut desar: ${error.message}`); }
+    }
+    const rows = changed.filter((x) => x.v !== "").map((x) => ({ player_id: x.id, dorsal: Number(x.v), updated_at: now }));
+    if (rows.length) {
+      const { error } = await sb.from("bib_numbers").upsert(rows).select("player_id");
+      if (error) { setBusy(false); return onError(`No s'ha pogut desar: ${error.message}`); }
+    }
+    setBusy(false);
+    onSaved();
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <p className="muted small" style={{ marginTop: 0 }}>Si una jugadora no en té, s&apos;agafa el seu dorsal normal.</p>
+      <ul className="bibs-nums">
+        {sorted.map((p) => (
+          <li key={p.id}>
+            <span>{p.name}</span>
+            <input inputMode="numeric" maxLength={2} value={vals[p.id] ?? ""} disabled={busy} aria-label={`Dorsal dels petos de ${p.name}`}
+              onChange={(e) => setVals((v) => ({ ...v, [p.id]: e.target.value.replace(/\D/g, "") }))} />
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="btn small" disabled={busy} onClick={save}>{busy ? "Desant…" : "Desar dorsals"}</button>
     </div>
   );
 }
