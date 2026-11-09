@@ -8,9 +8,10 @@ import { crestColor } from "@/lib/crest-color";
 type Team = { id: string; name: string; crest: string };
 let teamsPromise: Promise<Team[]> | null = null;
 let teamsCache: Team[] | null = null;
+const listeners = new Set<(t: Team[]) => void>();
 
 function loadTeams(): Promise<Team[]> {
-  teamsPromise ??= fetch("/api/fcf/crests")
+  teamsPromise ??= fetch("/api/fcf/crests", teamsCache ? { cache: "no-store" } : undefined)
     .then((r) => (r.ok ? r.json() : { teams: [] }))
     .then((j: { teams?: Team[] }) => (teamsCache = j.teams ?? []))
     .catch(() => (teamsCache = []));
@@ -40,15 +41,25 @@ export function crestFor(teams: Team[], name: string | null | undefined): string
   return best?.t.crest ?? null;
 }
 
+/** Torna a demanar la llista (p. ex. després d'afegir l'escut d'un rival) i avisa tots els escuts de la pàgina. */
+export async function reloadCrests(): Promise<Team[]> {
+  teamsPromise = null;
+  const t = await loadTeams();
+  for (const l of listeners) l(t);
+  return t;
+}
+
 /** Llista d'equips amb escut (es carrega en segon pla). */
 export function useCrests(): Team[] {
   const [teams, setTeams] = useState<Team[]>(() => teamsCache ?? []);
   useEffect(() => {
-    if (teamsCache) return;
     let alive = true;
-    loadTeams().then((t) => alive && setTeams(t));
+    const on = (t: Team[]) => alive && setTeams(t);
+    listeners.add(on);
+    if (!teamsCache) loadTeams().then(on);
     return () => {
       alive = false;
+      listeners.delete(on);
     };
   }, []);
   return teams;

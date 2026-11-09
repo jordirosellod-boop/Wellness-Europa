@@ -624,6 +624,19 @@ create table if not exists public.bib_numbers (
   updated_at timestamptz not null default now()
 );
 
+-- ESCUTS D'ALTRES EQUIPS (p. ex. rivals d'amistosos que no són del nostre grup). Els posa el staff:
+-- o el nom del fitxer de l'escut de la FCF (files.fcf.cat) o una imatge petita pujada. Són dades públiques del club.
+create table if not exists public.team_crests (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null check (char_length(btrim(name)) between 1 and 80 and name !~ '[[:cntrl:]<>]'),
+  name_key   text generated always as (lower(btrim(name))) stored unique,
+  fcf_file   text check (fcf_file is null or fcf_file ~ '^[A-Za-z0-9_.-]{3,120}\.(png|jpe?g|gif|webp)$'),
+  image      text check (image is null or (image ~ '^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$' and octet_length(image) < 200000)),
+  updated_by uuid default auth.uid() references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  constraint team_crests_one_source check ((fcf_file is null) <> (image is null))
+);
+
 -- GRUPS DE MATERIAL I PORTERIA: cada setmana (de dilluns a diumenge) un grup porta el material i un altre
 -- les porteries, i es va rotant (material 4 → 1 → 2 → 3…, porteria 1 → 2 → 3 → 4…).
 create table if not exists public.duty_groups (
@@ -1722,6 +1735,7 @@ alter table public.published_trainings enable row level security;
 alter table public.bib_settings       enable row level security;
 alter table public.bib_overrides      enable row level security;
 alter table public.bib_numbers        enable row level security;
+alter table public.team_crests        enable row level security;
 alter table public.fcf_league_actas   enable row level security;
 alter table public.scouting_targets   enable row level security;
 alter table public.corrections        enable row level security;
@@ -1735,7 +1749,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.calendar_tokens, public.google_drive_links, public.oauth_states, public.rival_ref_actas, public.match_minutes, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
-  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
+  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.team_crests, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
@@ -1774,10 +1788,10 @@ grant all on public.analysis_matches, public.analysis_events, public.analysis_bu
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
 grant all on public.weekly_plans to service_role;
 grant select, insert, update, delete on public.weekly_plans to authenticated;
-grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings to service_role;
+grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.team_crests, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings to service_role;
 grant select, insert, update, delete on public.duty_groups to authenticated;
 grant select, update on public.duty_settings to authenticated;
-grant select, insert, update, delete on public.published_trainings, public.bib_overrides, public.bib_numbers to authenticated;
+grant select, insert, update, delete on public.published_trainings, public.bib_overrides, public.bib_numbers, public.team_crests to authenticated;
 grant select, update on public.bib_settings to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;
 grant select, insert, update, delete on public.scouting_targets to authenticated;
@@ -2045,6 +2059,9 @@ create policy bib_settings_coach on public.bib_settings for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 drop policy if exists bib_overrides_coach on public.bib_overrides;
 create policy bib_overrides_coach on public.bib_overrides for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists team_crests_coach on public.team_crests;
+create policy team_crests_coach on public.team_crests for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
 drop policy if exists bib_numbers_coach on public.bib_numbers;
 create policy bib_numbers_coach on public.bib_numbers for all to authenticated

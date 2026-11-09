@@ -671,6 +671,19 @@ select pg_temp.check((select count(*) from public.bib_numbers) = 0, 'La jugadora
 select pg_temp.expect_error($$insert into public.bib_numbers (player_id, dorsal) values ('00000000-0000-0000-0000-0000000000b2', 77)$$, 'La jugadora no pot posar dorsals dels petos');
 reset role;
 delete from public.convocations where id = '00000000-0000-0000-0000-0000000b1b01';
+-- Escuts d'altres equips (amistosos): només el staff
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.team_crests (name, fcf_file) values ('CF Amistós', '12345.png');
+select pg_temp.check((select count(*) from public.team_crests) = 1, 'El staff afegeix l''escut d''un rival');
+select pg_temp.expect_error($$insert into public.team_crests (name, fcf_file) values ('cf amistós ', '999.png')$$, 'No es pot repetir el mateix equip');
+select pg_temp.expect_error($$insert into public.team_crests (name, fcf_file) values ('Altre', '../x.png')$$, 'El fitxer de l''escut ha de ser vàlid');
+select pg_temp.expect_error($$insert into public.team_crests (name) values ('Sense escut')$$, 'Cal un escut (fitxer o imatge)');
+select pg_temp.expect_error($$insert into public.team_crests (name, image) values ('Img', 'data:text/html;base64,AAAA')$$, 'Només imatges');
+insert into public.team_crests (name, image) values ('CF Imatge', 'data:image/png;base64,iVBORw0KGgo=');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.team_crests) = 0, 'La jugadora no llegeix la taula d''escuts');
+select pg_temp.expect_error($$insert into public.team_crests (name, fcf_file) values ('X', '1.png')$$, 'La jugadora no pot afegir escuts');
+reset role;
 delete from public.bib_numbers;
 update public.bib_settings set start_date = (select today from vars) + 100, start_player = (select ids[1] from bibp);
 insert into public.bib_overrides (day, player_id) values ((select today from vars) + 100, (select ids[2] from bibp));

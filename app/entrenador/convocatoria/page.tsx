@@ -15,6 +15,7 @@ import { rivalKey } from "@/lib/analysis";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
 import { Ticked } from "@/components/feel";
+import { RivalCrestPicker } from "@/components/rival-crest-picker";
 
 export default function ConvoPage() {
   return (
@@ -256,6 +257,7 @@ function ConvoForm({ c, friendly = false, onSaved }: { c?: Convocation; friendly
           </div>
         </div>
       </div>
+      {isAmistos && <RivalCrestPicker rival={f.rival} />}
       <div className="row" style={{ flexWrap: "nowrap" }}>
         <div style={{ flex: 1.3 }}>
           <label className="field" htmlFor="cdate">Dia</label>

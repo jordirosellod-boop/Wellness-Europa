@@ -70,7 +70,7 @@ h3 { font-size: 1rem; margin: 0 0 8px; }
 .stack > * + * { margin-top: 12px; }
 
 label.field { display: block; font-weight: 600; margin-bottom: 6px; }
-input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="time"], textarea, select {
+input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="time"], input[type="url"], textarea, select {
   width: 100%; font: inherit; padding: 12px; min-height: 48px;
   border: 1px solid var(--vora); border-radius: 10px; background: #fff; color: var(--text);
 }
@@ -285,7 +285,7 @@ h3 { font-size: 1.15rem; }
 .muted { color: var(--suau); }
 label.field { color: var(--blau); font-weight: 600; }
 
-input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="time"], textarea, select {
+input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="time"], input[type="url"], textarea, select {
   border: 1.5px solid var(--vora); border-radius: 8px; background: #fff; color: var(--text); font-family: var(--cos);
 }
 input:focus, textarea:focus, select:focus { border-color: var(--blau); outline: 2px solid var(--or); outline-offset: 1px; }
@@ -3167,3 +3167,17 @@ img.photo-in, img.pcard-photo, img.mw-photo { animation: cv-img-in .6s cubic-bez
 ::selection { background: rgba(219,179,77,.45); color: inherit; }
 input, textarea, [contenteditable] { caret-color: #c79a2e; }
 body { font-variant-numeric: tabular-nums; }
+
+/* Escut del rival als amistosos */
+.rcp { display: grid; gap: 8px; }
+.rcp-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--blau-clar); }
+.rcp-crest { width: 44px; height: 44px; object-fit: contain; flex: none; }
+.rcp-empty { display: grid; place-items: center; border-radius: 50%; background: #fff; color: #8a94b0; font-weight: 800; border: 2px dashed #c3cbe0; }
+.rcp-text { flex: 1; min-width: 0; font-size: .92rem; }
+.rcp-panel { display: grid; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid #dbe2f2; background: #fff; }
+.rcp-panel input[type="url"] { flex: 1; min-width: 0; }
+.rcp-upload { justify-self: start; cursor: pointer; }
+.rcp-known { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+.rcp-known button { display: grid; place-items: center; height: 46px; border-radius: 12px; border: 1px solid #e3e8f5; background: #fff; padding: 0; cursor: pointer; }
+.rcp-known button:active { transform: scale(.94); }
+.rcp-known img { width: 34px; height: 34px; object-fit: contain; }
