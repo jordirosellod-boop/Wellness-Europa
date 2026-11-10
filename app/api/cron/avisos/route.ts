@@ -18,6 +18,7 @@ export const maxDuration = 60;
 //  · el dia de partit, 2 h abans de la quedada: a les convocades
 //  · cada dia a les 22 h: a qui encara no ha fet l'RPE d'avui (menys les absents o que han avisat)
 //  · diumenge a les 20 h: resum de la setmana al staff
+//  · reunions individuals: la vigília a les 19 h i una hora abans
 //  · dilluns a les 9 h: l'informe del proper rival ja està fet (abans es llegeixen les actes noves de la FCF)
 export async function POST(req: Request) {
   const db = adminClient();
@@ -45,6 +46,8 @@ export async function POST(req: Request) {
   if (hour >= 8 && hour < 11) await step("petos-avui", () => bibsToday(db, today));
   if (dow === 1 && hour >= 9 && hour < 13) await step("grups", () => dutyGroups(db, today));
   await step("quedada", () => meetReminder(db, today));
+  if (hour >= 19 && hour < 22) await step("reunio-vigilia", () => meetingsTomorrow(db, addDays(today, 1)));
+  await step("reunio-1h", () => meetingsSoon(db, today));
   if (hour === 22) await step("rpe", () => rpeReminder(db, today));
   if (dow === 7 && hour >= 20 && hour < 23) await step("resum", () => weeklySummary(db, today));
   if (dow === 1 && hour >= 9 && hour < 12) await step("informe-rival", () => rivalReportReady(db, today));
@@ -65,6 +68,38 @@ async function bibsTomorrow(db: SupabaseClient, day: string): Promise<number | n
     body: `${first(row.display_name)}, demà els portes tu. Que no se t'oblidin!`,
     url: "/j",
   });
+}
+
+type MSlot = { id: string; day: string; start_time: string; player_id: string };
+/** Reunions (de rondes publicades i no fetes) d'un dia. */
+async function meetingsOn(db: SupabaseClient, day: string): Promise<MSlot[]> {
+  const { data, error } = await db.from("meeting_slots").select("id, day, start_time, player_id, meeting_rounds!inner(published)")
+    .eq("day", day).eq("done", false).not("player_id", "is", null).eq("meeting_rounds.published", true).order("start_time").range(0, 99);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as MSlot[];
+}
+
+/** La vigília: «Demà tens reunió a les…». */
+async function meetingsTomorrow(db: SupabaseClient, day: string): Promise<number | null> {
+  let sent = 0;
+  for (const s of await meetingsOn(db, day)) {
+    if (!(await claimPush(db, `reunio-vigilia:${s.id}`))) continue;
+    sent += await pushTo(db, [s.player_id], { title: "🗣️ Demà tens reunió", body: `A les ${s.start_time.slice(0, 5)} h, amb el staff. Fins demà!`, url: "/j" });
+  }
+  return sent || null;
+}
+
+/** Una hora abans (entre 45 i 75 minuts abans, perquè el rellotge passa cada 15 minuts). */
+async function meetingsSoon(db: SupabaseClient, today: string): Promise<number | null> {
+  const now = Date.now();
+  let sent = 0;
+  for (const s of await meetingsOn(db, today)) {
+    const left = madridEpoch(s.day, s.start_time.slice(0, 5)) - now;
+    if (left < 30 * 60_000 || left > 75 * 60_000) continue;
+    if (!(await claimPush(db, `reunio-1h:${s.id}`))) continue;
+    sent += await pushTo(db, [s.player_id], { title: "🗣️ La teva reunió és d'aquí a una hora", body: `Avui a les ${s.start_time.slice(0, 5)} h. T'esperem!`, url: "/j" });
+  }
+  return sent || null;
 }
 
 /** El mateix dia al matí: recordatori a la jugadora que porta els petos avui. */

@@ -3181,3 +3181,46 @@ body { font-variant-numeric: tabular-nums; }
 .rcp-known button { display: grid; place-items: center; height: 46px; border-radius: 12px; border: 1px solid #e3e8f5; background: #fff; padding: 0; cursor: pointer; }
 .rcp-known button:active { transform: scale(.94); }
 .rcp-known img { width: 34px; height: 34px; object-fit: contain; }
+
+/* Reunió individual (jugadora) */
+.meeting-card { display: flex; align-items: center; gap: 14px; border: 2px solid #dbb34d; background: linear-gradient(135deg, #fffaf0, #fff); }
+.meeting-card.today { background: linear-gradient(160deg, #fff8e6, #fbe9b7); }
+.mc-date { width: 62px; height: 62px; flex: none; border-radius: 16px; display: grid; place-content: center; text-align: center; line-height: .9;
+  background: linear-gradient(160deg, #f6e3a8, #dbb34d 60%, #c79a2e); color: var(--navy); font-family: var(--display); box-shadow: 0 6px 14px rgba(199,154,46,.35); }
+.mc-date b { font-weight: 400; font-size: 1.9rem; }
+.mc-date small { font-size: .8rem; letter-spacing: .12em; }
+.mc-body { display: grid; gap: 2px; min-width: 0; }
+.mc-k { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #8a6412; }
+.mc-body b { font-family: var(--display); font-weight: 400; font-size: 1.35rem; color: var(--navy); letter-spacing: .02em; }
+.mc-left { font-size: .88rem; color: var(--muted, #5a6680); }
+
+/* Reunions (staff) */
+.mt-round { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; text-align: left; border: 0; width: 100%; cursor: pointer; font: inherit; color: inherit; }
+.mt-round b { font-family: var(--display); font-weight: 400; font-size: 1.25rem; color: var(--navy); }
+.mt-round small { grid-column: 1 / -1; }
+.mt-wins { display: grid; gap: 6px; }
+.mt-win { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.4fr auto; gap: 6px; align-items: center; }
+.mt-win > * { min-width: 0; }
+@media (max-width: 520px) { .mt-win { grid-template-columns: 1fr 1fr 1fr auto; } .mt-win input[type="text"] { grid-column: 1 / -2; grid-row: 2; } }
+.mt-title { font-family: var(--display); font-size: 1.4rem; color: var(--navy); border: 0 !important; padding: 0 !important; background: transparent !important; }
+.mt-day { padding: 0; overflow: hidden; }
+.mt-day.past { opacity: .7; }
+.mt-day header { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: linear-gradient(90deg, rgba(219,179,77,.18), transparent); }
+.mt-day header > span:last-child { display: grid; }
+.mt-day header b { font-family: var(--display); font-weight: 400; font-size: 1.2rem; color: var(--navy); }
+.mt-day header small { color: var(--muted, #5a6680); font-size: .82rem; }
+.mt-date { width: 46px; height: 46px; border-radius: 12px; display: grid; place-content: center; text-align: center; line-height: .9; font-family: var(--display); color: var(--navy);
+  background: linear-gradient(160deg, #f6e3a8, #dbb34d 60%, #c79a2e); }
+.mt-date b { font-weight: 400; font-size: 1.35rem; color: var(--navy) !important; }
+.mt-date small { font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; color: var(--navy) !important; }
+.mt-row { display: flex; align-items: stretch; border-top: 1px solid #e8ecf5; }
+.mt-main { flex: 1; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; flex-wrap: wrap; }
+.mt-row.picked .mt-main { background: #fff3d1; box-shadow: inset 4px 0 0 #dbb34d; }
+.mt-time { font-family: var(--display); font-size: 1.2rem; color: #b8862a; min-width: 3.2em; }
+.mt-num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; font-family: var(--display); color: #fff;
+  background: radial-gradient(circle at 35% 30%, #1d4fd0, #0a2ea0 55%, #061847); box-shadow: inset 0 0 0 2px #dbb34d; }
+.mt-name { font-weight: 600; flex: 1; min-width: 8em; }
+.mt-name i { color: var(--muted, #8a94b0); font-weight: 400; }
+.mt-row.done .mt-name { text-decoration: line-through; opacity: .6; }
+.mt-done { width: 52px; border: 0; border-left: 1px solid #e8ecf5; background: none; font-size: 1.1rem; color: #b7c0d6; cursor: pointer; }
+.mt-done.on { background: var(--verd-clar); color: var(--verd); font-weight: 800; }

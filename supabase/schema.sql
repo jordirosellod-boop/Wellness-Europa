@@ -637,6 +637,31 @@ create table if not exists public.team_crests (
   constraint team_crests_one_source check ((fcf_file is null) <> (image is null))
 );
 
+-- REUNIONS INDIVIDUALS: el staff fa una ronda (p. ex. 15 min amb cada jugadora) amb les seves franges.
+-- Cada jugadora només veu la seva reunió, i només quan la ronda està publicada. Sense notes: només dia i hora.
+create table if not exists public.meeting_rounds (
+  id           uuid primary key default gen_random_uuid(),
+  title        text not null check (char_length(btrim(title)) between 1 and 80 and title !~ '[[:cntrl:]<>]'),
+  duration_min smallint not null default 15 check (duration_min between 5 and 60),
+  published    boolean not null default false,
+  published_at timestamptz,
+  created_by   uuid default auth.uid() references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create table if not exists public.meeting_slots (
+  id         uuid primary key default gen_random_uuid(),
+  round_id   uuid not null references public.meeting_rounds(id) on delete cascade,
+  day        date not null,
+  start_time time not null,
+  player_id  uuid references public.profiles(id) on delete set null,
+  done       boolean not null default false,
+  updated_at timestamptz not null default now(),
+  constraint meeting_slots_one_time unique (round_id, day, start_time)
+);
+create unique index if not exists meeting_slots_one_player on public.meeting_slots (round_id, player_id) where player_id is not null;
+create index if not exists meeting_slots_player_idx on public.meeting_slots (player_id, day);
+
 -- GRUPS DE MATERIAL I PORTERIA: cada setmana (de dilluns a diumenge) un grup porta el material i un altre
 -- les porteries, i es va rotant (material 4 → 1 → 2 → 3…, porteria 1 → 2 → 3 → 4…).
 create table if not exists public.duty_groups (
@@ -1315,6 +1340,33 @@ drop trigger if exists absence_notices_stamp on public.absence_notices;
 create trigger absence_notices_stamp before insert or update on public.absence_notices
   for each row execute function public.stamp_absence_notice();
 
+-- REUNIONS: ajudes per a les polítiques (sense passar per les polítiques de l'altra taula, que farien un bucle).
+create or replace function public.has_meeting_in(p_round uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.meeting_slots m where m.round_id = p_round and m.player_id = (select auth.uid()));
+$$;
+create or replace function public.meeting_round_published(p_round uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce((select r.published from public.meeting_rounds r where r.id = p_round), false);
+$$;
+
+-- REUNIONS: intercanvia les jugadores de dues franges de la mateixa ronda (una pot estar buida). Només staff.
+create or replace function public.swap_meeting_slots(p_a uuid, p_b uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  a public.meeting_slots;
+  b public.meeting_slots;
+begin
+  if not (select public.is_coach()) then raise exception 'Només el staff pot canviar les reunions.'; end if;
+  select * into a from public.meeting_slots where id = p_a for update;
+  select * into b from public.meeting_slots where id = p_b for update;
+  if a.id is null or b.id is null or a.round_id <> b.round_id then raise exception 'Franges no vàlides.'; end if;
+  if a.id = b.id then return; end if;
+  update public.meeting_slots set player_id = null, updated_at = now() where id = a.id;
+  update public.meeting_slots set player_id = a.player_id, done = false, updated_at = now() where id = b.id;
+  update public.meeting_slots set player_id = b.player_id, done = false, updated_at = now() where id = a.id;
+end $$;
+
 -- PETOS: qui els porta cada dia (de p_from a p_to). Ho poden veure el staff i les jugadores.
 create or replace function public.bib_schedule(p_from date, p_to date)
 returns table (day date, player_id uuid, display_name text, dorsal smallint, manual boolean)
@@ -1736,6 +1788,8 @@ alter table public.bib_settings       enable row level security;
 alter table public.bib_overrides      enable row level security;
 alter table public.bib_numbers        enable row level security;
 alter table public.team_crests        enable row level security;
+alter table public.meeting_rounds     enable row level security;
+alter table public.meeting_slots      enable row level security;
 alter table public.fcf_league_actas   enable row level security;
 alter table public.scouting_targets   enable row level security;
 alter table public.corrections        enable row level security;
@@ -1749,7 +1803,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.calendar_tokens, public.google_drive_links, public.oauth_states, public.rival_ref_actas, public.match_minutes, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
-  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.team_crests, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
+  public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.team_crests, public.meeting_rounds, public.meeting_slots, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
   public.fcf_league_actas, public.scouting_targets from anon, authenticated;
 grant select                         on public.profiles, public.player_links to authenticated;
 grant select, insert, update, delete on public.sessions                      to authenticated;
@@ -1788,10 +1842,10 @@ grant all on public.analysis_matches, public.analysis_events, public.analysis_bu
 grant select, insert, update, delete on public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards to authenticated;
 grant all on public.weekly_plans to service_role;
 grant select, insert, update, delete on public.weekly_plans to authenticated;
-grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.team_crests, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings to service_role;
+grant all on public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.team_crests, public.meeting_rounds, public.meeting_slots, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings to service_role;
 grant select, insert, update, delete on public.duty_groups to authenticated;
 grant select, update on public.duty_settings to authenticated;
-grant select, insert, update, delete on public.published_trainings, public.bib_overrides, public.bib_numbers, public.team_crests to authenticated;
+grant select, insert, update, delete on public.published_trainings, public.bib_overrides, public.bib_numbers, public.team_crests, public.meeting_rounds, public.meeting_slots to authenticated;
 grant select, update on public.bib_settings to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;
 grant select, insert, update, delete on public.scouting_targets to authenticated;
@@ -1802,6 +1856,10 @@ revoke all on function public.is_owner() from public, anon;
 grant execute on function public.is_owner() to authenticated;
 revoke all on function public.duty_week(date) from public, anon;
 grant execute on function public.duty_week(date) to authenticated, service_role;
+revoke all on function public.has_meeting_in(uuid), public.meeting_round_published(uuid) from public, anon;
+grant execute on function public.has_meeting_in(uuid), public.meeting_round_published(uuid) to authenticated, service_role;
+revoke all on function public.swap_meeting_slots(uuid, uuid) from public, anon;
+grant execute on function public.swap_meeting_slots(uuid, uuid) to authenticated, service_role;
 revoke all on function public.bib_schedule(date, date) from public, anon;
 grant execute on function public.bib_schedule(date, date) to authenticated, service_role;
 revoke all on function public.notice_is_open(uuid) from public, anon;
@@ -2060,6 +2118,19 @@ create policy bib_settings_coach on public.bib_settings for all to authenticated
 drop policy if exists bib_overrides_coach on public.bib_overrides;
 create policy bib_overrides_coach on public.bib_overrides for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists meeting_rounds_coach on public.meeting_rounds;
+create policy meeting_rounds_coach on public.meeting_rounds for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+-- La jugadora veu la ronda publicada només si hi té una reunió
+drop policy if exists meeting_rounds_player on public.meeting_rounds;
+create policy meeting_rounds_player on public.meeting_rounds for select to authenticated
+  using (published and public.has_meeting_in(id));
+drop policy if exists meeting_slots_coach on public.meeting_slots;
+create policy meeting_slots_coach on public.meeting_slots for all to authenticated
+  using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists meeting_slots_player on public.meeting_slots;
+create policy meeting_slots_player on public.meeting_slots for select to authenticated
+  using (player_id = (select auth.uid()) and public.meeting_round_published(round_id));
 drop policy if exists team_crests_coach on public.team_crests;
 create policy team_crests_coach on public.team_crests for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));

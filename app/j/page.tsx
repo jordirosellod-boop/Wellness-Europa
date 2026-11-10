@@ -11,6 +11,7 @@ import { PlayerAttendance } from "@/components/player-attendance";
 import { RehabCard } from "@/components/rehab-card";
 import { PlayerPlanning } from "@/components/weekly-view";
 import { BibsCard } from "@/components/bibs";
+import { MeetingCard } from "@/components/meeting-card";
 import { DutiesCard } from "@/components/duties";
 import { PlayerTraining } from "@/components/player-training";
 import { Confetti, MatchdayHero, ResultCard } from "@/components/matchday";
@@ -604,6 +605,7 @@ function Dashboard({
 
       {data?.streak != null && <StreakCard meId={me.id} n={data.streak} />}
 
+      <MeetingCard meId={me.id} today={today} />
       <BibsCard meId={me.id} today={today} />
       <DutiesCard meId={me.id} title="Material i porteria" />
 

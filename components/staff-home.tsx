@@ -67,6 +67,7 @@ const svg = (d: string) => (
 );
 const TILES: { href: string; label: string; sub: string; icon: ReactNode; owner?: boolean }[] = [
   { href: "/entrenador/convocatoria", label: "Convocatòria", sub: "Llista, onze i amistosos", icon: svg("M9 3h6l1 3h4v15H4V6h4zM9 12l2 2 4-4") },
+  { href: "/entrenador/reunions", label: "Reunions", sub: "Individuals amb cada jugadora", icon: svg("M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z") },
   { href: "/entrenador/assistencia", label: "Llista", sub: "Passar llista", icon: svg("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M16 11l2 2 4-4") },
   { href: "/entrenador/entreno", label: "Entreno", sub: "Els entrenos penjats", icon: svg("M9 3h6v4H9zM5 5h4M15 5h4v16H5V5M8 12h8M8 16h5") },
   { href: "/entrenador/planning", label: "Planning", sub: "La setmana i petos", icon: svg("M7 3v4M17 3v4M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z") },

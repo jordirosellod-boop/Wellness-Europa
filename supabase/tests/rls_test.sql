@@ -671,6 +671,38 @@ select pg_temp.check((select count(*) from public.bib_numbers) = 0, 'La jugadora
 select pg_temp.expect_error($$insert into public.bib_numbers (player_id, dorsal) values ('00000000-0000-0000-0000-0000000000b2', 77)$$, 'La jugadora no pot posar dorsals dels petos');
 reset role;
 delete from public.convocations where id = '00000000-0000-0000-0000-0000000b1b01';
+-- Reunions individuals
+create temp table mtp as select (select id from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id limit 1) as p1,
+  (select id from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id offset 1 limit 1) as p2;
+grant select on mtp to authenticated, anon;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+insert into public.meeting_rounds (id, title) values ('00000000-0000-0000-0000-0000000e0e01', 'Reunions novembre');
+insert into public.meeting_slots (id, round_id, day, start_time, player_id) values
+  ('00000000-0000-0000-0000-0000000e0f01', '00000000-0000-0000-0000-0000000e0e01', current_date + 5, '19:00', (select p1 from mtp)),
+  ('00000000-0000-0000-0000-0000000e0f02', '00000000-0000-0000-0000-0000000e0e01', current_date + 5, '19:15', '00000000-0000-0000-0000-0000000000b2'),
+  ('00000000-0000-0000-0000-0000000e0f03', '00000000-0000-0000-0000-0000000e0e01', current_date + 6, '18:30', null);
+select pg_temp.expect_error($$insert into public.meeting_slots (round_id, day, start_time, player_id) values ('00000000-0000-0000-0000-0000000e0e01', current_date + 7, '19:00', (select p1 from mtp))$$, 'Una jugadora només té una reunió per ronda');
+select pg_temp.expect_error($$insert into public.meeting_slots (round_id, day, start_time) values ('00000000-0000-0000-0000-0000000e0e01', current_date + 5, '19:00')$$, 'No hi pot haver dues reunions a la mateixa hora');
+select public.swap_meeting_slots('00000000-0000-0000-0000-0000000e0f01', '00000000-0000-0000-0000-0000000e0f02');
+select pg_temp.check((select player_id from public.meeting_slots where id = '00000000-0000-0000-0000-0000000e0f01') = '00000000-0000-0000-0000-0000000000b2'
+  and (select player_id from public.meeting_slots where id = '00000000-0000-0000-0000-0000000e0f02') = (select p1 from mtp), 'El staff intercanvia dues jugadores');
+select public.swap_meeting_slots('00000000-0000-0000-0000-0000000e0f02', '00000000-0000-0000-0000-0000000e0f03');
+select pg_temp.check((select player_id from public.meeting_slots where id = '00000000-0000-0000-0000-0000000e0f03') = (select p1 from mtp)
+  and (select player_id from public.meeting_slots where id = '00000000-0000-0000-0000-0000000e0f02') is null, 'El staff mou una jugadora a una franja lliure');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.meeting_slots) = 0 and (select count(*) from public.meeting_rounds) = 0, 'Si la ronda no està publicada, la jugadora no veu res');
+reset role; update public.meeting_rounds set published = true where id = '00000000-0000-0000-0000-0000000e0e01';
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+select pg_temp.check((select count(*) from public.meeting_slots) = 1 and (select player_id from public.meeting_slots) = '00000000-0000-0000-0000-0000000000b2', 'La jugadora només veu la seva reunió');
+select pg_temp.check((select count(*) from public.meeting_rounds) = 1, 'La jugadora veu la ronda on té reunió');
+select pg_temp.expect_error($$select public.swap_meeting_slots('00000000-0000-0000-0000-0000000e0f01', '00000000-0000-0000-0000-0000000e0f03')$$, 'La jugadora no pot canviar reunions');
+with u as (update public.meeting_slots set done = true returning 1) select pg_temp.check(count(*) = 0, 'La jugadora no pot marcar-la com a feta') from u;
+reset role; select set_config('request.jwt.claim.sub', (select p2::text from mtp), false); set role authenticated;
+select pg_temp.check((select count(*) from public.meeting_rounds) = 0, 'Una jugadora sense reunió no veu la ronda');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select count(*) from public.meeting_slots$$, 'Anònim no veu reunions');
+reset role;
+delete from public.meeting_rounds where id = '00000000-0000-0000-0000-0000000e0e01';
 -- Escuts d'altres equips (amistosos): només el staff
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 insert into public.team_crests (name, fcf_file) values ('CF Amistós', '12345.png');

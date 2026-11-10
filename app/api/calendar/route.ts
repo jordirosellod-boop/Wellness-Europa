@@ -22,6 +22,13 @@ export async function GET(req: Request) {
       db.from("convocations").select("id, match_date, kickoff, meet_time, rival, is_home, competition, venue, address, kit").eq("published", true).gte("match_date", from).lte("match_date", to).order("match_date").order("id").range(f, t)),
   ]);
 
+  // Reunions individuals (de rondes publicades): la jugadora, la seva; el staff, totes (sense noms)
+  const { data: who2 } = await db.from("profiles").select("role").eq("id", who.profile_id).maybeSingle();
+  let mq = db.from("meeting_slots").select("id, day, start_time, player_id, meeting_rounds!inner(published, duration_min)")
+    .eq("meeting_rounds.published", true).not("player_id", "is", null).gte("day", from).lte("day", to).order("day").order("start_time").range(0, 499);
+  if (who2?.role !== "coach") mq = mq.eq("player_id", who.profile_id);
+  const { data: meetings } = await mq;
+
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
   const ev: string[] = [];
   const matchDays = new Set(convos.map((c) => c.match_date));
@@ -46,6 +53,11 @@ export async function GET(req: Request) {
       uid: `partit-${c.id}`, stamp, date: c.match_date, start: c.meet_time ? hhmm(c.meet_time) : c.kickoff ? hhmm(c.kickoff) : null, minutes: 150,
       title: `⚽ ${home} – ${away}`, location: [c.venue, c.address].filter(Boolean).join(", "), desc,
     }));
+  }
+
+  for (const m of (meetings ?? []) as unknown as { id: string; day: string; start_time: string; meeting_rounds: { duration_min: number } | { duration_min: number }[] }[]) {
+    const r = Array.isArray(m.meeting_rounds) ? m.meeting_rounds[0] : m.meeting_rounds;
+    ev.push(vevent({ uid: `reunio-${m.id}`, stamp, date: m.day, start: m.start_time.slice(0, 5), minutes: r?.duration_min ?? 15, title: "🗣️ Reunió individual · Juvenil C" }));
   }
 
   const body = [
