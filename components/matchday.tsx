@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Crest, useRivalColor } from "@/components/crest";
 import type { CSSProperties } from "react";
-import { WeatherChip } from "@/components/weather";
+import { WeatherChip, WeatherFx } from "@/components/weather";
 import { GoalStoryButton, ResultStoryButton } from "@/components/convo-story";
 import { prettyTeam } from "@/lib/analysis";
 import { hhmm, KITS, kitOf, type Convocation } from "@/lib/convo";
@@ -88,6 +88,7 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
 
   return (
     <section className={`matchday phase-${phase}${tint ? " tinted" : ""}`} style={tint} aria-label="Dia de partit">
+      <WeatherFx date={c.match_date} time={c.kickoff ?? c.meet_time} address={c.is_home ? null : c.address} />
       <span className="md-kicker">⚽ Dia de partit{c.competition ? ` · ${c.competition}` : ""}</span>
       <div className="md-teams">
         <span className={c.is_home ? "us" : ""}><Crest name={home} size={64} className="md-crest" /><b>{home}</b></span>

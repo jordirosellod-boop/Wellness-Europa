@@ -16,6 +16,7 @@ import { addDays, fmtShort, startOfWeek } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
 import { fetchWeeklyPlan } from "@/lib/weekly";
 import { fmtDate, fmtDateSmart, fmtSessionTime, nowMadridHHMM, SESSION_COLS, type Session } from "@/lib/wellness";
+import { GreetSky } from "@/components/greet-sky";
 
 type Info = {
   next: Session | null;
@@ -129,7 +130,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
     <div className="staff-home">
       <SplashMatchSaver today={today} />
       <header className={`greet ${part}`}>
-        <span className="greet-sky" aria-hidden="true" />
+        <GreetSky />
         {editing ? (
           <form className="greet-edit" onSubmit={(e) => { e.preventDefault(); saveGreeting(); }}>
             <label htmlFor="greet-name">Com vols que et saludi?</label>

@@ -127,3 +127,52 @@ export function CompactTitle() {
   if (!bar) return null;
   return createPortal(<span className={`tb-title${title ? " on" : ""}`} aria-hidden="true">{title}</span>, bar);
 }
+
+/**
+ * Sorpresa amagada: sacsejar el mòbil a l'inici fa ploure escuts amb «FORÇA EUROPA!».
+ * A l'iPhone només funciona si ja s'ha donat permís de moviment (p. ex. tocant el cromo); no es demana mai sol.
+ */
+export function ShakeCrests() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let last = 0, hits: number[] = [], prev: { x: number; y: number; z: number } | null = null;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const p = window.location.pathname;
+      if (p !== "/j" && p !== "/entrenador") return;
+      const a = e.accelerationIncludingGravity;
+      if (!a || a.x == null || a.y == null || a.z == null) return;
+      const cur = { x: a.x, y: a.y, z: a.z };
+      if (prev) {
+        const d = Math.abs(cur.x - prev.x) + Math.abs(cur.y - prev.y) + Math.abs(cur.z - prev.z);
+        const t = Date.now();
+        if (d > 28) {
+          hits = [...hits.filter((h) => t - h < 900), t];
+          if (hits.length >= 3 && t - last > 6000) { last = t; hits = []; haptic(); setOn(true); }
+        }
+      }
+      prev = cur;
+    };
+    window.addEventListener("devicemotion", onMotion);
+    return () => window.removeEventListener("devicemotion", onMotion);
+  }, []);
+  if (!on) return null;
+  return <CrestRain onDone={() => setOn(false)} />;
+}
+
+function CrestRain({ onDone }: { onDone: () => void }) {
+  const [crests] = useState(() => Array.from({ length: 26 }, (_, i) => ({
+    left: Math.random() * 100, size: 26 + Math.random() * 34, delay: Math.random() * 0.9, dur: 1.6 + Math.random() * 1.2, rot: (Math.random() - 0.5) * 540, key: i,
+  })));
+  useEffect(() => { const t = setTimeout(onDone, 3400); return () => clearTimeout(t); }, [onDone]);
+  return createPortal(
+    <div className="crest-rain" aria-hidden="true">
+      {crests.map((c) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={c.key} src="/escut.png" alt="" style={{ left: `${c.left}%`, width: c.size, height: c.size, animationDelay: `${c.delay}s`, animationDuration: `${c.dur}s`, ["--rot" as string]: `${c.rot}deg` }} />
+      ))}
+      <b>FORÇA<br />EUROPA!</b>
+    </div>,
+    document.body,
+  );
+}

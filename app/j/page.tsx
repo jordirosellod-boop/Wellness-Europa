@@ -59,6 +59,7 @@ import {
 } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
+import { GreetSky } from "@/components/greet-sky";
 
 type State =
   | { kind: "loading" }
@@ -468,7 +469,7 @@ function Greeting({ name, today, level, meId, onMe }: { name: string; today: str
   }, []);
   return (
     <header className={`greet ${part}`}>
-      <span className="greet-sky" aria-hidden="true" />
+      <GreetSky />
       <MeAvatar meId={meId} onClick={onMe} />
       <h1>{GREET[part]}, {name}!</h1>
       <p className="row" style={{ gap: 8, margin: 0 }}>

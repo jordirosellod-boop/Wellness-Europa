@@ -9,7 +9,13 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "Juvenil C 2026/2027", {
       body: data.body || "Recorda omplir el wellness.",
       icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      // A Android, la icona petita de dalt de la pantalla: la silueta de l'escut (només en blanc)
+      badge: "/badge-96.png",
+      // Els avisos del mateix tipus se substitueixen (no s'amunteguen), però tornen a sonar
+      tag: data.tag || (data.title || "avis").replace(/[^\p{L}\p{N} ]/gu, "").trim().toLowerCase().slice(0, 40) || "avis",
+      renotify: true,
+      vibrate: [60, 40, 60],
+      timestamp: Date.now(),
       data: { url: data.url || "/j" },
     }),
   );

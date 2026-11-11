@@ -21,6 +21,8 @@ export function SplashMatchSaver({ today }: { today: string }) {
         const rival = prettyTeam(c.rival);
         localStorage.setItem("splash-match", JSON.stringify({
           d: c.match_date, t: c.kickoff ? hhmm(c.kickoff) : "", h: c.is_home, c: crestFor(teams, rival) ?? "",
+          // per a la barra «en directe» de dalt
+          r: rival, m: c.meet_time ? hhmm(c.meet_time) : "",
         }));
       } catch { /* sense emmagatzematge: l'entrada surt com sempre */ }
     }, () => {});

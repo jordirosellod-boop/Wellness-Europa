@@ -3224,3 +3224,98 @@ body { font-variant-numeric: tabular-nums; }
 .mt-row.done .mt-name { text-decoration: line-through; opacity: .6; }
 .mt-done { width: 52px; border: 0; border-left: 1px solid #e8ecf5; background: none; font-size: 1.1rem; color: #b7c0d6; cursor: pointer; }
 .mt-done.on { background: var(--verd-clar); color: var(--verd); font-weight: 800; }
+
+/* Cel de la salutació segons l'hora: alba, dia, posta i nit, amb el sol (o la lluna) al seu lloc de l'arc */
+.greet .greet-sky[data-sky] { overflow: hidden; border-radius: inherit; transition: background 1.2s ease; }
+.greet .greet-sky[data-sky="alba"] { background: linear-gradient(170deg, #ffb59a 0%, #f08bb0 30%, #7d7fe0 65%, var(--blau) 100%); }
+.greet .greet-sky[data-sky="dia"] { background: linear-gradient(160deg, #6fb3ff 0%, #3d7be8 55%, var(--blau) 100%); }
+.greet .greet-sky[data-sky="posta"] { background: linear-gradient(165deg, #ffb35c 0%, #f0706a 30%, #a04c9a 62%, #2a2f8f 85%, var(--blau) 100%); }
+.greet .greet-sky[data-sky="nit"] { background: linear-gradient(165deg, #050d2e 0%, #0b1846 55%, #142b7a 100%); }
+.greet .greet-sky[data-sky]::before {
+  content: ""; position: absolute; left: var(--sun-x, 80%); top: var(--sun-y, 30%); right: auto; bottom: auto; translate: -50% -50%;
+  width: 54px; height: 54px; border-radius: 50%; transition: left 2s ease, top 2s ease;
+  background: radial-gradient(circle, #fff6c9 0 40%, #ffd45c 60%, rgba(255,212,92,0) 72%); box-shadow: 0 0 40px 12px rgba(255,220,120,.45);
+  animation: sun-rise 1s var(--ease) both;
+}
+.greet .greet-sky[data-sky="alba"]::before, .greet .greet-sky[data-sky="posta"]::before {
+  width: 66px; height: 66px; background: radial-gradient(circle, #ffe3a3 0 45%, #ff9d4d 65%, rgba(255,157,77,0) 72%); box-shadow: 0 0 46px 14px rgba(255,160,90,.45);
+}
+.greet .greet-sky[data-sky="nit"]::before {
+  width: 40px; height: 40px; background: #f3efe0; box-shadow: inset -10px -4px 0 0 #d9d3bd, 0 0 24px 4px rgba(243,239,224,.35);
+}
+.greet .greet-sky[data-sky]:not([data-sky="nit"])::after { content: none; }
+.greet .greet-sky[data-sky="nit"]::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(1.5px 1.5px at 12% 22%, #fff 99%, transparent), radial-gradient(1px 1px at 28% 68%, #fff 99%, transparent),
+    radial-gradient(1.5px 1.5px at 44% 18%, #fff 99%, transparent), radial-gradient(1px 1px at 58% 52%, #fff 99%, transparent),
+    radial-gradient(2px 2px at 70% 80%, #fff 99%, transparent), radial-gradient(1px 1px at 82% 35%, #fff 99%, transparent),
+    radial-gradient(1.5px 1.5px at 92% 70%, #fff 99%, transparent), radial-gradient(1px 1px at 6% 82%, #fff 99%, transparent);
+  animation: twinkle 3.2s ease-in-out infinite;
+}
+/* La grada del CEE a sota del cel, que es mou més a poc a poc en baixar (profunditat) */
+.greet .gs-grada {
+  position: absolute; left: 0; right: 0; bottom: -24px; height: 85%; pointer-events: none;
+  background: url(/fons-grada.webp) center 70% / cover no-repeat; opacity: .28; mix-blend-mode: luminosity;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 65%); mask-image: linear-gradient(to bottom, transparent 0%, #000 65%);
+  transform: translate3d(0, calc(var(--sy, 0) * .12px), 0); will-change: transform;
+}
+.greet .greet-sky[data-sky="nit"] .gs-grada { opacity: .2; }
+@media (prefers-reduced-motion: reduce) { .greet .gs-grada { transform: none; } .greet .greet-sky[data-sky]::before { animation: none; transition: none; } }
+
+/* El temps a la targeta del partit (per sota del contingut) */
+.matchday { isolation: isolate; }
+.matchday .wx-fx { position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit; overflow: hidden; }
+.wx-rain {
+  background-image:
+    linear-gradient(105deg, transparent 0 46%, rgba(190,215,255,.55) 48%, transparent 50%),
+    linear-gradient(105deg, transparent 0 46%, rgba(190,215,255,.35) 48%, transparent 50%);
+  background-size: 22px 46px, 34px 70px; background-position: 0 0, 11px 20px;
+  animation: wx-rain .55s linear infinite; opacity: .55;
+}
+@keyframes wx-rain { to { background-position: -12px 46px, -1px 90px; } }
+.wx-snow {
+  background-image: radial-gradient(2px 2px at 20% 30%, #fff 99%, transparent), radial-gradient(1.5px 1.5px at 60% 10%, #fff 99%, transparent),
+    radial-gradient(2.5px 2.5px at 80% 60%, #fff 99%, transparent), radial-gradient(1.5px 1.5px at 40% 80%, #fff 99%, transparent);
+  background-size: 120px 120px; animation: wx-snow 6s linear infinite; opacity: .8;
+}
+@keyframes wx-snow { to { background-position: 30px 120px, -20px 120px, 10px 120px, -30px 120px; } }
+.wx-sun i {
+  position: absolute; left: 50%; top: -60%; width: 160%; aspect-ratio: 1; translate: -50% 0; border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(255,226,150,.16) 0 6deg, transparent 6deg 18deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0 25%, transparent 62%); mask-image: radial-gradient(circle, #000 0 25%, transparent 62%);
+  animation: wx-rays 40s linear infinite;
+}
+@keyframes wx-rays { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .wx-rain, .wx-snow, .wx-sun i { animation: none; } }
+
+/* Barra «en directe» del dia de partit (com l'illa dinàmica) */
+.live-pill {
+  position: fixed; left: 50%; top: calc(var(--top-safe, env(safe-area-inset-top, 0px)) + 6px); translate: -50% 0; z-index: 80;
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 10px; border-radius: 999px; max-width: calc(100vw - 32px);
+  background: #050b22; color: #fff; text-decoration: none; font-size: .82rem; white-space: nowrap;
+  box-shadow: 0 8px 22px rgba(1,10,40,.35), inset 0 0 0 1px rgba(219,179,77,.45);
+  animation: lp-in .55s var(--ease-back) both;
+}
+@keyframes lp-in { from { opacity: 0; transform: scale(.6, .4); } to { opacity: 1; transform: none; } }
+.live-pill b { font-family: var(--display); font-weight: 400; letter-spacing: .06em; color: #f3dc9a; }
+.live-pill .lp-clock { font-variant-numeric: tabular-nums; font-weight: 700; }
+.live-pill .lp-vs { opacity: .6; font-size: .72rem; }
+.live-pill img { width: 20px; height: 20px; object-fit: contain; }
+.live-pill .lp-rival { overflow: hidden; text-overflow: ellipsis; max-width: 9em; font-weight: 600; }
+.live-pill.lp-joc { box-shadow: 0 8px 22px rgba(1,10,40,.35), inset 0 0 0 1px rgba(255,90,90,.7); }
+.live-pill.lp-joc b { color: #ff8a8a; }
+.lp-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 0 0 rgba(255,77,77,.7); animation: lp-pulse 1.4s ease-out infinite; }
+@keyframes lp-pulse { to { box-shadow: 0 0 0 8px rgba(255,77,77,0); } }
+@media (prefers-reduced-motion: reduce) { .live-pill, .lp-dot { animation: none; } }
+
+/* Sorpresa: pluja d'escuts en sacsejar el mòbil */
+.crest-rain { position: fixed; inset: 0; z-index: 9500; pointer-events: none; overflow: hidden; display: grid; place-items: center; animation: cs-out .4s ease 3s forwards; }
+.crest-rain img { position: absolute; top: -70px; filter: drop-shadow(0 6px 10px rgba(1,20,70,.3)); animation: crest-fall linear both; }
+@keyframes crest-fall { to { transform: translateY(calc(100vh + 140px)) rotate(var(--rot, 180deg)); } }
+.crest-rain b {
+  font-family: var(--display); font-weight: 400; font-size: clamp(3rem, 16vw, 6rem); line-height: .9; text-align: center; color: #fff;
+  -webkit-text-stroke: 2px var(--navy); text-shadow: 0 6px 0 var(--or), 0 14px 30px rgba(1,20,70,.45);
+  animation: rain-word .7s var(--ease-back) .25s both;
+}
+@keyframes rain-word { from { opacity: 0; transform: scale(.4) rotate(-8deg); } to { opacity: 1; transform: rotate(-4deg); } }
