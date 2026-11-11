@@ -5,8 +5,18 @@ import { Crest } from "@/components/crest";
 import { hhmm, KITS, kitOf, type Convocation, type RosterRow } from "@/lib/convo";
 import { kitFont } from "@/lib/fonts";
 import { fmtDateSmart } from "@/lib/wellness";
+import { isoDow } from "@/lib/dates";
 
 export { KitNumber };
+
+const DOW = ["", "Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte", "Diumenge"];
+const MON = ["gen", "feb", "mar", "abr", "mai", "jun", "jul", "ago", "set", "oct", "nov", "des"];
+/** «Avui · 14 nov», «Demà · 14 nov» o «Dissabte 14 nov». */
+function dayLabel(d: string): string {
+  const smart = fmtDateSmart(d);
+  const num = `${Number(d.slice(8))} ${MON[Number(d.slice(5, 7)) - 1]}`;
+  return /^(Avui|Demà)$/.test(smart) ? `${smart} · ${num}` : `${DOW[isoDow(d)]} ${num}`;
+}
 
 function mapsUrl(q: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
@@ -35,11 +45,15 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
       </header>
 
       <div className="convo-match">
-        <span className={c.is_home ? "us" : ""}><Crest name={home} size={72} className="convo-crest" /><b>{home}</b></span>
+        <span className={c.is_home ? "us" : ""}><span className="cm-crest"><Crest name={home} size={78} className="convo-crest" /></span><b>{home}</b></span>
         <i>vs</i>
-        <span className={c.is_home ? "" : "us"}><Crest name={away} size={72} className="convo-crest" /><b>{away}</b></span>
+        <span className={c.is_home ? "" : "us"}><span className="cm-crest"><Crest name={away} size={78} className="convo-crest" /></span><b>{away}</b></span>
       </div>
-      <p className="convo-date"><span>{fmtDateSmart(c.match_date)}</span>{c.kickoff && <span>{hhmm(c.kickoff)} h</span>}<span className={c.is_home ? "home" : "away"}>{c.is_home ? "Local" : "Visitant"}</span></p>
+      <p className="convo-date">
+        <span className="cd-day">{dayLabel(c.match_date)}</span>
+        {c.kickoff && <span className="cd-time">{hhmm(c.kickoff)} h</span>}
+        <span className={`cd-side ${c.is_home ? "home" : "away"}`}>{c.is_home ? "🏠 Local" : "🚌 Visitant"}</span>
+      </p>
 
       {me && (
         <p className={`convo-me ${me.called ? "yes" : "no"}`}>
@@ -47,18 +61,26 @@ export function ConvoSheet({ c, roster, meId }: { c: Convocation; roster: Roster
         </p>
       )}
 
-      <dl className="convo-info">
-        {c.meet_time && (<div className="i-meet"><dt>Quedada</dt><dd>{hhmm(c.meet_time)} h</dd></div>)}
-        {c.kickoff && (<div className="i-ko"><dt>Partit</dt><dd>{hhmm(c.kickoff)} h</dd></div>)}
-        {c.kit && !kit && (<div className="i-kit"><dt>Equipació</dt><dd>{c.kit}</dd></div>)}
-        {place && (
-          <div className="wide i-place">
-            <dt>Camp</dt>
-            <dd><a href={mapsUrl(place)} target="_blank" rel="noreferrer">{place}</a></dd>
-          </div>
-        )}
-        {c.notes && (<div className="wide i-notes"><dt>Notes</dt><dd style={{ whiteSpace: "pre-line" }}>{c.notes}</dd></div>)}
-      </dl>
+      {(c.meet_time || c.kickoff) && (
+        <div className="convo-times">
+          {c.meet_time && <div><small>Quedada</small><b>{hhmm(c.meet_time)}</b></div>}
+          {c.meet_time && c.kickoff && <i aria-hidden="true">→</i>}
+          {c.kickoff && <div><small>Partit</small><b>{hhmm(c.kickoff)}</b></div>}
+        </div>
+      )}
+      {place && (
+        <a className="convo-place" href={mapsUrl(place)} target="_blank" rel="noreferrer">
+          <span className="cp-pin" aria-hidden="true">📍</span>
+          <span className="cp-text"><b>{c.venue || c.address}</b>{c.venue && c.address && <small>{c.address}</small>}</span>
+          <span className="cp-go">Com arribar ›</span>
+        </a>
+      )}
+      {((c.kit && !kit) || c.notes) && (
+        <dl className="convo-info">
+          {c.kit && !kit && (<div className="wide i-kit"><dt>Equipació</dt><dd>{c.kit}</dd></div>)}
+          {c.notes && (<div className="wide i-notes"><dt>Notes</dt><dd style={{ whiteSpace: "pre-line" }}>{c.notes}</dd></div>)}
+        </dl>
+      )}
 
       {kit && (
         <div className="convo-kit">
