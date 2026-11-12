@@ -26,7 +26,7 @@ import { AbsenceButton } from "@/components/absence-button";
 import { SeasonFx } from "@/components/season";
 import { firstName, rememberSplashName } from "@/lib/first-name";
 import { MonthStories, MonthWrapBanner } from "@/components/month-wrap";
-import { fetchStreak, streakText } from "@/lib/streak";
+import { fetchStreak, streakLevel, streakText, STREAK_LEVELS } from "@/lib/streak";
 import { fetchWeeklyPlan, itemTime, type WeeklyPlan } from "@/lib/weekly";
 import { nextConvoFor, PlayerConvo } from "@/components/player-convo";
 import { hhmm } from "@/lib/convo";
@@ -60,6 +60,7 @@ import {
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
 import { GreetSky } from "@/components/greet-sky";
+import { LevelUp } from "@/components/feel";
 
 type State =
   | { kind: "loading" }
@@ -461,7 +462,7 @@ const GREET = { mati: "Bon dia", tarda: "Bona tarda", nit: "Bona nit" } as const
 const dayPart = (hhmm: string): keyof typeof GREET => (hhmm >= "06:00" && hhmm < "13:00" ? "mati" : hhmm >= "13:00" && hhmm < "20:00" ? "tarda" : "nit");
 
 /** Salutació segons l'hora, amb el cel de fons: sol al matí, posta a la tarda i estrelles a la nit. */
-function Greeting({ name, today, level, meId, onMe }: { name: string; today: string; level: number | null; meId: string; onMe: (el: HTMLElement) => void }) {
+function Greeting({ name, today, level, meId, onMe, streak }: { name: string; today: string; level: number | null; meId: string; onMe: (el: HTMLElement) => void; streak: number | null }) {
   const [part, setPart] = useState<keyof typeof GREET>(() => dayPart(nowMadridHHMM()));
   useEffect(() => {
     const id = setInterval(() => setPart(dayPart(nowMadridHHMM())), 60_000);
@@ -470,7 +471,7 @@ function Greeting({ name, today, level, meId, onMe }: { name: string; today: str
   return (
     <header className={`greet ${part}`}>
       <GreetSky />
-      <MeAvatar meId={meId} onClick={onMe} />
+      <MeAvatar meId={meId} onClick={onMe} streak={streak} />
       <h1>{GREET[part]}, {name}!</h1>
       <p className="row" style={{ gap: 8, margin: 0 }}>
         <span>{fmtDate(today)}</span>
@@ -482,7 +483,7 @@ function Greeting({ name, today, level, meId, onMe }: { name: string; today: str
 }
 
 /** La seva foto (o la samarreta amb el dorsal) a la salutació. Porta al seu cromo. */
-function MeAvatar({ meId, onClick }: { meId: string; onClick: (el: HTMLElement) => void }) {
+function MeAvatar({ meId, onClick, streak }: { meId: string; onClick: (el: HTMLElement) => void; streak: number | null }) {
   const [thumb, setThumb] = useState<string | null>(null);
   const me = useDorsals().get(meId);
   useEffect(() => {
@@ -490,10 +491,21 @@ function MeAvatar({ meId, onClick }: { meId: string; onClick: (el: HTMLElement) 
     fetchAvatar(meId).then((x) => alive && setThumb(x), () => {});
     return () => { alive = false; };
   }, [meId]);
+  // Anell de la ratxa: s'omple fins al següent nivell; el dia que hi arriba, daurat i ple
+  const lv = streak != null ? streakLevel(streak) : null;
+  const full = !!lv && streak! > 0 && STREAK_LEVELS.includes(streak!);
+  const R = 31, L = 2 * Math.PI * R;
   return (
-    <button type="button" className={`greet-me${thumb ? " photo" : ""}${me?.gk ? " gk" : ""}`} onClick={(e) => onClick(e.currentTarget)} aria-label="El meu cromo">
+    <button type="button" className={`greet-me${thumb ? " photo" : ""}${me?.gk ? " gk" : ""}${lv ? " ringed" : ""}`} onClick={(e) => onClick(e.currentTarget)}
+      aria-label={lv ? `El meu cromo · ratxa de ${streak}${lv.to ? `, ${lv.to - streak!} per al nivell ${lv.level + 1}` : ""}` : "El meu cromo"}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {thumb ? <img className="photo-in" src={thumb} alt="" /> : <Shirt n={me?.n} gk={me?.gk} size={40} />}
+      {lv && (
+        <svg className={`streak-ring${full ? " full" : ""}`} viewBox="0 0 68 68" aria-hidden="true">
+          <circle cx="34" cy="34" r={R} className="sr-track" />
+          <circle cx="34" cy="34" r={R} className="sr-fill" style={{ strokeDasharray: L, strokeDashoffset: L * (1 - (full ? 1 : lv.progress)) }} />
+        </svg>
+      )}
     </button>
   );
 }
@@ -502,21 +514,25 @@ function MeAvatar({ meId, onClick }: { meId: string; onClick: (el: HTMLElement) 
 function StreakCard({ meId, n }: { meId: string; n: number }) {
   const [up, setUp] = useState(false);
   const [party, setParty] = useState(false);
+  const [levelUp, setLevelUp] = useState<number | null>(null);
   useEffect(() => {
     const key = `ratxa:${meId}`;
     let prev: number | null = null;
     try { const v = localStorage.getItem(key); prev = v == null ? null : Number(v); localStorage.setItem(key, String(n)); } catch { /* sense emmagatzematge */ }
     if (prev == null || n <= prev) return;
-    const t = setTimeout(() => { setUp(true); if (n % 5 === 0) setParty(true); }, 0);
+    const hit = STREAK_LEVELS.find((m) => prev! < m && n >= m);
+    const t = setTimeout(() => { setUp(true); if (hit) setLevelUp(streakLevel(n).level); else if (n % 5 === 0) setParty(true); }, 0);
     return () => clearTimeout(t);
   }, [meId, n]);
   return (
     <section className={`card streak-card${n >= 5 ? " hot" : ""}${up ? " up" : ""}`}>
       {party && <Confetti onDone={() => setParty(false)} />}
+      {levelUp != null && <LevelUp level={levelUp} n={n} onDone={() => setLevelUp(null)} />}
       <span className="streak-flame" aria-hidden="true">{n > 0 ? "🔥" : "💤"}</span>
       <div>
         <b>{n === 1 ? "1 wellness seguit" : `${n} wellness seguits`}</b>
         <span className="muted small">{streakText(n)}</span>
+        {(() => { const lv = streakLevel(n); return <span className="streak-level">Nivell {lv.level}{lv.to ? ` · ${lv.to - n} per al ${lv.level + 1}` : " · el màxim!"}</span>; })()}
       </div>
       {n > 0 && <span className="streak-n" key={n}>{n}</span>}
     </section>
@@ -560,7 +576,7 @@ function Dashboard({
 
   return (
     <>
-      <Greeting name={firstName(me.display_name)} today={today} level={data?.level ?? null} meId={me.id} onMe={(el) => go("cromo", el)} />
+      <Greeting name={firstName(me.display_name)} today={today} level={data?.level ?? null} meId={me.id} onMe={(el) => go("cromo", el)} streak={data?.streak ?? null} />
       {error && <p className="msg error">{error}</p>}
 
       <MonthWrapBanner meId={me.id} name={me.display_name} today={today} />

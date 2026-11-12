@@ -50,3 +50,14 @@ export function streakText(n: number): string {
   if (n >= 2) return "Bon començament!";
   return "Omple el wellness cada dia per fer ratxa";
 }
+
+/** Nivells de la ratxa: es puja en arribar a 5, 10, 20, 30, 50, 75 i 100 wellness seguits. */
+export const STREAK_LEVELS = [5, 10, 20, 30, 50, 75, 100];
+
+/** Nivell actual, quants en falten per al següent i el progrés (0–1) dins el nivell. */
+export function streakLevel(n: number): { level: number; from: number; to: number | null; progress: number } {
+  const level = STREAK_LEVELS.filter((m) => n >= m).length;
+  const from = level ? STREAK_LEVELS[level - 1] : 0;
+  const to = STREAK_LEVELS[level] ?? null;
+  return { level, from, to, progress: to == null ? 1 : (n - from) / (to - from) };
+}

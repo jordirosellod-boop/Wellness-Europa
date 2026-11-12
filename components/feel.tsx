@@ -31,7 +31,24 @@ export function HapticTouches() {
       if (el) haptic();
     };
     document.addEventListener("click", on, true);
-    return () => document.removeEventListener("click", on, true);
+    // Onada de llum daurada des d'on es toca, als botons principals
+    const down = (e: PointerEvent) => {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const b = (e.target as HTMLElement | null)?.closest?.<HTMLElement>("a.btn:not(.secondary), button.btn:not(.secondary):not(:disabled)");
+      if (!b) return;
+      const r = b.getBoundingClientRect();
+      const cs = getComputedStyle(b);
+      if (cs.position === "static") b.style.position = "relative";
+      if (cs.overflow === "visible") b.style.overflow = "hidden";
+      const size = Math.max(r.width, r.height) * 2.2;
+      const w = document.createElement("span");
+      w.className = "tap-wave";
+      w.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
+      b.appendChild(w);
+      setTimeout(() => w.remove(), 650);
+    };
+    document.addEventListener("pointerdown", down, true);
+    return () => { document.removeEventListener("click", on, true); document.removeEventListener("pointerdown", down, true); };
   }, []);
   return null;
 }
@@ -172,6 +189,30 @@ function CrestRain({ onDone }: { onDone: () => void }) {
         <img key={c.key} src="/escut.png" alt="" style={{ left: `${c.left}%`, width: c.size, height: c.size, animationDelay: `${c.delay}s`, animationDuration: `${c.dur}s`, ["--rot" as string]: `${c.rot}deg` }} />
       ))}
       <b>FORÇA<br />EUROPA!</b>
+    </div>,
+    document.body,
+  );
+}
+
+/** Pujada de nivell de la ratxa: rajos daurats, l'escut i «NIVELL n» a pantalla completa. Es tanca sol o tocant. */
+export function LevelUp({ level, n, onDone }: { level: number; n: number; onDone: () => void }) {
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { onDone(); return; }
+    const t1 = setTimeout(() => haptic(), 450);
+    const t2 = setTimeout(onDone, 4200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [onDone]);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="level-up" role="dialog" aria-label={`Nivell ${level}`} onClick={onDone}>
+      <i className="lu-rays" aria-hidden="true" />
+      <div className="lu-body">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/escut.png" alt="" width={110} height={110} />
+        <span className="lu-k">Nou nivell de ratxa</span>
+        <b>NIVELL {level}</b>
+        <span className="lu-n">🔥 {n} wellness seguits</span>
+      </div>
     </div>,
     document.body,
   );

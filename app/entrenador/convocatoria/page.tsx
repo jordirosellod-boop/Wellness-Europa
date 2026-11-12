@@ -406,6 +406,17 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
   useEffect(() => {
     load();
   }, [load]);
+  // Qui l'ha vista a l'app (només ho veu el staff)
+  const [seen, setSeen] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!c.published) return;
+    let alive = true;
+    const get = () => fetchAll<{ player_id: string; seen_at: string }>((f, t) => supabase().from("convocation_views").select("player_id, seen_at").eq("convocation_id", c.id).order("player_id").range(f, t))
+      .then((l) => alive && setSeen(new Map(l.map((x) => [x.player_id, x.seen_at]))), () => {});
+    get();
+    const id = setInterval(get, 60_000);
+    return () => { alive = false; clearInterval(id); };
+  }, [c.id, c.published]);
 
   /** Convoca o desconvoca; la pantalla canvia només quan el servidor ho confirma. */
   async function setCalled(ids: string[], called: boolean) {
@@ -507,6 +518,16 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
           <button className="btn small secondary" onClick={remove}>Esborrar</button>
         </div>
         {c.published && <p className="muted small" style={{ marginBottom: 0 }}>Els canvis de la llista es veuen a l&apos;instant a l&apos;app de les jugadores.</p>}
+        {c.published && calledN > 0 && (() => {
+          const called = roster.filter((r) => r.called && !r.guest);
+          const n = called.filter((r) => seen.has(r.player_id)).length;
+          return (
+            <div className="seen-bar" title="Convocades que ja l'han oberta a l'app">
+              <span>👁 Vista per <b>{n}</b> de {called.length} convocades</span>
+              <i><i style={{ width: `${called.length ? (n / called.length) * 100 : 0}%` }} /></i>
+            </div>
+          );
+        })()}
         {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status"><Ticked text={msg.text} /></p>}
       </section>
 
@@ -555,6 +576,7 @@ function ConvoEditor({ c, onChanged, onDeleted }: { c: Convocation; onChanged: (
                 >
                   <b>{r.dorsal ?? "·"}</b>
                   <span>{r.display_name}</span>
+                  {r.called && c.published && <em className={`seen${seen.has(r.player_id) ? " on" : ""}`} title={seen.has(r.player_id) ? "L'ha vista" : "Encara no l'ha oberta"} aria-label={seen.has(r.player_id) ? "L'ha vista" : "Encara no l'ha vista"}>👁</em>}
                   <i aria-hidden="true">{saving.has(r.player_id) ? "…" : r.called ? "✓" : ""}</i>
                 </button>
               )}

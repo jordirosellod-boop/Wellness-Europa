@@ -24,7 +24,15 @@ export function MeetingCard({ meId, today }: { meId: string; today: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     let alive = true;
-    fetchMyNextMeeting(meId, today).then((x) => alive && setM(x), () => {});
+    fetchMyNextMeeting(meId, today).then((x) => {
+      if (!alive) return;
+      setM(x);
+      // Per a la píndola de dalt (a les altres pantalles) el dia de la reunió
+      try {
+        if (x) localStorage.setItem("next-meeting", JSON.stringify({ d: x.day, t: hm(x.start_time), dur: x.duration_min }));
+        else localStorage.removeItem("next-meeting");
+      } catch { /* sense emmagatzematge */ }
+    }, () => {});
     return () => { alive = false; };
   }, [meId, today]);
   useEffect(() => {

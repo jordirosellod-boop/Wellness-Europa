@@ -320,6 +320,14 @@ create table if not exists public.convocation_players (
   primary key (convocation_id, player_id)
 );
 
+-- QUI HA VIST LA CONVOCATÒRIA: quan la jugadora l'obre a l'app (només la primera vegada). Ho veu només el staff.
+create table if not exists public.convocation_views (
+  convocation_id uuid not null references public.convocations(id) on delete cascade,
+  player_id      uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  seen_at        timestamptz not null default now(),
+  primary key (convocation_id, player_id)
+);
+
 -- JUGADORES AFEGIDES a una convocatòria (pujades d'un altre equip: Cadet A, Juvenil D...).
 -- No tenen compte a l'app. Dades mínimes: nom, dorsal i equip d'on vénen.
 create table if not exists public.convocation_guests (
@@ -1790,6 +1798,7 @@ alter table public.bib_numbers        enable row level security;
 alter table public.team_crests        enable row level security;
 alter table public.meeting_rounds     enable row level security;
 alter table public.meeting_slots      enable row level security;
+alter table public.convocation_views  enable row level security;
 alter table public.fcf_league_actas   enable row level security;
 alter table public.scouting_targets   enable row level security;
 alter table public.corrections        enable row level security;
@@ -1800,7 +1809,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
-  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests,
+  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests, public.convocation_views,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.calendar_tokens, public.google_drive_links, public.oauth_states, public.rival_ref_actas, public.match_minutes, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
   public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.team_crests, public.meeting_rounds, public.meeting_slots, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
@@ -1846,6 +1855,8 @@ grant all on public.published_trainings, public.bib_settings, public.bib_overrid
 grant select, insert, update, delete on public.duty_groups to authenticated;
 grant select, update on public.duty_settings to authenticated;
 grant select, insert, update, delete on public.published_trainings, public.bib_overrides, public.bib_numbers, public.team_crests, public.meeting_rounds, public.meeting_slots to authenticated;
+grant select, insert on public.convocation_views to authenticated;
+grant all on public.convocation_views to service_role;
 grant select, update on public.bib_settings to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;
 grant select, insert, update, delete on public.scouting_targets to authenticated;
@@ -2118,6 +2129,15 @@ create policy bib_settings_coach on public.bib_settings for all to authenticated
 drop policy if exists bib_overrides_coach on public.bib_overrides;
 create policy bib_overrides_coach on public.bib_overrides for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists convocation_views_coach on public.convocation_views;
+create policy convocation_views_coach on public.convocation_views for select to authenticated using ((select public.is_coach()));
+drop policy if exists convocation_views_own on public.convocation_views;
+create policy convocation_views_own on public.convocation_views for select to authenticated using (player_id = (select auth.uid()));
+-- La jugadora apunta que l'ha vista (ella mateixa, i només si està publicada)
+drop policy if exists convocation_views_insert on public.convocation_views;
+create policy convocation_views_insert on public.convocation_views for insert to authenticated
+  with check (player_id = (select auth.uid()) and (select public.is_player())
+              and exists (select 1 from public.convocations c where c.id = convocation_id and c.published));
 drop policy if exists meeting_rounds_coach on public.meeting_rounds;
 create policy meeting_rounds_coach on public.meeting_rounds for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));

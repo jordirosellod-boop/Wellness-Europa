@@ -9,6 +9,8 @@ import { addDays } from "@/lib/dates";
 import { todayMadrid } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
+import { Walkout } from "@/components/walkout";
+import { supabase } from "@/lib/supabase";
 
 /** Convocatòries publicades: la propera (o l'última) i, a sota, les anteriors. */
 export function PlayerConvo({ meId }: { meId: string }) {
@@ -42,6 +44,19 @@ export function PlayerConvo({ meId }: { meId: string }) {
 
   const c = list?.find((x) => x.id === selected) ?? null;
 
+  // Apunta que l'ha vista (ho veu el staff) i, si està convocada i encara no l'havia vist, el «walkout»
+  const [walk, setWalk] = useState<{ id: string; dorsal: number | null } | null>(null);
+  useEffect(() => {
+    if (!c || roster?.id !== c.id) return;
+    supabase().from("convocation_views").upsert({ convocation_id: c.id }, { onConflict: "convocation_id,player_id", ignoreDuplicates: true }).then(() => {}, () => {});
+    const me = roster.rows.find((r) => r.player_id === meId);
+    if (!me?.called || c.match_date < today || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const key = `walkout:${c.id}`;
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, "1"); } catch { return; }
+    const t = setTimeout(() => setWalk({ id: c.id, dorsal: me.dorsal }), 350);
+    return () => clearTimeout(t);
+  }, [c, roster, meId, today]);
+
   return (
     <>
       <h1>Convocatòria</h1>
@@ -63,6 +78,7 @@ export function PlayerConvo({ meId }: { meId: string }) {
       })()}
       {c && roster?.id === c.id && <ConvoSheet c={c} roster={roster.rows} meId={meId} />}
       {c && roster?.id !== c.id && !error && <Loading />}
+      {c && walk?.id === c.id && <Walkout c={c} dorsal={walk.dorsal} onDone={() => setWalk(null)} />}
     </>
   );
 }

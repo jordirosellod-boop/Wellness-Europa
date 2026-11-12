@@ -675,6 +675,23 @@ delete from public.convocations where id = '00000000-0000-0000-0000-0000000b1b01
 create temp table mtp as select (select id from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id limit 1) as p1,
   (select id from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id offset 1 limit 1) as p2;
 grant select on mtp to authenticated, anon;
+-- Qui ha vist la convocatòria
+insert into public.convocations (id, match_date, rival, published) values
+  ('00000000-0000-0000-0000-0000000c0c01', current_date + 3, 'Vista CF', true),
+  ('00000000-0000-0000-0000-0000000c0c02', current_date + 4, 'Esborrany CF', false);
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+insert into public.convocation_views (convocation_id) values ('00000000-0000-0000-0000-0000000c0c01');
+insert into public.convocation_views (convocation_id) values ('00000000-0000-0000-0000-0000000c0c01') on conflict do nothing;
+select pg_temp.check((select count(*) from public.convocation_views) = 1, 'La jugadora apunta que ha vist la convocatòria (un sol cop)');
+select pg_temp.expect_error($$insert into public.convocation_views (convocation_id) values ('00000000-0000-0000-0000-0000000c0c02')$$, 'No es pot marcar vista una convocatòria no publicada');
+select pg_temp.expect_error($$insert into public.convocation_views (convocation_id, player_id) values ('00000000-0000-0000-0000-0000000c0c01', (select p1 from mtp))$$, 'No es pot marcar vista en nom d''una altra');
+select pg_temp.expect_error($$delete from public.convocation_views$$, 'La jugadora no la pot esborrar');
+reset role; select set_config('request.jwt.claim.sub', (select p1::text from mtp), false); set role authenticated;
+select pg_temp.check((select count(*) from public.convocation_views) = 0, 'Una jugadora no veu qui més l''ha vista');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.check((select count(*) from public.convocation_views) = 1, 'El staff veu qui l''ha vista');
+reset role;
+delete from public.convocations where id in ('00000000-0000-0000-0000-0000000c0c01', '00000000-0000-0000-0000-0000000c0c02');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 insert into public.meeting_rounds (id, title) values ('00000000-0000-0000-0000-0000000e0e01', 'Reunions novembre');
 insert into public.meeting_slots (id, round_id, day, start_time, player_id) values
