@@ -12,7 +12,8 @@ import { AnalysisStats, ZonePitch, type APlayer } from "@/components/analysis-st
 import { DrawingEditor, DrawingOverlay, type Shape } from "@/components/telestrator";
 import { matchInsights } from "@/lib/analysis-insights";
 import { CoachShell, Footer, OwnerOnly } from "@/components/ui";
-import { VideoPlayer, type VideoHandle } from "@/components/video-player";
+import { VideoPlayer, type PlayerKind, type VideoHandle } from "@/components/video-player";
+import { classifyLink, type VideoLink } from "@/lib/video-link";
 import {
   ABUTTON_COLS, AEVENT_COLS, AMATCH_COLS, DEFAULT_BUTTONS, HIGHLIGHT_BUTTON, fetchAEvents, fetchAMatches, fetchButtons, fmtClock, fromVideo, halfOf,
   minuteOf, toVideo, youtubeId, type AButton, type AEvent, type AMatch,
@@ -30,6 +31,13 @@ import { deleteWithUndo } from "@/lib/undo";
 import { crowd } from "@/lib/feel";
 import { canRecordTab, startTabRecording } from "@/lib/tab-recorder";
 import { safeName } from "@/lib/share-file";
+
+/** Com es reprodueix cada tipus d'enllaç (els que no són Vimeo ni Drive es proven primer com a fitxer). */
+function srcOf(l: VideoLink): { kind: PlayerKind; url: string; remote?: boolean; page?: string } {
+  if (l.kind === "vimeo") return { kind: "vimeo", url: l.url };
+  if (l.kind === "drive") return { kind: "embed", url: l.url };
+  return { kind: "file", url: l.url, remote: true, page: l.kind === "embed" ? l.url : undefined };
+}
 
 export default function AnalysisPage() {
   return (
@@ -243,7 +251,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [tab, setTab] = useState<"tag" | "list" | "clips" | "stats" | "report">("tag");
   const [mode, setMode] = useState<"video" | "live">("video");
-  const [src, setSrc] = useState<{ kind: "file" | "youtube"; url: string; veo?: boolean } | null>(null);
+  const [src, setSrc] = useState<{ kind: PlayerKind; url: string; veo?: boolean; remote?: boolean; page?: string } | null>(null);
   const [veoBusy, setVeoBusy] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null); // per fer els talls
   const [vt, setVt] = useState(0);
@@ -300,6 +308,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
         setTab("list");
       }
       if (mm.video_source === "youtube" && mm.video_ref) setSrc({ kind: "youtube", url: mm.video_ref });
+      if (mm.video_source === "link" && mm.video_ref) { const l = classifyLink(mm.video_ref); if (l) setSrc(srcOf(l)); }
       // Veo: l'adreça del vídeo pot caducar, així que es torna a demanar cada cop a partir de l'enllaç.
       if (mm.video_source === "veo" && mm.video_ref) {
         resolveVeo(mm.video_ref).then(
@@ -510,14 +519,15 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (match?.video_ref !== f.name || match?.video_source !== "file") saveMatch({ video_source: "file", video_ref: f.name });
   }
 
-  /** Enllaç de YouTube o de Veo. */
+  /** Qualsevol enllaç: Veo, YouTube, Vimeo, Google Drive, Dropbox, un fitxer de vídeo o una altra web. */
   async function openLink() {
-    const link = ytUrl.replace(/\s+/g, ""); // en copiar del mòbil de vegades s'hi colen espais o salts de línia
-    if (/veo\.(co|com)\/|veocdn\.com\//i.test(link)) {
+    const l = classifyLink(ytUrl);
+    if (!l) return setMsg({ ok: false, text: "Aquest enllaç no és vàlid. Copia'l sencer (ha de començar per https://)." });
+    if (l.kind === "veo") {
       setVeoBusy(true);
       setMsg(null);
       try {
-        const v = await resolveVeo(link);
+        const v = await resolveVeo(l.url);
         setSrc({ kind: "file", url: v.video_url, veo: true });
         setVideoFile(null);
         setMode("video");
@@ -529,7 +539,20 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
       }
       return;
     }
-    openYoutube();
+    if (l.kind === "youtube") return openYoutube();
+    setMsg(null);
+    setSrc(srcOf(l));
+    setVideoFile(null);
+    setMode("video");
+    const ref = ytUrl.replace(/\s+/g, "").slice(0, 1000);
+    if (match?.video_ref !== ref || match?.video_source !== "link") saveMatch({ video_source: "link", video_ref: ref });
+  }
+
+  /** Si un enllaç no es pot reproduir com a fitxer, es prova dins la pàgina (com fa el web d'on ve). */
+  function linkFailed() {
+    if (!src?.remote) return;
+    if (src.page) setSrc({ kind: "embed", url: src.page });
+    else setMsg({ ok: false, text: "No s'ha pogut obrir aquest vídeo. Comprova que l'enllaç sigui públic." });
   }
 
   function openYoutube() {
@@ -621,18 +644,18 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                     <p className="muted small" style={{ margin: 0 }}>L&apos;últim cop vas fer servir «{match.video_ref}». Torna&apos;l a obrir (el vídeo no es guarda a l&apos;app).</p>
                   )}
                   <div className="row" style={{ flexWrap: "nowrap", gap: 6 }}>
-                    <input type="text" placeholder="…o enganxa l'enllaç de Veo o de YouTube" value={ytUrl} onChange={(e) => setYtUrl(e.target.value)}
+                    <input type="text" placeholder="…o enganxa qualsevol enllaç de vídeo" value={ytUrl} onChange={(e) => setYtUrl(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && openLink()} />
                     <button className="btn small" disabled={veoBusy || !ytUrl.trim()} onClick={openLink}>{veoBusy ? "Obrint…" : "Obrir"}</button>
                   </div>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Veo: a l&apos;app o la web de Veo, Compartir → copiar l&apos;enllaç (el partit ha de ser «Públic») i enganxa&apos;l aquí. Es recordarà per a la propera vegada.
+                    Veo, YouTube, Vimeo, Google Drive, Dropbox o un enllaç a un fitxer de vídeo (.mp4…). Ha de ser públic (a Veo, el partit «Públic»). Es recordarà per a la propera vegada.
                   </p>
                 </div>
               ) : (
                 <>
                   <div className={`an-stage${rec ? " rec" : ""}`}>
-                    <VideoPlayer ref={player} kind={src.kind} src={src.url} onTick={onTick} />
+                    <VideoPlayer ref={player} kind={src.kind} src={src.url} onTick={onTick} onFail={linkFailed} />
                     {rec && <RecOverlay rec={rec} title={match.title} onStart={(t, auto) => void recStart(t, auto)} onTeam={(t) => setRec((r) => r && { ...r, team: t })} onClose={recClose} labels={teamLabels(match)} />}
                     {frozen && !drawEdit && <DrawingOverlay shapes={frozen} />}
                     {drawEdit && (
@@ -647,6 +670,12 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                       />
                     )}
                   </div>
+                  {src.kind === "embed" && (
+                    <p className="msg info an-msg">
+                      Aquest vídeo no deixa que l&apos;app el controli: per marcar accions fes servir <b>⏱ Directe</b> (toca «Començar» quan comenci el partit al vídeo).{" "}
+                      <a href={src.url} target="_blank" rel="noreferrer">Obrir-lo en una pestanya nova ↗</a>
+                    </p>
+                  )}
                   <div className="an-controls">
                     <button onClick={() => player.current?.seek((player.current?.time() ?? 0) - 10)} aria-label="Enrere 10 segons">−10</button>
                     <button onClick={() => player.current?.seek((player.current?.time() ?? 0) - 3)} aria-label="Enrere 3 segons">−3</button>
@@ -754,7 +783,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
           )}
 
           {tab === "clips" && (
-            <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")}
+            <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo || src?.remote ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")}
               onRecord={src && mode === "video" ? recOpen : undefined} />
           )}
 

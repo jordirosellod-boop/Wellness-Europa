@@ -543,6 +543,7 @@ select pg_temp.expect_error($$select * from public.rehab_entries$$, 'Anònim no 
 reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
 insert into public.analysis_matches (id, title, match_date, rival) values ('99999999-0000-0000-0000-000000000001', 'J5 vs Damm', current_date, 'Damm');
 with u as (update public.analysis_matches set video_source = 'veo', video_ref = 'https://app.veo.co/matches/x/' where id = '99999999-0000-0000-0000-000000000001' returning 1) select pg_temp.check(count(*) = 1, 'Es pot desar un enllaç de Veo') from u;
+with u as (update public.analysis_matches set video_source = 'link', video_ref = 'https://player.vimeo.com/video/123456789?h=' || repeat('a', 500) where id = '99999999-0000-0000-0000-000000000001' returning 1) select pg_temp.check(count(*) = 1, 'Es pot desar qualsevol enllaç (encara que sigui llarg)') from u;
 select pg_temp.expect_error($$update public.analysis_matches set video_source = 'vimeo'$$, 'Font de vídeo desconeguda rebutjada');
 insert into public.analysis_events (match_id, t, action, team, player_id, result, zx, zy) values
   ('99999999-0000-0000-0000-000000000001', 125.4, 'Xut', 'us', '00000000-0000-0000-0000-0000000000b2', 'ok', 80, 40);

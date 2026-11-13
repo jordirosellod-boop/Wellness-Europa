@@ -264,11 +264,11 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord 
         </section>
   ) : null;
 
-  if (match.video_source === "youtube" && !file) {
+  if ((match.video_source === "youtube" || match.video_source === "link") && !file) {
     return (
       <><section className="card">
         <h3 className="esc" style={{ marginTop: 0 }}>Talls</h3>
-        <p className="muted">Els vídeos de YouTube no es poden descarregar, però sí gravar: amb el <b>mode gravació</b> el vídeo es posa a pantalla completa i reprodueix sol tots els talls en ordre (sortida, pressió, transicions, a destacar i gols), amb un títol a cada apartat. Tu només has de gravar la pantalla de l&apos;iPad.</p>
+        <p className="muted">Els vídeos de YouTube o Vimeo no es poden descarregar, però sí gravar: amb el <b>mode gravació</b> el vídeo es posa a pantalla completa i reprodueix sol tots els talls en ordre (sortida, pressió, transicions, a destacar i gols), amb un títol a cada apartat. Tu només has de gravar la pantalla de l&apos;iPad.</p>
         {onRecord && <button className="btn block" onClick={onRecord}>🎬 Mode gravació</button>}
       </section>
       {savedList}</>
