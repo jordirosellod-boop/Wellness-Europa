@@ -866,7 +866,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
 
           {tab === "clips" && (
             <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo || src?.remote ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")}
-              onRecord={src && mode === "video" ? recOpen : undefined} />
+              onRecord={src && mode === "video" && src.kind !== "embed" ? recOpen : undefined}
+              embed={src?.kind === "embed"} onRecordWindow={() => void startWinRec()} />
           )}
 
           {tab === "stats" && (

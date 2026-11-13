@@ -14,6 +14,7 @@ import { asFile, createVideoWriter, deleteVideo, keepAwake, listVideos, markOnDr
 import { connectDrive, disconnectDrive, driveStatus, uploadToDrive, type DriveStatus } from "@/lib/drive-upload";
 import { Ticked } from "@/components/feel";
 import { deleteWithUndo } from "@/lib/undo";
+import { canRecordTab } from "@/lib/tab-recorder";
 
 type TeamFilter = "us" | "rival" | "all";
 type Job = { label: string; progress: number; ctrl: AbortController };
@@ -67,9 +68,12 @@ function useRivalCard(match: AMatch, crest: string | null): { card: RivalCard | 
 }
 
 /** Descarregar els talls del vídeo: un per un, per apartats (accions) o tots junts. */
-export function ClipExport({ match, events, buttons, file, playerName, onRecord }: {
+export function ClipExport({ match, events, buttons, file, playerName, onRecord, onRecordWindow, embed = false }: {
   match: AMatch; events: AEvent[]; buttons: AButton[]; file: File | string | null; playerName: (id: string | null) => string; onRecord?: () => void;
+  /** Webs que l'app no pot controlar (Drive, Hudl…): gravar la finestra del partit per tenir-ne el fitxer. */
+  onRecordWindow?: () => void; embed?: boolean;
 }) {
+  const [linkBlocked, setLinkBlocked] = useState(false);
   const L = teamLabels(match);
   const [team, setTeam] = useState<TeamFilter>("us");
   const [cards, setCards] = useState(true);
@@ -230,9 +234,13 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord 
     } catch (e) {
       writer?.abort();
       if (e instanceof DOMException && e.name === "AbortError") setMsg({ ok: true, text: "Cancel·lat." });
-      else if (typeof file === "string" && !(e instanceof ExportError))
-        // Veo no sempre deixa llegir el vídeo des d'una altra web: llavors cal el fitxer.
-        setMsg({ ok: false, text: "Veo no deixa retallar aquest vídeo des de l'enllaç. Descarrega el partit de Veo (MP4) i obre'l com a fitxer per fer els talls." });
+      else if (typeof file === "string" && !(e instanceof ExportError)) {
+        // La web del vídeo no deixa llegir-lo des d'una altra (passa amb Veo i molts enllaços): llavors es fa gravant
+        setLinkBlocked(true);
+        setMsg({ ok: false, text: onRecord && canRecordTab()
+          ? "Aquesta web no deixa retallar el vídeo des de l'enllaç. Fes-ho gravant: toca «Descarregar tots els talls (gravant)» a sota."
+          : "Aquesta web no deixa retallar el vídeo des de l'enllaç. Descarrega'n el fitxer (MP4) i obre'l a dalt per fer els talls." });
+      }
       else setMsg({ ok: false, text: e instanceof ExportError ? e.message : `No s'ha pogut fer el vídeo: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
       release();
@@ -264,15 +272,34 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord 
         </section>
   ) : null;
 
-  if ((match.video_source === "youtube" || match.video_source === "link") && !file) {
+  // Enllaços que l'app controla però no pot llegir (YouTube, Vimeo…): l'app reprodueix tots els talls i els grava
+  const recordCard = (
+    <section className="card">
+      <h3 className="esc" style={{ marginTop: 0 }}>Descarregar tots els talls</h3>
+      {canRecordTab() ? (
+        <p className="muted">Aquest vídeo no es pot descarregar directament, però sí <b>gravant</b>: l&apos;app el posa a pantalla completa, reprodueix sola tots els talls en ordre (sortida, pressió, transicions, a destacar i gols, amb un títol a cada apartat) i ho grava. Al final tens el vídeo a «Vídeos fets» per desar-lo o pujar-lo al Drive.</p>
+      ) : (
+        <p className="muted">Aquest vídeo no es pot descarregar directament, però sí gravar: amb el <b>mode gravació</b> el vídeo es posa a pantalla completa i reprodueix sol tots els talls en ordre, amb un títol a cada apartat. A l&apos;iPad, grava la pantalla amb el control de l&apos;iPad mentre es reprodueix.</p>
+      )}
+      {onRecord && <button className="btn block" onClick={onRecord}>{canRecordTab() ? "⬇️ Descarregar tots els talls (gravant)" : "🎬 Mode gravació"}</button>}
+    </section>
+  );
+  if (embed && !file) {
     return (
       <><section className="card">
-        <h3 className="esc" style={{ marginTop: 0 }}>Talls</h3>
-        <p className="muted">Els vídeos de YouTube o Vimeo no es poden descarregar, però sí gravar: amb el <b>mode gravació</b> el vídeo es posa a pantalla completa i reprodueix sol tots els talls en ordre (sortida, pressió, transicions, a destacar i gols), amb un títol a cada apartat. Tu només has de gravar la pantalla de l&apos;iPad.</p>
-        {onRecord && <button className="btn block" onClick={onRecord}>🎬 Mode gravació</button>}
+        <h3 className="esc" style={{ marginTop: 0 }}>Descarregar tots els talls</h3>
+        {canRecordTab() ? (
+          <p className="muted">Aquesta web no deixa que l&apos;app faci els talls directament. Primer <b>grava la finestra del partit</b> (on l&apos;estàs mirant): quan l&apos;aturis, el vídeo s&apos;obre aquí i podràs descarregar tots els talls d&apos;un cop.</p>
+        ) : (
+          <p className="muted">Aquesta web no deixa que l&apos;app faci els talls directament. A l&apos;iPad: grava la pantalla mentre mires el partit i obre aquell vídeo a dalt («Obrir el vídeo del dispositiu»); llavors podràs descarregar tots els talls.</p>
+        )}
+        {onRecordWindow && canRecordTab() && <button className="btn block" onClick={onRecordWindow}>🔴 Gravar la finestra del partit</button>}
       </section>
       {savedList}</>
     );
+  }
+  if ((match.video_source === "youtube" || match.video_source === "link") && !file) {
+    return <>{recordCard}{savedList}</>;
   }
   if (!file) {
     return (
@@ -288,6 +315,7 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord 
   const busy = !!job;
   return (
     <div ref={root} className="clip-export">
+      {linkBlocked && onRecord && recordCard}
       <section className="card">
         <div className="row between" style={{ gap: 8 }}>
           <h3 className="esc" style={{ margin: 0 }}>Descarregar talls</h3>
