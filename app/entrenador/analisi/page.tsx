@@ -31,6 +31,7 @@ import { deleteWithUndo } from "@/lib/undo";
 import { crowd } from "@/lib/feel";
 import { canRecordTab, startTabRecording } from "@/lib/tab-recorder";
 import { safeName } from "@/lib/share-file";
+import { asFile, listVideos, type SavedVideo } from "@/lib/saved-videos";
 
 /** Com es reprodueix cada tipus d'enllaç (els que no són Vimeo ni Drive es proven primer com a fitxer). */
 function srcOf(l: VideoLink): { kind: PlayerKind; url: string; remote?: boolean; page?: string } {
@@ -274,6 +275,19 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const recPlan = useRef<{ items: RecItem[]; i: number; timer: ReturnType<typeof setTimeout> | null } | null>(null);
   const [rec, setRec] = useState<{ phase: "ready" | "run" | "end"; item: RecItem | null; n: number; i: number; team: "us" | "rival" | "all"; note?: string; auto?: boolean } | null>(null);
   const recorder = useRef<Awaited<ReturnType<typeof startTabRecording>> | null>(null);
+  // Webs amb sessió (Hudl, Wyscout…): s'obren a part i, si no es poden veure aquí, es grava aquella finestra
+  const [frameKey, setFrameKey] = useState(0);
+  const [winRec, setWinRec] = useState<{ since: number } | null>(null);
+  const winRecorder = useRef<Awaited<ReturnType<typeof startTabRecording>> | null>(null);
+  const [recorded, setRecorded] = useState<SavedVideo[]>([]);
+  useEffect(() => {
+    if (!winRec) return;
+    const t = setInterval(() => force((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [winRec]);
+  useEffect(() => {
+    listVideos(id).then((l) => setRecorded(l.filter((v) => v.name.startsWith("Partit gravat"))), () => {});
+  }, [id, winRec]);
 
   useEffect(() => {
     (async () => {
@@ -548,6 +562,52 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (match?.video_ref !== ref || match?.video_source !== "link") saveMatch({ video_source: "link", video_ref: ref });
   }
 
+  /** Obre la web del vídeo en una finestra a part, per iniciar-hi sessió (l'app no veu mai la contrasenya). */
+  function openLogin() {
+    if (!src) return;
+    const w = window.open(src.url, "partit-analisi", "popup,width=1200,height=760");
+    if (!w) window.open(src.url, "_blank", "noopener");
+    setMsg({ ok: true, text: "Inicia sessió a la finestra nova. Després toca «↻ Tornar a carregar»: si la web ho permet, el partit sortirà aquí. Si no, grava aquella finestra." });
+  }
+
+  /** Grava la finestra on es veu el partit; en aturar, el vídeo gravat s'obre aquí per analitzar-lo. */
+  async function startWinRec() {
+    if (!match) return;
+    setMsg(null);
+    try {
+      winRecorder.current = await startTabRecording(match.id, safeName(`Partit gravat - ${match.title} - ${match.match_date}`), { other: true });
+      winRecorder.current.onEnded(() => void stopWinRec());
+      setWinRec({ since: Date.now() });
+    } catch (e) {
+      winRecorder.current = null;
+      if (e instanceof Error && e.name === "NotAllowedError") return;
+      setMsg({ ok: false, text: `No s'ha pogut començar a gravar: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  }
+  async function stopWinRec() {
+    const r = winRecorder.current;
+    if (!r) return;
+    winRecorder.current = null;
+    setMsg({ ok: true, text: "Desant el vídeo gravat…" });
+    try {
+      const vid = await r.stop();
+      setWinRec(null);
+      const v = (await listVideos(id)).find((x) => x.id === vid);
+      if (v) await openRecorded(v);
+    } catch (e) {
+      setWinRec(null);
+      setMsg({ ok: false, text: `No s'ha pogut desar la gravació: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  }
+  async function openRecorded(v: SavedVideo) {
+    const f = await asFile(v);
+    if (src?.kind === "file" && src.url.startsWith("blob:")) URL.revokeObjectURL(src.url);
+    setSrc({ kind: "file", url: URL.createObjectURL(f) });
+    setVideoFile(f);
+    setMode("video");
+    setMsg({ ok: true, text: "Ja tens el partit gravat. Marca «Inici 1a part» quan comenci i ja pots etiquetar, dibuixar i fer els talls." });
+  }
+
   /** Si un enllaç no es pot reproduir com a fitxer, es prova dins la pàgina (com fa el web d'on ve). */
   function linkFailed() {
     if (!src?.remote) return;
@@ -640,6 +700,13 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                     📂 Obrir el vídeo del dispositiu
                     <input type="file" accept="video/*" onChange={openFile} hidden />
                   </label>
+                  {recorded.length > 0 && (
+                    <div className="stack" style={{ gap: 6 }}>
+                      {recorded.slice(0, 3).map((v) => (
+                        <button key={v.id} type="button" className="btn block secondary" onClick={() => void openRecorded(v)}>🎞 Obrir el partit gravat ({new Date(v.created).toLocaleDateString("ca-ES", { day: "numeric", month: "short" })})</button>
+                      ))}
+                    </div>
+                  )}
                   {match.video_source === "file" && match.video_ref && (
                     <p className="muted small" style={{ margin: 0 }}>L&apos;últim cop vas fer servir «{match.video_ref}». Torna&apos;l a obrir (el vídeo no es guarda a l&apos;app).</p>
                   )}
@@ -655,7 +722,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
               ) : (
                 <>
                   <div className={`an-stage${rec ? " rec" : ""}`}>
-                    <VideoPlayer ref={player} kind={src.kind} src={src.url} onTick={onTick} onFail={linkFailed} />
+                    <VideoPlayer key={`${src.url}-${frameKey}`} ref={player} kind={src.kind} src={src.url} onTick={onTick} onFail={linkFailed} />
                     {rec && <RecOverlay rec={rec} title={match.title} onStart={(t, auto) => void recStart(t, auto)} onTeam={(t) => setRec((r) => r && { ...r, team: t })} onClose={recClose} labels={teamLabels(match)} />}
                     {frozen && !drawEdit && <DrawingOverlay shapes={frozen} />}
                     {drawEdit && (
@@ -671,10 +738,25 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                     )}
                   </div>
                   {src.kind === "embed" && (
-                    <p className="msg info an-msg">
-                      Aquest vídeo no deixa que l&apos;app el controli: per marcar accions fes servir <b>⏱ Directe</b> (toca «Començar» quan comenci el partit al vídeo).{" "}
-                      <a href={src.url} target="_blank" rel="noreferrer">Obrir-lo en una pestanya nova ↗</a>
-                    </p>
+                    <div className="msg info an-msg an-login">
+                      <p style={{ margin: 0 }}>Aquesta web no deixa que l&apos;app controli el vídeo. Si s&apos;ha d&apos;iniciar sessió per veure el partit:</p>
+                      <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                        <button type="button" className="btn small" onClick={openLogin}>🔑 Iniciar sessió</button>
+                        <button type="button" className="btn small secondary" onClick={() => setFrameKey((k) => k + 1)}>↻ Tornar a carregar</button>
+                        {canRecordTab() && !winRec && <button type="button" className="btn small secondary" onClick={() => void startWinRec()}>🔴 Gravar la finestra del partit</button>}
+                      </div>
+                      <p className="small" style={{ margin: "6px 0 0" }}>
+                        {canRecordTab()
+                          ? "Si no surt aquí, posa'l a reproduir a la finestra on has iniciat sessió i toca «Gravar la finestra del partit» (tria aquella finestra). En aturar, el vídeo s'obre aquí amb tot: marcar, dibuixar i talls. També pots marcar en directe amb ⏱ Directe."
+                          : "A l'iPad no es pot gravar des de l'app: fes servir la gravació de pantalla de l'iPad i, després, «Obrir el vídeo del dispositiu». O marca en directe amb ⏱ Directe."}
+                      </p>
+                    </div>
+                  )}
+                  {winRec && (
+                    <div className="an-winrec" role="status">
+                      <span className="dot" /> Gravant la finestra del partit · {fmtClock((Date.now() - winRec.since) / 1000)}
+                      <button type="button" className="btn small" onClick={() => void stopWinRec()}>⏹ Aturar i analitzar</button>
+                    </div>
                   )}
                   <div className="an-controls">
                     <button onClick={() => player.current?.seek((player.current?.time() ?? 0) - 10)} aria-label="Enrere 10 segons">−10</button>

@@ -5,12 +5,18 @@ import { announceVideo, createVideoWriter } from "@/lib/saved-videos";
 
 export const canRecordTab = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia && typeof MediaRecorder !== "undefined";
 
-export async function startTabRecording(match_id: string, baseName: string) {
+/**
+ * Grava aquesta pestanya (per defecte) o, amb `other`, una altra finestra o pestanya que triï la persona
+ * (p. ex. la web on ha iniciat sessió per veure el partit). Es desa a «Vídeos fets» del partit.
+ */
+export async function startTabRecording(match_id: string, baseName: string, opts: { other?: boolean } = {}) {
   const stream = await navigator.mediaDevices.getDisplayMedia({
-    video: { frameRate: 30, displaySurface: "browser" } as MediaTrackConstraints,
+    video: { frameRate: 30, displaySurface: opts.other ? "window" : "browser" } as MediaTrackConstraints,
     audio: true,
-    // Chrome: proposa directament aquesta pestanya
-    ...({ preferCurrentTab: true, selfBrowserSurface: "include", surfaceSwitching: "exclude" } as Record<string, unknown>),
+    // Chrome: proposa directament aquesta pestanya (o, per a una altra web, deixa triar qualsevol finestra)
+    ...(opts.other
+      ? { preferCurrentTab: false, selfBrowserSurface: "exclude", surfaceSwitching: "include" }
+      : { preferCurrentTab: true, selfBrowserSurface: "include", surfaceSwitching: "exclude" }) as Record<string, unknown>,
   } as DisplayMediaStreamOptions);
   const mime = ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m)) ?? "";
   const type = mime.startsWith("video/mp4") ? "video/mp4" : "video/webm";

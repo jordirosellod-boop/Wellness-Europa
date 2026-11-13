@@ -3462,3 +3462,9 @@ body { font-variant-numeric: tabular-nums; }
   background: radial-gradient(circle, rgba(255,236,170,.55) 0%, rgba(246,215,122,.25) 35%, rgba(246,215,122,0) 65%);
   transform: scale(0); animation: tap-wave .6s cubic-bezier(.2,.7,.2,1) forwards; }
 @keyframes tap-wave { to { transform: scale(1); opacity: 0; } }
+
+/* Anàlisi: webs amb sessió (gravar la finestra del partit) */
+.an-login .btn { margin: 0; }
+.an-winrec { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: #fff0f0; color: #a11; font-weight: 700; font-size: .9rem; }
+.an-winrec .dot { width: 10px; height: 10px; border-radius: 50%; background: #e53935; animation: lp-pulse 1.4s ease-out infinite; }
+.an-winrec .btn { margin-left: auto; }
