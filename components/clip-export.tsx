@@ -281,7 +281,8 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord,
       ) : (
         <p className="muted">Aquest vídeo no es pot descarregar directament, però sí gravar: amb el <b>mode gravació</b> el vídeo es posa a pantalla completa i reprodueix sol tots els talls en ordre, amb un títol a cada apartat. A l&apos;iPad, grava la pantalla amb el control de l&apos;iPad mentre es reprodueix.</p>
       )}
-      {onRecord && <button className="btn block" onClick={onRecord}>{canRecordTab() ? "⬇️ Descarregar tots els talls (gravant)" : "🎬 Mode gravació"}</button>}
+      {onRecord && canRecordTab() && <button className="btn block" onClick={onRecord}>⬇️ Descarregar tots els talls (gravant)</button>}
+      {onRecord && <button className={`btn block${canRecordTab() ? " secondary" : ""}`} style={{ marginTop: 8 }} onClick={onRecord}>🎬 Mode gravació</button>}
     </section>
   );
   if (embed && !file) {
@@ -316,6 +317,13 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord,
   return (
     <div ref={root} className="clip-export">
       {linkBlocked && onRecord && recordCard}
+      {!linkBlocked && onRecord && (
+        <section className="card">
+          <h3 className="esc" style={{ marginTop: 0 }}>Mode gravació</h3>
+          <p className="muted" style={{ marginTop: 0 }}>El vídeo es posa a pantalla completa i reprodueix sol tots els talls en ordre, amb un títol a cada apartat{canRecordTab() ? " (i, si vols, l'app ho grava)" : " (grava la pantalla de l'iPad)"}.</p>
+          <button className="btn block secondary" onClick={onRecord}>🎬 Mode gravació</button>
+        </section>
+      )}
       <section className="card">
         <div className="row between" style={{ gap: 8 }}>
           <h3 className="esc" style={{ margin: 0 }}>Descarregar talls</h3>
