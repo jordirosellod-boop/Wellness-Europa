@@ -397,6 +397,21 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     }
     return items;
   }
+  /** «Mode gravació» des de qualsevol lloc: si encara no hi ha vídeo (o la web no deixa controlar-lo), diu què cal fer. */
+  function recAny() {
+    if (!src) {
+      setMode("video");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setMsg({ ok: false, text: "Per al mode gravació, primer obre el vídeo del partit a dalt (fitxer o enllaç)." });
+    }
+    if (src.kind === "embed") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setMsg({ ok: false, text: "Aquesta web no deixa que l'app reprodueixi els talls sola. Grava primer la finestra del partit (botó vermell de dalt) i després ja podràs fer servir el mode gravació." });
+    }
+    if (mode !== "video") setMode("video");
+    recOpen();
+  }
+
   function recOpen() {
     queue.current = null;
     setPlaying(null);
@@ -767,6 +782,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                     <select aria-label="Velocitat" value={rateV} onChange={(e) => { const r = Number(e.target.value); setRateV(r); player.current?.rate(r); }}>
                       {[0.25, 0.5, 1, 1.5, 2].map((r) => <option key={r} value={r}>{r}x</option>)}
                     </select>
+                    <button type="button" className="an-small-link" onClick={recAny}>🎬 Mode gravació</button>
                     <button type="button" className="an-small-link" onClick={() => setSrc(null)}>Canviar</button>
                   </div>
                   {playing && (
@@ -866,7 +882,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
 
           {tab === "clips" && (
             <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo || src?.remote ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")}
-              onRecord={src && mode === "video" && src.kind !== "embed" ? recOpen : undefined}
+              onRecord={recAny}
               embed={src?.kind === "embed"} onRecordWindow={() => void startWinRec()} />
           )}
 

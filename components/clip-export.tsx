@@ -307,6 +307,7 @@ export function ClipExport({ match, events, buttons, file, playerName, onRecord,
       <><section className="card">
         <h3 className="esc" style={{ marginTop: 0 }}>Talls</h3>
         <p className="muted">Carrega primer el vídeo del partit (a dalt, «Obrir vídeo») per poder descarregar els talls.</p>
+        {onRecord && <button className="btn block secondary" onClick={onRecord}>🎬 Mode gravació</button>}
       </section>
       {savedList}</>
     );
