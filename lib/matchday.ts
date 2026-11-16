@@ -5,6 +5,7 @@ import { fetchAvatars } from "@/lib/player-photos";
 import { addDays } from "@/lib/dates";
 import { supabase } from "@/lib/supabase";
 import { TZ } from "@/lib/wellness";
+import { rivalKey } from "@/lib/analysis";
 
 /** Mil·lisegons (epoch) d'una data i hora de Barcelona («2026-10-29», «10:00:00»). */
 export function madridEpoch(date: string, time: string): number {
@@ -85,20 +86,43 @@ export async function fetchScorers(actaId: string): Promise<Scorer[]> {
 export type OurMatch = { day: string; rival: string; us: number | null; them: number | null };
 let oursCache: Promise<Map<string, OurMatch>> | null = null;
 
-/** Els nostres partits de lliga (de la FCF), per dia: el rival i, si ja s'ha jugat, el resultat. */
+/**
+ * Els nostres partits per dia (per als escuts del calendari): els de lliga de la FCF i, a sobre, les convocatòries,
+ * que tenen la data real (si un partit s'ha mogut o la FCF no l'ha actualitzat, mana la convocatòria).
+ */
 export function fetchOurMatches(): Promise<Map<string, OurMatch>> {
   oursCache ??= (async () => {
-    const { data, error } = await supabase().from("fcf_matches")
-      .select("acta_id, kickoff, home, away, home_goals, away_goals, is_home").not("kickoff", "is", null)
-      .order("kickoff").order("acta_id").range(0, 199);
-    if (error) throw new Error(error.message);
-    const m = new Map<string, OurMatch>();
-    for (const r of (data ?? []) as (FcfResult & { home_goals: number | null; away_goals: number | null })[]) {
-      const day = r.kickoff!.slice(0, 10);
-      const us = r.is_home ? r.home_goals : r.away_goals, them = r.is_home ? r.away_goals : r.home_goals;
-      m.set(day, { day, rival: r.is_home ? r.away : r.home, us, them });
+    const sb = supabase();
+    const [fcf, convos] = await Promise.all([
+      sb.from("fcf_matches").select("acta_id, kickoff, home, away, home_goals, away_goals, is_home").not("kickoff", "is", null)
+        .order("kickoff").order("acta_id").range(0, 199),
+      sb.from("convocations").select("match_date, rival").order("match_date").order("id").range(0, 199),
+    ]);
+    if (fcf.error) throw new Error(fcf.error.message);
+    const list: OurMatch[] = ((fcf.data ?? []) as (FcfResult & { home_goals: number | null; away_goals: number | null })[]).map((r) => ({
+      day: r.kickoff!.slice(0, 10), rival: r.is_home ? r.away : r.home,
+      us: r.is_home ? r.home_goals : r.away_goals, them: r.is_home ? r.away_goals : r.home_goals,
+    }));
+    const key = (n: string) => rivalKey(n);
+    // El mateix equip encara que s'escrigui diferent («PREMIA DALT, C.D. A» i «Premià de Dalt»)
+    const COMMON = new Set(["club", "futbol", "femeni", "esportiu", "esportiva", "penya", "blanc", "blava", "escola", "sant", "santa"]);
+    const words = (k: string) => new Set(k.split(" ").filter((w) => w.length >= 4 && !COMMON.has(w)));
+    const same = (a: string, b: string) => {
+      const x = key(a), y = key(b);
+      if (!x || !y) return false;
+      if (x === y || x.startsWith(y) || y.startsWith(x)) return true;
+      const wy = words(y);
+      return [...words(x)].some((w) => wy.has(w));
+    };
+    const gap = (a: string, b: string) => Math.abs(Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 864e5;
+    for (const c of (convos.data ?? []) as { match_date: string; rival: string }[]) {
+      const m = list.filter((x) => same(x.rival, c.rival) && gap(x.day, c.match_date) <= 21).sort((a, b) => gap(a.day, c.match_date) - gap(b.day, c.match_date))[0];
+      if (m) m.day = c.match_date;
+      else list.push({ day: c.match_date, rival: c.rival, us: null, them: null });
     }
-    return m;
+    const out = new Map<string, OurMatch>();
+    for (const m of list) out.set(m.day, m);
+    return out;
   })().catch((e) => { oursCache = null; throw e; });
   return oursCache;
 }

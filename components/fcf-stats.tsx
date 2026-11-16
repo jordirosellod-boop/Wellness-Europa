@@ -8,6 +8,7 @@ import { fmtDateTime, friendlyError, type Profile } from "@/lib/wellness";
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
 import { CountUp } from "@/components/count-up";
+import { isPlayed } from "@/lib/played";
 
 type Match = {
   acta_id: string; jornada: number; kickoff: string | null; home: string; away: string;
@@ -104,7 +105,7 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
     gf += (m.is_home ? m.home_goals : m.away_goals) ?? 0;
     ga += (m.is_home ? m.away_goals : m.home_goals) ?? 0;
   }
-  const next = data.matches.find((m) => !m.closed);
+  const next = data.matches.find((m) => !isPlayed(m));
   const nameOf = new Map(data.players.map((p) => [p.fcf_id, p]));
   const ranking = [...data.players].sort((a, b) => b.goals - a.goals || b.matches - a.matches || a.full_name.localeCompare(b.full_name));
   const linkedIds = new Set(data.players.map((p) => p.profile_id).filter(Boolean));

@@ -130,7 +130,7 @@ function ConvoForm({ c, friendly = false, onSaved }: { c?: Convocation; friendly
     if (c) return;
     const sb = supabase();
     fetchAll<FcfNext>((a, b) =>
-      sb.from("fcf_matches").select("acta_id, jornada, kickoff, home, away, is_home").eq("closed", false).order("jornada").order("acta_id").range(a, b),
+      sb.from("fcf_matches").select("acta_id, jornada, kickoff, home, away, is_home").eq("closed", false).gte("kickoff", `${todayMadrid()}T00:00:00`).order("jornada").order("acta_id").range(a, b),
     ).then((l) => setFcf(l.slice(0, 6)), () => {});
   }, [c]);
 

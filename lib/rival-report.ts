@@ -4,6 +4,7 @@
 import { rivalKey } from "@/lib/analysis";
 import { PERIODS, type BigRaw, type League, type PlayerStat, type TeamStat } from "@/lib/bigdata";
 import { normalize, type GroupMatch } from "@/lib/fcf";
+import { isPlayed } from "@/lib/played";
 
 export type RMatch = { j: number; date: string | null; home: boolean; opp: string; oppId: string; gf: number; gc: number; res: "G" | "E" | "P" };
 export type RPlayer = PlayerStat & { lastStart: boolean; inLast: boolean; newcomer: boolean; missingRegular: boolean; sanction: string | null };
@@ -25,7 +26,7 @@ const sameTeam = (a: string, b: string) => { const x = rivalKey(a), y = rivalKey
 
 /** El proper rival (el primer partit nostre encara no jugat). */
 export function nextRival(raw: BigRaw): { id: string; match: GroupMatch } | null {
-  const mine = raw.matches.filter((m) => !m.closed && (m.home_id === raw.us_id || m.away_id === raw.us_id))
+  const mine = raw.matches.filter((m) => !isPlayed(m) && (m.home_id === raw.us_id || m.away_id === raw.us_id))
     .sort((a, b) => a.jornada - b.jornada || String(a.kickoff).localeCompare(String(b.kickoff)));
   const m = mine[0];
   return m ? { id: m.home_id === raw.us_id ? m.away_id : m.home_id, match: m } : null;
@@ -46,7 +47,7 @@ export function buildReport(L: League, raw: BigRaw, teamId: string): RivalReport
   const ourMatches = us ? mine(us.id).map((m) => toR(m, us.id)) : [];
 
   // Proper partit contra nosaltres
-  const nm = raw.matches.find((m) => !m.closed && ((m.home_id === teamId && m.away_id === raw.us_id) || (m.away_id === teamId && m.home_id === raw.us_id)));
+  const nm = raw.matches.find((m) => !isPlayed(m) && ((m.home_id === teamId && m.away_id === raw.us_id) || (m.away_id === teamId && m.home_id === raw.us_id)));
   const next = nm ? { date: nm.kickoff, j: nm.jornada, rivalHome: nm.home_id === teamId } : null;
   const h2h = closed.find((m) => (m.home_id === teamId && m.away_id === raw.us_id) || (m.away_id === teamId && m.home_id === raw.us_id));
   const headToHead = h2h ? { j: h2h.jornada, home: h2h.home_id === raw.us_id, usGoals: h2h.home_id === raw.us_id ? h2h.home_goals! : h2h.away_goals!, themGoals: h2h.home_id === raw.us_id ? h2h.away_goals! : h2h.home_goals! } : null;

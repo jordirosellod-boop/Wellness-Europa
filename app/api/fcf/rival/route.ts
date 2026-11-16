@@ -1,6 +1,7 @@
 import { standings } from "@/lib/fcf";
 import { fresh, groupMatches } from "@/lib/fcf-cache";
 import { adminClient } from "@/lib/server-admin";
+import { isPlayed } from "@/lib/played";
 
 export const maxDuration = 30;
 
@@ -20,8 +21,8 @@ export async function GET(req: Request) {
     const f = fresh();
     const all = await groupMatches(db, cfg.grup_id as string, f);
     const ours = all.filter((m) => m.home_id === cfg.team_id || m.away_id === cfg.team_id);
-    // Proper partit: el primer sense tancar (si no n'hi ha, l'últim jugat).
-    const next = ours.find((m) => !m.closed) ?? ours[ours.length - 1] ?? null;
+    // Proper partit: el primer que encara no s'ha jugat (si no n'hi ha, l'últim).
+    const next = ours.find((m) => !isPlayed(m)) ?? ours[ours.length - 1] ?? null;
     if (!next) return Response.json({ next: null, stale_at: f.stale_at });
     const rivalId = next.home_id === cfg.team_id ? next.away_id : next.home_id;
     const table = standings(all);
