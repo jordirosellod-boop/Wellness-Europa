@@ -1,5 +1,5 @@
 import type { ActaFull } from "@/lib/fcf-bigdata";
-import { matchNames, normalize } from "@/lib/fcf";
+import { matchNames, normalize, prettyPlace } from "@/lib/fcf";
 import { fresh, groupMatches, sideOf, teamMatchesOf, writeManual, writeManualMany, type ManualMatch } from "@/lib/fcf-cache";
 import { parseFcfText } from "@/lib/fcf-paste";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -52,6 +52,7 @@ export async function POST(req: Request) {
       };
     }
     await writeManualMany(db, grup, items);
+    await saveVenues(db, found.map(({ r, m }) => ({ acta: m.acta_id, venue: r.venue })));
     await refreshOurs(db, grup, cfg.team_id as string);
     return Response.json({ ok: true, preview });
   }
@@ -73,6 +74,8 @@ export async function POST(req: Request) {
   await writeManual(db, grup, m.acta_id, {
     kickoff, ...(a.finished && a.home_goals != null && a.away_goals != null ? { home_goals: a.home_goals, away_goals: a.away_goals, closed: true } : {}),
   });
+
+  await saveVenues(db, [{ acta: m.acta_id, venue: a.venue }]);
 
   // 2. L'acta (per als golejadors i el Big Data): les jugadores ja conegudes conserven el seu identificador
   const { data: known } = await db.from("fcf_players").select("fcf_id, full_name").range(0, 999);
@@ -142,4 +145,19 @@ async function refreshOurs(db: SupabaseClient, grup: string, teamId: string) {
   const { error } = await db.from("fcf_matches").upsert(mine.map((x) => ({ ...x, updated_at: now })), { onConflict: "acta_id" });
   if (error) throw new Error(error.message);
   await db.from("fcf_config").update({ last_sync: now, last_error: null }).eq("id", true);
+}
+
+/** El camp de cada partit (per omplir sol el camp de la convocatòria). No es trepitja un que ja tingui adreça. */
+async function saveVenues(db: SupabaseClient, list: { acta: string; venue: string | null }[]) {
+  const withVenue = list.filter((x) => x.venue && x.venue.trim().length > 2);
+  if (!withVenue.length) return;
+  const keys = withVenue.map((x) => `venue:${x.acta}`);
+  const { data: cur } = await db.from("fcf_cache").select("key, data").in("key", keys);
+  const has = new Map((cur ?? []).map((r) => [r.key as string, r.data as { address?: string | null }]));
+  const now = new Date().toISOString();
+  const rows = withVenue.filter((x) => !has.get(`venue:${x.acta}`)?.address).map((x) => ({
+    key: `venue:${x.acta}`, fetched_at: now,
+    data: { acta_id: x.acta, venue: prettyPlace(x.venue!).slice(0, 120), address: null, lat: null, lng: null },
+  }));
+  if (rows.length) await db.from("fcf_cache").upsert(rows).then(() => {}, () => {});
 }

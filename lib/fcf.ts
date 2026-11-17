@@ -33,7 +33,7 @@ type RawMatch = {
 };
 
 /** «CAMP DE FUTBOL MPAL. DE BREDA» → «Camp de Futbol Mpal. de Breda». */
-function prettyPlace(s: string): string {
+export function prettyPlace(s: string): string {
   const small = new Set(["de", "del", "la", "les", "el", "els", "i", "a", "d'", "l'"]);
   return s
     .trim()
