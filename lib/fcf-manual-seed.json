@@ -1,0 +1,160 @@
+{
+ "updated": "2026-11-17",
+ "manual": {
+  "4132082": {
+   "kickoff": "2026-10-18T15:00:00",
+   "home_goals": 5,
+   "away_goals": 0,
+   "closed": true
+  },
+  "4132084": {
+   "kickoff": "2026-10-18T14:30:00",
+   "home_goals": 9,
+   "away_goals": 0,
+   "closed": true
+  },
+  "4132085": {
+   "kickoff": "2026-10-17T17:30:00",
+   "home_goals": 4,
+   "away_goals": 2,
+   "closed": true
+  },
+  "4132086": {
+   "kickoff": "2026-10-17T15:00:00",
+   "home_goals": 0,
+   "away_goals": 5,
+   "closed": true
+  },
+  "4132087": {
+   "kickoff": "2026-10-17T16:00:00",
+   "home_goals": 4,
+   "away_goals": 3,
+   "closed": true
+  },
+  "4132088": {
+   "kickoff": "2026-10-17T12:15:00",
+   "home_goals": 4,
+   "away_goals": 2,
+   "closed": true
+  },
+  "4132089": {
+   "kickoff": "2026-10-18T20:00:00",
+   "home_goals": 1,
+   "away_goals": 5,
+   "closed": true
+  },
+  "4132091": {
+   "kickoff": "2026-10-25T12:00:00",
+   "home_goals": 0,
+   "away_goals": 4,
+   "closed": true
+  },
+  "4132092": {
+   "kickoff": "2026-10-24T18:15:00",
+   "home_goals": 7,
+   "away_goals": 2,
+   "closed": true
+  },
+  "4132093": {
+   "kickoff": "2026-10-25T18:00:00",
+   "home_goals": 3,
+   "away_goals": 0,
+   "closed": true
+  },
+  "4132094": {
+   "kickoff": "2026-10-25T17:00:00",
+   "home_goals": 1,
+   "away_goals": 2,
+   "closed": true
+  },
+  "4132095": {
+   "kickoff": "2026-10-25T17:00:00",
+   "home_goals": 4,
+   "away_goals": 2,
+   "closed": true
+  },
+  "4132096": {
+   "kickoff": "2026-10-24T18:00:00",
+   "home_goals": 2,
+   "away_goals": 2,
+   "closed": true
+  },
+  "4132097": {
+   "kickoff": "2026-10-24T17:00:00",
+   "home_goals": 3,
+   "away_goals": 5,
+   "closed": true
+  },
+  "4132099": {
+   "kickoff": "2026-10-31T15:00:00",
+   "home_goals": 2,
+   "away_goals": 0,
+   "closed": true
+  },
+  "4132100": {
+   "kickoff": "2026-10-31T17:45:00",
+   "home_goals": 3,
+   "away_goals": 2,
+   "closed": true
+  },
+  "4132101": {
+   "kickoff": "2026-10-31T15:00:00",
+   "home_goals": 0,
+   "away_goals": 12,
+   "closed": true
+  },
+  "4132102": {
+   "kickoff": "2026-11-01T18:00:00",
+   "home_goals": 7,
+   "away_goals": 2,
+   "closed": true
+  },
+  "4132103": {
+   "kickoff": "2026-10-31T16:30:00",
+   "home_goals": 3,
+   "away_goals": 0,
+   "closed": true
+  },
+  "4132104": {
+   "kickoff": "2026-11-01T15:00:00",
+   "home_goals": 0,
+   "away_goals": 5,
+   "closed": true
+  },
+  "4132105": {
+   "kickoff": "2026-10-31T14:00:00",
+   "home_goals": 3,
+   "away_goals": 0,
+   "closed": true
+  },
+  "4132120": {
+   "kickoff": "2026-11-15T19:30:00",
+   "home_goals": 4,
+   "away_goals": 5,
+   "closed": true
+  }
+ },
+ "venues": {
+  "4132082": "Camp de Futbol Mpal. de Santa Eulàlia de Riuprimer",
+  "4132084": "Camp de Futbol Mpal. Torres de Palau",
+  "4132085": "Camp de Futbol Mpal. d'Ocata",
+  "4132086": "Estadi Mpal. Torras i Bages (2)",
+  "4132087": "Camp de Futbol Mpal. de Pont Major",
+  "4132088": "Camp de Futbol Mpal. de Cabanes",
+  "4132089": "Camp de Futbol Mpal. de Premià de Dalt",
+  "4132091": "Camp de Futbol Mpal. de l'Estartit",
+  "4132092": "Camp de Futbol Mpal. Teixonera",
+  "4132094": "Camp de Futbol Mpal. de Torelló",
+  "4132095": "Camp de Futbol Cem Fernando González Resina",
+  "4132096": "Camp de Futbol Parroquia de Santa Maria de Llerona",
+  "4132097": "Camp de Futbol Mpal. Ca la Guidó-Pedro Alia Dorado",
+  "4132099": "Camp de Futbol Mpal. Torres de Palau",
+  "4132100": "Camp de Futbol Mpal. d'Ocata",
+  "4132101": "Estadi Mpal. Torras i Bages (2)",
+  "4132102": "Camp de Futbol Mpal. de Pont Major",
+  "4132103": "Camp de Futbol Mpal. de Cabanes",
+  "4132104": "Camp de Futbol Mpal. de Premià de Dalt",
+  "4132105": "Camp de Futbol Mpal. Nou Sardenya",
+  "4132120": "Camp de Futbol Mpal. Nou Sardenya"
+ }
+}

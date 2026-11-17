@@ -1,5 +1,5 @@
 import { fetchMatchVenue, fetchVenueFromActaPage } from "@/lib/fcf";
-import { fresh, groupMatches, rivalKey } from "@/lib/fcf-cache";
+import { fresh, groupMatches, rivalKey, seedVenue } from "@/lib/fcf-cache";
 import { adminClient } from "@/lib/server-admin";
 
 export const maxDuration = 30;
@@ -35,6 +35,8 @@ export async function GET(req: Request) {
     if (m) {
       const { data: c } = await db.from("fcf_cache").select("data").eq("key", `venue:${m.acta_id}`).maybeSingle();
       if (c?.data) return Response.json({ venue: c.data, stale: true });
+      const sv = seedVenue(m.acta_id);
+      if (sv) return Response.json({ venue: { acta_id: m.acta_id, venue: sv, address: null, lat: null, lng: null }, stale: true });
       // La pàgina pública del partit (la del web de la FCF) també diu el camp
       const page = await fetchVenueFromActaPage(m.acta_id).catch(() => null);
       if (page?.venue) {

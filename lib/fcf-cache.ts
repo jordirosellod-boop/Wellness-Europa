@@ -8,11 +8,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchGroupMatches, type FcfMatch, type GroupMatch } from "@/lib/fcf";
 import { fetchActaFull, fetchScorers, fetchSanctions, type ActaFull, type Scorer, type Sanction } from "@/lib/fcf-bigdata";
 import snapshot from "@/lib/fcf-snapshot.json";
+import seedData from "@/lib/fcf-manual-seed.json";
 
 /** Si les dades no són d'ara: de quan són (ISO). */
 export type Freshness = { stale_at: string | null; unread?: number };
 export const fresh = (): Freshness => ({ stale_at: null, unread: 0 });
 
+const SEED = seedData as { manual: Record<string, unknown>; venues: Record<string, string> };
 const SNAP = snapshot as { grup_id: string; at: string; matches: GroupMatch[]; scorers: Scorer[]; sanctions: Sanction[] };
 
 async function readCache<T>(db: SupabaseClient, key: string): Promise<{ data: T; at: string } | null> {
@@ -111,8 +113,12 @@ export type ManualMatch = { kickoff?: string | null; home_goals?: number | null;
 /** Dades enganxades de la FCF pel staff, per partit (acta_id). */
 export async function readManual(db: SupabaseClient, grup: string): Promise<Record<string, ManualMatch>> {
   const c = await readCache<Record<string, ManualMatch>>(db, `manual:${grup}`);
-  return c?.data ?? {};
+  // Les jornades copiades de la FCF que porta l'app (el que s'enganxa després hi va per sobre)
+  const base = SNAP.grup_id === grup ? (SEED.manual as Record<string, ManualMatch>) : {};
+  return { ...base, ...(c?.data ?? {}) };
 }
+/** El camp d'un partit copiat de la FCF que porta l'app (si n'hi ha). */
+export const seedVenue = (acta: string): string | null => (SEED.venues as Record<string, string>)[acta] ?? null;
 export async function writeManual(db: SupabaseClient, grup: string, acta: string, m: ManualMatch) {
   return writeManualMany(db, grup, { [acta]: m });
 }
