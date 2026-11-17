@@ -5,6 +5,7 @@ import { addDays, fmtShort } from "@/lib/dates";
 import { Shirt, useDorsals } from "@/components/shirt";
 import { bibName, fetchBibPlayers, fetchBibs, fetchBibSettings, type BibDay, type BibPlayer, type BibSettings } from "@/lib/bibs";
 import { supabase } from "@/lib/supabase";
+import { ClubIcon } from "@/components/club-icons";
 
 /** Targeta de la jugadora: qui porta els petos avui (o el proper dia) i els següents. */
 export function BibsCard({ meId, today }: { meId: string; today: string }) {
@@ -21,7 +22,7 @@ export function BibsCard({ meId, today }: { meId: string; today: string }) {
   return (
     <section className={`card bibs-card${mine ? " mine" : ""}${mine && first.day === today ? " today" : ""}`}>
       {mine && first.day === today && <i className="bibs-shine" aria-hidden="true" />}
-      <h2>🦺 Petos</h2>
+      <h2 className="ico-h"><ClubIcon name="petos" /> Petos</h2>
       <p className="bibs-now">
         <Shirt n={first.dorsal} gk={dorsals.get(first.player_id)?.gk} size={40} tone={mine ? "gold" : "home"} />
         <span>{mine ? <b>{when} et toca a tu portar els petos!</b> : <><span>{when} els porta</span> <b>{bibName(first)}</b></>}</span>
@@ -83,7 +84,7 @@ export function BibsAdmin({ weekStart, onChanged }: { weekStart: string; onChang
 
   return (
     <section className="card bibs-admin">
-      <h2 style={{ marginTop: 0 }}>🦺 Petos</h2>
+      <h2 className="ico-h" style={{ marginTop: 0 }}><ClubIcon name="petos" /> Petos</h2>
       <p className="muted small" style={{ marginTop: -4 }}>
         Cada dia d&apos;entreno o partit els porta una jugadora, per ordre del dorsal dels petos (no canvia encara que a la convocatòria en porti un altre). Si consta absent, està lesionada o el dia de partit no està convocada, li toca a la següent.
       </p>

@@ -3472,3 +3472,68 @@ body { font-variant-numeric: tabular-nums; }
 /* Enganxar de la FCF */
 .fcf-paste textarea { font-size: .85rem; font-family: ui-monospace, Menlo, monospace; }
 .fcf-paste-prev { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--blau-clar); }
+
+/* Menú de baix de vidre: píndola flotant amb un indicador daurat que llisca */
+.bottom-nav {
+  left: 10px; right: 10px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); padding: 4px; padding-bottom: 4px; border-radius: 24px;
+  background: rgba(6, 24, 71, .72); -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,.14); border-top: 1px solid rgba(255,255,255,.22);
+  box-shadow: 0 14px 34px rgba(1,14,50,.35), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.bottom-nav button { position: relative; z-index: 1; min-height: 54px; border-radius: 20px; transition: color .25s ease; }
+.bottom-nav button svg { transition: transform .35s var(--ease-back); }
+.bottom-nav button[aria-current="page"] { box-shadow: none; color: #f6d77a; }
+.bottom-nav button[aria-current="page"] svg { transform: translateY(-1px) scale(1.08); }
+.bottom-nav .bn-ind {
+  position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 5); border-radius: 20px;
+  background: radial-gradient(80% 90% at 50% 0%, rgba(246,215,122,.28), rgba(246,215,122,.08) 70%), rgba(255,255,255,.06);
+  box-shadow: inset 0 0 0 1px rgba(246,215,122,.35); transform: translateX(calc(var(--i, 0) * 100%));
+  transition: transform .5s cubic-bezier(.34,1.45,.5,1), opacity .2s ease;
+}
+.bottom-nav[style*="--i: -1"] .bn-ind, .bottom-nav[style*="--i:-1"] .bn-ind { opacity: 0; }
+body:has(.bottom-nav) footer.foot { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .bottom-nav { background: rgba(6,24,71,.96); } }
+@media (prefers-reduced-motion: reduce) { .bottom-nav .bn-ind { transition: none; } }
+
+/* Cortina «V» del club en canviar d'apartat */
+.v-curtain { position: fixed; inset: 0; z-index: 9400; pointer-events: none; overflow: hidden; }
+.v-curtain svg { position: absolute; top: 0; left: 0; height: 100%; width: 300%; transform: translateX(-100%); animation: vc-sweep .66s cubic-bezier(.65,0,.35,1) forwards; }
+.v-curtain .vc-gold { fill: #dbb34d; }
+.v-curtain .vc-blue { fill: #0a2ea0; }
+@keyframes vc-sweep { from { transform: translateX(-100%); } to { transform: translateX(34%); } }
+
+/* Icones del club als títols */
+.ico-h { display: flex; align-items: center; gap: 8px; }
+.club-ico { flex: none; vertical-align: -3px; }
+.mc-k .club-ico, .wk-banner-k .club-ico { vertical-align: -3px; margin-right: 2px; }
+.streak-flame .club-ico { display: block; filter: drop-shadow(0 2px 6px rgba(219,150,40,.45)); }
+
+/* Dia de partit: l'app es vesteix amb el color de l'equipació (3a vermella, 2a blava; la 1a és la de sempre) */
+html[data-kit="third"] { --blau: #c4202b; --blau-fosc: #8a1018; --blau-clar: #fdebec; }
+html[data-kit="away"] { --blau: #1559d6; --blau-fosc: #0c3c9c; --blau-clar: #e6efff; }
+html[data-kit="third"] .topbar, html[data-kit="away"] .topbar { box-shadow: inset 0 -3px 0 rgba(219,179,77,.85); }
+html[data-kit] .topbar, html[data-kit] .btn { transition: background-color .6s ease; }
+
+/* Gra fi als fons blau marí (com un cartell imprès) */
+:root { --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .075 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.convo {
+  background:
+    var(--grain),
+    radial-gradient(90% 45% at 50% 0%, rgba(70,110,230,.55), transparent 70%),
+    radial-gradient(70% 30% at 50% 100%, rgba(219,179,77,.12), transparent 75%),
+    linear-gradient(180deg, #050f36 0%, #081a55 45%, #0b2577 100%);
+}
+.matchday {
+  background:
+    var(--grain),
+    radial-gradient(110% 60% at 50% -10%, rgba(219,179,77,.28), transparent 60%),
+    var(--escapulat-net) center top / 100% auto no-repeat,
+    linear-gradient(165deg, #061847, var(--navy) 45%, var(--blau));
+}
+.bottom-nav { background: var(--grain), rgba(6, 24, 71, .72); }
+.walkout { background: var(--grain), radial-gradient(70% 50% at 50% 60%, #0d2a80 0%, #050d2e 60%, #01040f 100%); }
+.level-up { background: var(--grain), radial-gradient(60% 45% at 50% 45%, rgba(246,215,122,.35), rgba(5,13,46,.92) 70%); }
+
+/* Contorn de llum daurada a les fotos de les jugadores (com en una foto d'estudi) */
+.cv-photo img { filter: drop-shadow(-12px 6px 10px rgba(0,0,30,.6)) drop-shadow(0 0 1px rgba(255,238,180,.95)) drop-shadow(0 0 5px rgba(246,215,122,.35)); }
+img.pcard-photo, .p-hero-photo img { filter: drop-shadow(0 0 1px rgba(255,238,180,.9)) drop-shadow(0 0 7px rgba(246,215,122,.3)) drop-shadow(0 14px 22px rgba(0,0,30,.45)); }

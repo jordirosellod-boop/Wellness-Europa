@@ -6,6 +6,7 @@ import { dutyOf, fetchDuties, fetchDutyMembers, fetchDutySettings, firstNames, g
 import { fetchAll, supabase } from "@/lib/supabase";
 import { todayMadrid } from "@/lib/wellness";
 import { Ticked } from "@/components/feel";
+import { ClubIcon } from "@/components/club-icons";
 
 /** Qui porta el material i les porteries aquesta setmana (per a les jugadores i el planning). */
 export function DutiesCard({ week, meId, title = "Aquesta setmana" }: { week?: string; meId?: string; title?: string }) {
@@ -20,7 +21,7 @@ export function DutiesCard({ week, meId, title = "Aquesta setmana" }: { week?: s
   const mine = meId ? groups.find((g) => g.players.some((p) => p.id === meId)) : null;
   return (
     <section className={`card duties-card${mine?.task ? " mine" : ""}`}>
-      <h2>{title}</h2>
+      <h2 className="ico-h"><ClubIcon name="material" /> {title}</h2>
       {mine?.task && <p className="duties-me">Et toca a tu: <b>{TASK_LABEL[mine.task]}</b> ({groupName(mine)})</p>}
       <ul className="duties-list">
         {[mat, gk].filter((g): g is DutyGroup => !!g).map((g) => (
@@ -82,7 +83,7 @@ export function DutiesAdmin({ week }: { week: string }) {
   const opts = Array.from({ length: n }, (_, i) => i + 1);
   return (
     <section className="card duties-admin">
-      <h2 style={{ marginTop: 0 }}>🧺 Material i 🥅 porteria</h2>
+      <h2 className="ico-h" style={{ marginTop: 0 }}><ClubIcon name="material" /> Material i <ClubIcon name="porteria" /> porteria</h2>
       <p className="muted small" style={{ marginTop: -4 }}>Cada setmana roten: el grup de material passa al següent, i el de porteria també.</p>
       {msg && <p className={`msg${msg.ok ? "" : " error"}`}><Ticked text={msg.text} /></p>}
       {cfg && (

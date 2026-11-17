@@ -60,7 +60,8 @@ import {
 import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
 import { GreetSky } from "@/components/greet-sky";
-import { LevelUp } from "@/components/feel";
+import { curtain, LevelUp } from "@/components/feel";
+import { ClubIcon } from "@/components/club-icons";
 
 type State =
   | { kind: "loading" }
@@ -227,6 +228,10 @@ function PlayerHome({ me }: { me: Profile }) {
       window.scrollTo({ top: 0 });
     };
     if (next === section) return window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    // Des del menú de baix: la cortina «V» del club creua la pantalla i, a sota, canvia l'apartat
+    if (!from && NAV.includes(next) && NAV.includes(section === "normes" ? "multes" : section)) {
+      return curtain(() => flushSync(run));
+    }
     if (from) from.style.viewTransitionName = "panel";
     transition(from ? "grow" : "slide", () => {
       if (from) from.style.viewTransitionName = "";
@@ -314,7 +319,8 @@ function PlayerHome({ me }: { me: Profile }) {
 
       </div>
 
-      <nav className="bottom-nav" aria-label="Menú">
+      <nav className="bottom-nav" aria-label="Menú" style={{ ["--i" as string]: NAV.indexOf(section === "normes" ? "multes" : section) }}>
+        <i className="bn-ind" aria-hidden="true" />
         {([
           ["inici", "Inici", ICONS.inici],
           ["avui", "Avui", ICONS.avui],
@@ -331,6 +337,8 @@ function PlayerHome({ me }: { me: Profile }) {
     </div>
   );
 }
+
+const NAV: Section[] = ["inici", "avui", "calendari", "lliga", "multes"];
 
 const svg = (d: string) => (
   <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -528,7 +536,7 @@ function StreakCard({ meId, n }: { meId: string; n: number }) {
     <section className={`card streak-card${n >= 5 ? " hot" : ""}${up ? " up" : ""}`}>
       {party && <Confetti onDone={() => setParty(false)} />}
       {levelUp != null && <LevelUp level={levelUp} n={n} onDone={() => setLevelUp(null)} />}
-      <span className="streak-flame" aria-hidden="true">{n > 0 ? "🔥" : "💤"}</span>
+      <span className="streak-flame" aria-hidden="true">{n > 0 ? <ClubIcon name="ratxa" size={34} /> : "💤"}</span>
       <div>
         <b>{n === 1 ? "1 wellness seguit" : `${n} wellness seguits`}</b>
         <span className="muted small">{streakText(n)}</span>
@@ -614,7 +622,7 @@ function Dashboard({
 
       {data?.trainingToday && (
         <button type="button" className="wk-banner train" onClick={(e) => go("entreno", e.currentTarget)}>
-          <span className="wk-banner-k">📋 Entreno d&apos;avui</span>
+          <span className="wk-banner-k"><ClubIcon name="entreno" size={16} /> Entreno d&apos;avui</span>
           <b>Ja està penjat. Mira les tasques i els equips!</b>
           <span className="wk-banner-more">Veure l&apos;entreno ›</span>
         </button>
@@ -629,7 +637,7 @@ function Dashboard({
       <RehabCard meId={me.id} today={today} />
 
       <section className="card today-card">
-        <h2>Avui</h2>
+        <h2 className="ico-h"><ClubIcon name="avui" /> Avui</h2>
         {sessions.length === 0 && <Empty compact art="rest" title="Avui no hi ha cap sessió" hint="Bon descans! 😴" />}
         {sessions.map((s) => {
           const m = data?.mine.get(s.id);

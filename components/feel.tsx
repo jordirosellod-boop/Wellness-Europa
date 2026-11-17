@@ -217,3 +217,19 @@ export function LevelUp({ level, n, onDone }: { level: number; n: number; onDone
     document.body,
   );
 }
+
+/**
+ * Cortina «V» del club: una V blava i daurada creua la pantalla i, quan la tapa, es fa el canvi (cb).
+ * Si es demana menys moviment, el canvi es fa directament.
+ */
+export function curtain(cb: () => void) {
+  if (typeof document === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return cb();
+  document.querySelector(".v-curtain")?.remove();
+  const el = document.createElement("div");
+  el.className = "v-curtain";
+  el.setAttribute("aria-hidden", "true");
+  el.innerHTML = '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path class="vc-gold" d="M0 0 L80 0 L100 50 L80 100 L0 100 Z"/><path class="vc-blue" d="M0 0 L77 0 L97 50 L77 100 L0 100 Z"/></svg>';
+  document.body.appendChild(el);
+  setTimeout(cb, 320);
+  setTimeout(() => el.remove(), 680);
+}

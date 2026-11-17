@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { madridEpoch } from "@/lib/matchday";
 import { todayMadrid } from "@/lib/wellness";
 
-type Saved = { d: string; t: string; m?: string; h: boolean; c: string; r?: string };
+type Saved = { d: string; t: string; m?: string; h: boolean; c: string; r?: string; k?: string };
 const MATCH_MIN = 105; // durada aproximada (dues parts i el descans)
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -45,6 +45,11 @@ export function LivePill() {
       try {
         const x = JSON.parse(localStorage.getItem("splash-match") || "null") as Saved | null;
         setM(x && x.d === todayMadrid() && x.t ? x : null);
+        // Dia de partit: l'app es vesteix amb el color de l'equipació triada
+        const kit = x && x.d === todayMadrid() && x.k ? x.k : "";
+        if ((document.documentElement.dataset.kit ?? "") !== kit) {
+          if (kit) document.documentElement.dataset.kit = kit; else delete document.documentElement.dataset.kit;
+        }
         const r = JSON.parse(localStorage.getItem("next-meeting") || "null") as { d: string; t: string; dur: number } | null;
         setMeeting(r && r.d === todayMadrid() ? r : null);
       } catch { setM(null); setMeeting(null); }

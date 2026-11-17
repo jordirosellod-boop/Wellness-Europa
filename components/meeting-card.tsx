@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DOW_NAMES, endOf, fetchMyNextMeeting, hm, type MeetingSlot } from "@/lib/meetings";
 import { isoDow } from "@/lib/dates";
 import { madridEpoch } from "@/lib/matchday";
+import { ClubIcon } from "@/components/club-icons";
 
 type Mine = MeetingSlot & { duration_min: number; title: string };
 
@@ -50,7 +51,7 @@ export function MeetingCard({ meId, today }: { meId: string; today: string }) {
     <section className={`card meeting-card${isToday ? " today" : ""}`}>
       <div className="mc-date" aria-hidden="true"><b>{day}</b><small>{["GEN", "FEB", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OCT", "NOV", "DES"][month - 1]}</small></div>
       <div className="mc-body">
-        <span className="mc-k">🗣️ La teva reunió</span>
+        <span className="mc-k"><ClubIcon name="reunio" size={16} /> La teva reunió</span>
         <b>{isToday ? "Avui" : DOW_NAMES[isoDow(m.day)]} · {hm(m.start_time)}–{endOf(m.start_time, m.duration_min)} h</b>
         <span className="mc-left">{left(start - now)} · {m.duration_min} min amb el staff</span>
       </div>

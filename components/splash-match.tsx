@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { crestFor, useCrests } from "@/components/crest";
 import { prettyTeam } from "@/lib/analysis";
-import { fetchConvocations, hhmm } from "@/lib/convo";
+import { fetchConvocations, hhmm, kitOf } from "@/lib/convo";
 
 /**
  * Guarda al mòbil el proper partit perquè, el dia del partit, la pantalla d'entrada surti amb els dos escuts
@@ -23,6 +23,8 @@ export function SplashMatchSaver({ today }: { today: string }) {
           d: c.match_date, t: c.kickoff ? hhmm(c.kickoff) : "", h: c.is_home, c: crestFor(teams, rival) ?? "",
           // per a la barra «en directe» de dalt
           r: rival, m: c.meet_time ? hhmm(c.meet_time) : "",
+          // l'equipació del dia (els accents de l'app agafen el seu color)
+          k: kitOf(c.kit) ?? "",
         }));
       } catch { /* sense emmagatzematge: l'entrada surt com sempre */ }
     }, () => {});
