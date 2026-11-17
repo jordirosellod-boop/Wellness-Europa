@@ -51,7 +51,7 @@ export const rivalKey = (s: string) =>
     .replace(/,?\s+(c\.e\.|u\.e\.|c\.f\.|a\.d\.|c\.d\.|u\.d\.|f\.c\.)\s*/g, " ")
     .replace(/\s+[a-z]$/, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 /** A l'acta els equips no porten la lletra («BREDA, U.E.» i no «BREDA, U.E. A»). */
-function sideOf(m: GroupMatch, team: string): "home" | "away" | null {
+export function sideOf(m: GroupMatch, team: string): "home" | "away" | null {
   const k = rivalKey(team), hk = rivalKey(m.home), ak = rivalKey(m.away);
   if (k === hk || hk.startsWith(k) || k.startsWith(hk)) return "home";
   if (k === ak || ak.startsWith(k) || k.startsWith(ak)) return "away";
@@ -80,8 +80,11 @@ const PLAYED_AFTER_MS = 3 * 3600 * 1000; // l'acta es mira 3 h després de comen
  * amb l'acta (primer la guardada; si no, se'n llegeixen com a molt `maxReads` de noves, de 4 en 4).
  */
 export async function groupMatches(db: SupabaseClient, grup: string, f: Freshness, maxReads = 12): Promise<GroupMatch[]> {
-  const list = await cached(db, `group-matches:${grup}`, () => fetchGroupMatches(grup), f, SNAP.grup_id === grup ? SNAP.matches : null);
-  if (!f.stale_at) return list;
+  const raw = await cached(db, `group-matches:${grup}`, () => fetchGroupMatches(grup), f, SNAP.grup_id === grup ? SNAP.matches : null);
+  if (!f.stale_at) return raw;
+  // El que el staff ha enganxat de la web de la FCF (data, hora i resultat reals) mana sobre la còpia guardada
+  const manual = await readManual(db, grup);
+  const list = raw.map((m) => (manual[m.acta_id] ? { ...m, ...manual[m.acta_id] } : m));
   const due = list.filter((m) => !m.closed && m.kickoff && Date.parse(`${m.kickoff}+02:00`) + PLAYED_AFTER_MS < Date.now());
   if (!due.length) return list;
   const saved = new Map<string, ActaFull>();
@@ -102,6 +105,19 @@ export async function groupMatches(db: SupabaseClient, grup: string, f: Freshnes
     const s = a && !m.closed ? scoreFromActa(m, a) : null;
     return s ? { ...m, home_goals: s.home, away_goals: s.away, closed: true } : m;
   });
+}
+
+export type ManualMatch = { kickoff?: string | null; home_goals?: number | null; away_goals?: number | null; closed?: boolean };
+/** Dades enganxades de la FCF pel staff, per partit (acta_id). */
+export async function readManual(db: SupabaseClient, grup: string): Promise<Record<string, ManualMatch>> {
+  const c = await readCache<Record<string, ManualMatch>>(db, `manual:${grup}`);
+  return c?.data ?? {};
+}
+export async function writeManual(db: SupabaseClient, grup: string, acta: string, m: ManualMatch) {
+  const cur = await readManual(db, grup);
+  cur[acta] = { ...cur[acta], ...m };
+  const { error } = await db.from("fcf_cache").upsert({ key: `manual:${grup}`, data: cur, fetched_at: new Date().toISOString() });
+  if (error) throw new Error(error.message);
 }
 
 /** Els partits del nostre equip, a partir dels del grup. */

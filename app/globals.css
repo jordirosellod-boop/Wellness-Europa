@@ -3468,3 +3468,7 @@ body { font-variant-numeric: tabular-nums; }
 .an-winrec { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: #fff0f0; color: #a11; font-weight: 700; font-size: .9rem; }
 .an-winrec .dot { width: 10px; height: 10px; border-radius: 50%; background: #e53935; animation: lp-pulse 1.4s ease-out infinite; }
 .an-winrec .btn { margin-left: auto; }
+
+/* Enganxar de la FCF */
+.fcf-paste textarea { font-size: .85rem; font-family: ui-monospace, Menlo, monospace; }
+.fcf-paste-prev { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--blau-clar); }

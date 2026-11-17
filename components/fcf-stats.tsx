@@ -127,6 +127,7 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
           )}
         </div>
       )}
+      {mode === "coach" && <PasteFcf onSaved={load} />}
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
 
       {data.matches.length === 0 ? (
@@ -232,5 +233,59 @@ export function FcfStats({ mode, meId }: { mode: "coach" | "player"; meId?: stri
         </>
       )}
     </>
+  );
+}
+
+type Preview = { jornada: number; home: string; away: string; date: string | null; time: string | null; home_goals: number | null; away_goals: number | null; finished: boolean; goals: number; players: number; ours: boolean };
+
+/** Staff: enganxar l'acta copiada de la web de la FCF (resultat, data i hora reals, gols i alineacions). */
+function PasteFcf({ onSaved }: { onSaved: () => Promise<unknown> | void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [prev, setPrev] = useState<Preview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function call(save: boolean) {
+    setBusy(true); setMsg(null);
+    try {
+      const { data: s } = await supabase().auth.getSession();
+      const res = await fetch("/api/fcf/import", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` }, body: JSON.stringify({ text, save }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+      if (!save) { setPrev(j.preview as Preview); return; }
+      const p = j.preview as Preview;
+      setMsg({ ok: true, text: `Desat ✓ J${p.jornada}: ${p.home} ${p.home_goals ?? ""}–${p.away_goals ?? ""} ${p.away}${j.players ? ` · ${j.players} jugadores nostres` : ""}. Enganxa la següent acta quan vulguis.` });
+      setText(""); setPrev(null);
+      await onSaved();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) return <button className="btn secondary block" style={{ marginBottom: 12 }} onClick={() => setOpen(true)}>📋 Enganxar de la FCF</button>;
+  return (
+    <section className="card stack fcf-paste">
+      <div className="row between"><h2 style={{ margin: 0 }}>📋 Enganxar de la FCF</h2><button className="btn small secondary" onClick={() => setOpen(false)}>Tancar</button></div>
+      <p className="muted small" style={{ margin: 0 }}>
+        A la web de la FCF obre l&apos;<b>acta</b> del partit (pestanya Resultats › toca el partit), selecciona-ho tot, copia-ho i enganxa-ho aquí.
+        Es desaran el resultat, la data i l&apos;hora reals, els gols i les alineacions.
+      </p>
+      <textarea value={text} onChange={(e) => { setText(e.target.value); setPrev(null); }} rows={7} placeholder="TEMPORADA : 2026 / 27&#10;DATA: …" disabled={busy} />
+      {prev && (
+        <div className="fcf-paste-prev">
+          <b>J{prev.jornada} · {prev.home} {prev.home_goals ?? "–"} – {prev.away_goals ?? "–"} {prev.away}</b>
+          <span className="muted small">{prev.date ? prev.date.split("-").reverse().join("/") : "sense data"}{prev.time ? ` · ${prev.time} h` : ""} · {prev.finished ? "acabat" : "pendent"} · {prev.goals} gols · {prev.players} jugadores a l&apos;alineació</span>
+        </div>
+      )}
+      {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`} role="status">{msg.text}</p>}
+      <div className="row" style={{ gap: 6 }}>
+        {!prev
+          ? <button className="btn" disabled={busy || text.trim().length < 20} onClick={() => call(false)}>{busy ? "Llegint…" : "Llegir"}</button>
+          : <button className="btn" disabled={busy} onClick={() => call(true)}>{busy ? "Desant…" : "✓ Desar"}</button>}
+      </div>
+    </section>
   );
 }

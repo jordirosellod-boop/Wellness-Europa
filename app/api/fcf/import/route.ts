@@ -1,0 +1,109 @@
+import type { ActaFull } from "@/lib/fcf-bigdata";
+import { matchNames, normalize } from "@/lib/fcf";
+import { fresh, groupMatches, sideOf, teamMatchesOf, writeManual } from "@/lib/fcf-cache";
+import { parseActaText } from "@/lib/fcf-paste";
+import { adminClient } from "@/lib/server-admin";
+
+export const maxDuration = 60;
+
+// «Enganxar de la FCF»: el staff copia l'acta d'un partit de la web de la FCF (com qualsevol espectador) i l'enganxa.
+// Es desa el resultat, la data i l'hora reals, els gols i les alineacions; després tot (calendari, Big Data,
+// informe del rival i estadístiques) es calcula amb aquestes dades.
+export async function POST(req: Request) {
+  const db = adminClient();
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return Response.json({ error: "Cal iniciar sessió." }, { status: 401 });
+  const { data: u } = await db.auth.getUser(token);
+  if (!u.user) return Response.json({ error: "La sessió ha caducat. Torna a entrar." }, { status: 401 });
+  const { data: me } = await db.from("profiles").select("role").eq("id", u.user.id).maybeSingle();
+  if (me?.role !== "coach") return Response.json({ error: "Només el staff." }, { status: 403 });
+
+  const body = (await req.json().catch(() => ({}))) as { text?: unknown; save?: unknown };
+  const text = typeof body.text === "string" ? body.text.slice(0, 60_000) : "";
+  const a = parseActaText(text);
+  if (!a) return Response.json({ error: "No hi trobo cap acta. Copia tota la pàgina de l'acta (des de «TEMPORADA» fins a les alineacions)." }, { status: 400 });
+
+  const { data: cfg } = await db.from("fcf_config").select("grup_id, team_id").eq("id", true).single();
+  if (!cfg) return Response.json({ error: "Falta la configuració de la FCF." }, { status: 500 });
+  const grup = cfg.grup_id as string;
+  const all = await groupMatches(db, grup, fresh(), 0);
+  const m = all.find((x) => sideOf(x, a.home) === "home" && sideOf(x, a.away) === "away");
+  if (!m) return Response.json({ error: `No trobo el partit ${a.home} – ${a.away} al grup.` }, { status: 404 });
+
+  const ours = sideOf(m, a.home) && (m.home_id === cfg.team_id || m.away_id === cfg.team_id);
+  const preview = {
+    jornada: m.jornada, home: m.home, away: m.away, date: a.date, time: a.time,
+    home_goals: a.home_goals, away_goals: a.away_goals, finished: a.finished,
+    goals: a.goals.length, players: a.players.length, ours,
+  };
+  if (body.save !== true) return Response.json({ preview });
+
+  // 1. Data, hora i resultat del partit
+  const kickoff = a.date ? `${a.date}T${a.time ?? (m.kickoff?.slice(11, 16) || "00:00")}:00` : m.kickoff;
+  await writeManual(db, grup, m.acta_id, {
+    kickoff, ...(a.finished && a.home_goals != null && a.away_goals != null ? { home_goals: a.home_goals, away_goals: a.away_goals, closed: true } : {}),
+  });
+
+  // 2. L'acta (per als golejadors i el Big Data): les jugadores ja conegudes conserven el seu identificador
+  const { data: known } = await db.from("fcf_players").select("fcf_id, full_name").range(0, 999);
+  const idOf = new Map((known ?? []).map((p) => [normalize(p.full_name as string), p.fcf_id as string]));
+  const pid = (name: string) => idOf.get(normalize(name)) ?? `n-${normalize(name).replace(/\s+/g, "-").slice(0, 60)}`;
+  const acta: ActaFull = {
+    players: a.players.map((p) => ({ id: pid(p.name), name: p.name, dorsal: p.dorsal, titular: p.titular, gk: false, cap: p.cap, team: p.team, yc: 0, rc: 0 })),
+    goals: a.goals.filter((g) => g.name).map((g) => ({ id: pid(g.name), name: g.name, team: g.team, minute: g.minute, kind: g.own ? "GOL EN PRÒPIA" : g.penalty ? "GOL PENAL" : "GOL" })),
+  };
+  if (acta.players.length || acta.goals.length) {
+    const { error } = await db.from("fcf_league_actas").upsert({ acta_id: m.acta_id, grup_id: grup, jornada: m.jornada, data: acta });
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  // 3. Els nostres partits (calendari, proper partit) amb les dades noves
+  const updated = await groupMatches(db, grup, fresh(), 0);
+  const mine = teamMatchesOf(updated, cfg.team_id as string);
+  const now = new Date().toISOString();
+  if (mine.length) {
+    const { error } = await db.from("fcf_matches").upsert(mine.map((x) => ({ ...x, updated_at: now })), { onConflict: "acta_id" });
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  // 4. Si és un partit nostre: alineació i gols de cada jugadora, i els seus totals
+  let players = 0;
+  if (ours) {
+    const usSide = m.home_id === cfg.team_id ? "home" : "away";
+    const lineup = a.players.filter((p) => sideOf(m, p.team) === usSide);
+    if (lineup.length) {
+      const rows = lineup.map((p) => ({ fcf_id: pid(p.name), full_name: p.name, dorsal: p.dorsal, updated_at: now }));
+      const { error: e1 } = await db.from("fcf_players").upsert(rows, { onConflict: "fcf_id" });
+      if (e1) return Response.json({ error: e1.message }, { status: 500 });
+      const apps = lineup.map((p) => ({
+        acta_id: m.acta_id, fcf_id: pid(p.name), titular: p.titular, dorsal: p.dorsal,
+        goals: a.goals.filter((g) => !g.own && g.side === usSide && g.name && normalize(g.name) === normalize(p.name)).length,
+      }));
+      const { error: e2 } = await db.from("fcf_appearances").upsert(apps, { onConflict: "acta_id,fcf_id" });
+      if (e2) return Response.json({ error: e2.message }, { status: 500 });
+      // Totals a partir de totes les actes guardades
+      const { data: allApps } = await db.from("fcf_appearances").select("fcf_id, titular, goals").range(0, 4999);
+      const tot = new Map<string, { matches: number; starts: number; goals: number }>();
+      for (const r of allApps ?? []) {
+        const t = tot.get(r.fcf_id as string) ?? { matches: 0, starts: 0, goals: 0 };
+        t.matches++; if (r.titular) t.starts++; t.goals += Number(r.goals) || 0;
+        tot.set(r.fcf_id as string, t);
+      }
+      for (const [id, t] of tot) await db.from("fcf_players").update({ ...t, updated_at: now }).eq("fcf_id", id);
+      players = lineup.length;
+      // Relaciona les fitxes noves amb les jugadores de l'app quan el nom coincideix clarament
+      const [{ data: fp }, { data: profiles }] = await Promise.all([
+        db.from("fcf_players").select("fcf_id, full_name, profile_id").range(0, 999),
+        db.from("profiles").select("id, display_name").eq("role", "player").range(0, 999),
+      ]);
+      const linked = new Set((fp ?? []).filter((x) => x.profile_id).map((x) => x.profile_id as string));
+      const free = (profiles ?? []).filter((x) => !linked.has(x.id as string)) as { id: string; display_name: string }[];
+      const pending = (fp ?? []).filter((x) => !x.profile_id) as { fcf_id: string; full_name: string }[];
+      for (const [fcfId, profileId] of matchNames(pending, free)) {
+        await db.from("fcf_players").update({ profile_id: profileId }).eq("fcf_id", fcfId).is("profile_id", null);
+      }
+    }
+  }
+  await db.from("fcf_config").update({ last_sync: now, last_error: null }).eq("id", true);
+  return Response.json({ ok: true, preview, players });
+}
