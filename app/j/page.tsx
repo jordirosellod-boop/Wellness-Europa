@@ -62,7 +62,6 @@ import { Empty } from "@/components/empty";
 import { GreetSky } from "@/components/greet-sky";
 import { curtain, LevelUp } from "@/components/feel";
 import { ClubIcon } from "@/components/club-icons";
-import { MottoLine, useMotto } from "@/components/motto";
 import { Welcome } from "@/components/welcome";
 
 type State =
@@ -475,7 +474,6 @@ const dayPart = (hhmm: string): keyof typeof GREET => (hhmm >= "06:00" && hhmm <
 /** Salutació segons l'hora, amb el cel de fons: sol al matí, posta a la tarda i estrelles a la nit. */
 function Greeting({ name, today, level, meId, onMe, streak }: { name: string; today: string; level: number | null; meId: string; onMe: (el: HTMLElement) => void; streak: number | null }) {
   const [part, setPart] = useState<keyof typeof GREET>(() => dayPart(nowMadridHHMM()));
-  const [motto] = useMotto();
   useEffect(() => {
     const id = setInterval(() => setPart(dayPart(nowMadridHHMM())), 60_000);
     return () => clearInterval(id);
@@ -489,7 +487,6 @@ function Greeting({ name, today, level, meId, onMe, streak }: { name: string; to
         <span>{fmtDate(today)}</span>
         {level ? <LevelBadge level={level} /> : null}
       </p>
-      <MottoLine motto={motto} />
       <SeasonFx today={today} />
     </header>
   );

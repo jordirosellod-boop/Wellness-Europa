@@ -676,14 +676,6 @@ delete from public.convocations where id = '00000000-0000-0000-0000-0000000b1b01
 create temp table mtp as select (select id from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id limit 1) as p1,
   (select id from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id offset 1 limit 1) as p2;
 grant select on mtp to authenticated, anon;
--- Frase del míster i marcador en directe
-select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
-with u as (update public.team_settings set motto = 'Avui, intensitat' where id returning 1) select pg_temp.check(count(*) = 1, 'El staff posa la frase del míster') from u;
-select pg_temp.expect_error($$update public.team_settings set motto = '<script>' where id$$, 'La frase no pot portar codi');
-reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
-select pg_temp.check((select motto from public.team_settings where id) = 'Avui, intensitat', 'La jugadora veu la frase del míster');
-with u as (update public.team_settings set motto = 'hola' where id returning 1) select pg_temp.check(count(*) = 0, 'La jugadora no pot canviar la frase') from u;
-reset role; update public.team_settings set motto = null where id;
 -- Qui ha vist la convocatòria
 insert into public.convocations (id, match_date, rival, published) values
   ('00000000-0000-0000-0000-0000000c0c01', current_date + 3, 'Vista CF', true),

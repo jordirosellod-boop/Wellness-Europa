@@ -3550,11 +3550,6 @@ img.pcard-photo, .p-hero-photo img { filter: drop-shadow(0 0 1px rgba(255,238,18
 .ml-score button.add.them { background: rgba(255,255,255,.22); color: #fff; }
 .md-live-score { font-family: var(--display); font-weight: 400; font-size: 1.3em; letter-spacing: .04em; }
 
-/* Frase del míster */
-.greet-motto { position: relative; margin: 8px 0 0; font-family: var(--display); font-size: 1.05rem; letter-spacing: .02em; color: #fff3cf; text-shadow: 0 2px 8px rgba(0,0,0,.25); animation: rise .5s var(--ease) .3s both; }
-.greet-motto > span { color: #f6d77a; font-size: 1.3em; line-height: 0; }
-.greet-motto small { font-family: var(--body, inherit); font-size: .72rem; opacity: .8; letter-spacing: .04em; }
-.motto-now { margin: 6px 0 0; font-family: var(--display); font-size: 1.15rem; color: var(--navy); }
 
 /* Benvinguda de primera vegada */
 .welcome { position: fixed; inset: 0; z-index: 9550; display: grid; grid-template-rows: 1fr auto auto auto; padding: calc(40px + env(safe-area-inset-top, 0px)) 24px calc(28px + env(safe-area-inset-bottom, 0px));

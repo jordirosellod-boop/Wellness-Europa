@@ -239,9 +239,6 @@ alter table public.team_settings add column if not exists owner_id uuid referenc
 -- Lliga interna: entrenaments mínims al mes perquè compti el promig.
 alter table public.team_settings add column if not exists league_min_trainings smallint not null default 6
   check (league_min_trainings between 1 and 31);
--- Frase del míster: surt a la salutació de totes les jugadores fins que es canvia (o s'esborra).
-alter table public.team_settings add column if not exists motto text
-  check (motto is null or (char_length(btrim(motto)) between 1 and 120 and motto = btrim(motto) and motto !~ '[[:cntrl:]<>]'));
 
 -- LLIGA INTERNA: cada mes és una lliga nova (els punts compten només aquell mes).
 -- "prev_rank" és la posició al final del dia anterior, per mostrar qui puja i qui baixa.
@@ -1833,7 +1830,7 @@ grant select, insert, update, delete on public.push_subscriptions            to 
 grant select, update                 on public.auto_fine_settings            to authenticated;
 grant select                         on public.fcf_config, public.fcf_matches, public.fcf_appearances to authenticated;
 grant select, update (profile_id)    on public.fcf_players                   to authenticated;
-grant select, update (commitment_level, league_min_trainings, motto, updated_at) on public.team_settings to authenticated;
+grant select, update (commitment_level, league_min_trainings, updated_at) on public.team_settings to authenticated;
 -- (league_points: sense permisos directes; tot passa per league_table/league_add/league_set)
 grant all on public.profiles, public.player_links, public.sessions, public.wellness, public.rpe, public.session_rules, public.fine_rules, public.fines,
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
