@@ -6,6 +6,7 @@ import { addDays } from "@/lib/dates";
 import { supabase } from "@/lib/supabase";
 import { TZ } from "@/lib/wellness";
 import { rivalKey } from "@/lib/analysis";
+import { withSeed } from "@/lib/fcf-seed";
 
 /** Mil·lisegons (epoch) d'una data i hora de Barcelona («2026-10-29», «10:00:00»). */
 export function madridEpoch(date: string, time: string): number {
@@ -99,7 +100,7 @@ export function fetchOurMatches(): Promise<Map<string, OurMatch>> {
       sb.from("convocations").select("match_date, rival").order("match_date").order("id").range(0, 199),
     ]);
     if (fcf.error) throw new Error(fcf.error.message);
-    const list: OurMatch[] = ((fcf.data ?? []) as (FcfResult & { home_goals: number | null; away_goals: number | null })[]).map((r) => ({
+    const list: OurMatch[] = ((fcf.data ?? []) as (FcfResult & { home_goals: number | null; away_goals: number | null })[]).map((r0) => withSeed(r0)).map((r) => ({
       day: r.kickoff!.slice(0, 10), rival: r.is_home ? r.away : r.home,
       us: r.is_home ? r.home_goals : r.away_goals, them: r.is_home ? r.away_goals : r.home_goals,
     }));

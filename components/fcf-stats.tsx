@@ -9,6 +9,7 @@ import { Loading } from "@/components/loading";
 import { Empty } from "@/components/empty";
 import { CountUp } from "@/components/count-up";
 import { isPlayed } from "@/lib/played";
+import { withSeed } from "@/lib/fcf-seed";
 
 type Match = {
   acta_id: string; jornada: number; kickoff: string | null; home: string; away: string;
@@ -30,6 +31,8 @@ async function fetchStats(withProfiles: boolean): Promise<Data> {
       ? fetchAll<Profile>((f, t) => sb.from("profiles").select("id, role, display_name").eq("role", "player").order("display_name").order("id").range(f, t))
       : Promise.resolve([] as Profile[]),
   ]);
+  // Les jornades copiades de la FCF que porta l'app (per si encara no s'ha fet l'actualització)
+  matches.splice(0, matches.length, ...matches.map((m) => withSeed(m as Match & { acta_id: string; closed: boolean; home_goals: number | null })));
   return { matches, players, apps, config: (cfg.data as Config) ?? null, profiles };
 }
 

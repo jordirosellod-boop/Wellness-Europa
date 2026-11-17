@@ -83,10 +83,10 @@ const PLAYED_AFTER_MS = 3 * 3600 * 1000; // l'acta es mira 3 h després de comen
  */
 export async function groupMatches(db: SupabaseClient, grup: string, f: Freshness, maxReads = 12): Promise<GroupMatch[]> {
   const raw = await cached(db, `group-matches:${grup}`, () => fetchGroupMatches(grup), f, SNAP.grup_id === grup ? SNAP.matches : null);
-  if (!f.stale_at) return raw;
-  // El que el staff ha enganxat de la web de la FCF (data, hora i resultat reals) mana sobre la còpia guardada
-  const manual = await readManual(db, grup);
-  const list = raw.map((m) => (manual[m.acta_id] ? { ...m, ...manual[m.acta_id] } : m));
+  // El que s'ha copiat de la web de la FCF (data, hora i resultat reals) mana, menys si la FCF ja dona el partit tancat
+  const manual = await readManual(db, grup).catch(() => ({} as Record<string, ManualMatch>));
+  const list = raw.map((m) => (manual[m.acta_id] && !(m.closed && m.home_goals != null) ? { ...m, ...manual[m.acta_id] } : m));
+  if (!f.stale_at) return list;
   const due = list.filter((m) => !m.closed && m.kickoff && Date.parse(`${m.kickoff}+02:00`) + PLAYED_AFTER_MS < Date.now());
   if (!due.length) return list;
   const saved = new Map<string, ActaFull>();
