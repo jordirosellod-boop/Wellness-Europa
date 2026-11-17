@@ -127,10 +127,82 @@
    "away_goals": 0,
    "closed": true
   },
+  "4132107": {
+   "kickoff": "2026-11-08T15:00:00",
+   "home_goals": 6,
+   "away_goals": 3,
+   "closed": true
+  },
+  "4132108": {
+   "kickoff": "2026-11-08T11:00:00",
+   "home_goals": 3,
+   "away_goals": 1,
+   "closed": true
+  },
+  "4132109": {
+   "kickoff": "2026-11-07T18:15:00",
+   "home_goals": 1,
+   "away_goals": 3,
+   "closed": true
+  },
+  "4132110": {
+   "kickoff": "2026-11-07T18:00:00",
+   "home_goals": 1,
+   "away_goals": 9,
+   "closed": true
+  },
+  "4132111": {
+   "kickoff": "2026-11-08T16:00:00",
+   "home_goals": 0,
+   "away_goals": 1,
+   "closed": true
+  },
+  "4132112": {
+   "kickoff": "2026-11-07T19:15:00",
+   "home_goals": 1,
+   "away_goals": 1,
+   "closed": true
+  },
+  "4132113": {
+   "kickoff": "2026-11-07T17:00:00",
+   "home_goals": 2,
+   "away_goals": 1,
+   "closed": true
+  },
+  "4132116": {
+   "kickoff": "2026-12-02T19:30:00"
+  },
+  "4132117": {
+   "kickoff": "2026-11-27T20:00:00"
+  },
+  "4132118": {
+   "kickoff": "2026-11-15T11:45:00",
+   "home_goals": 2,
+   "away_goals": 4,
+   "closed": true
+  },
+  "4132119": {
+   "kickoff": "2026-11-14T19:45:00",
+   "home_goals": 5,
+   "away_goals": 2,
+   "closed": true
+  },
   "4132120": {
    "kickoff": "2026-11-15T19:30:00",
    "home_goals": 4,
    "away_goals": 5,
+   "closed": true
+  },
+  "4132121": {
+   "kickoff": "2026-11-14T18:45:00",
+   "home_goals": 1,
+   "away_goals": 1,
+   "closed": true
+  },
+  "4132234": {
+   "kickoff": "2026-11-14T11:00:00",
+   "home_goals": 1,
+   "away_goals": 1,
    "closed": true
   }
  },
@@ -155,6 +227,19 @@
   "4132103": "Camp de Futbol Mpal. de Cabanes",
   "4132104": "Camp de Futbol Mpal. de Premià de Dalt",
   "4132105": "Camp de Futbol Mpal. Nou Sardenya",
-  "4132120": "Camp de Futbol Mpal. Nou Sardenya"
+  "4132107": "Camp de Futbol Mpal. de Santa Eulàlia de Riuprimer",
+  "4132108": "Camp de Futbol Mpal. de l'Estartit",
+  "4132109": "Camp de Futbol Mpal. Teixonera",
+  "4132110": "Camp de Futbol Mpal. de Breda",
+  "4132111": "Camp de Futbol Mpal. de Torelló",
+  "4132112": "Camp de Futbol Cem Fernando González Resina",
+  "4132113": "Camp de Futbol Mpal. Ca la Guidó-Pedro Alia Dorado",
+  "4132116": "Estadi Mpal. Torras i Bages (2)",
+  "4132117": "Camp de Futbol Mpal. de Pont Major",
+  "4132118": "Camp de Futbol Mpal. de Cabanes",
+  "4132119": "Camp de Futbol Mpal. de Premià de Dalt",
+  "4132120": "Camp de Futbol Mpal. Nou Sardenya",
+  "4132121": "Camp de Futbol Parroquia de Santa Maria de Llerona",
+  "4132234": "Camp de Futbol Mpal. Ca la Guidó-Pedro Alia Dorado"
  }
 }
