@@ -106,7 +106,7 @@ export function MatchdayHero({ c, called, onOpen }: { c: Convocation; called: bo
           </div>
         </div>
       )}
-      {phase === "joc" && <p className="md-live"><span className="dot" /> En joc · Força Europa!</p>}
+      {phase === "joc" && <p className="md-live"><span className="dot" /> En joc{c.live_us != null && c.live_them != null ? <> · <b className="md-live-score">{c.is_home ? c.live_us : c.live_them} – {c.is_home ? c.live_them : c.live_us}</b></> : " · Força Europa!"}</p>}
       {phase === "final" && <p className="md-live done">Partit acabat · Gràcies per l&apos;esforç 💙</p>}
 
       <WeatherChip date={c.match_date} time={c.kickoff ?? c.meet_time} address={c.is_home ? null : c.address} dark />

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // La imatge del marcador (notificacions) fa servir la lletra del club
+  outputFileTracingIncludes: { "/api/score-image": ["./app/fonts/Escapulada.ttf", "./public/escut.png"] },
   async headers() {
     return [
       {

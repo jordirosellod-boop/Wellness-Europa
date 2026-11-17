@@ -7,6 +7,8 @@ import { fetchAll, supabase } from "@/lib/supabase";
 import { Ticked } from "@/components/feel";
 import { whistle } from "@/lib/feel";
 import { SoundToggle } from "@/components/feel";
+import { crestFor, useCrests } from "@/components/crest";
+import { haptic } from "@/lib/feel";
 
 // Minuts jugats, apuntats en directe: el rellotge del partit i qui és al camp.
 // Tot es guarda al mòbil mentre dura (si es tanca l'app, continua on era) i a la base de dades a cada canvi.
@@ -40,6 +42,9 @@ export function MinutesLive({ c, roster }: { c: Convocation; roster: RosterRow[]
   const [, tick] = useState(0);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [season, setSeason] = useState<Map<string, { min: number; pj: number; tit: number }> | null>(null);
+  // Marcador en directe: en marcar un gol s'avisa tot l'equip al mòbil
+  const [score, setScore] = useState<{ us: number; them: number }>(() => ({ us: c.live_us ?? 0, them: c.live_them ?? 0 }));
+  const teams = useCrests();
 
   // Estat inicial: el que hi havia al mòbil o, si no, l'onze inicial de la pissarra
   useEffect(() => {
@@ -94,6 +99,27 @@ export function MinutesLive({ c, roster }: { c: Convocation; roster: RosterRow[]
   if (!st) return null;
   const now = clockNow(st);
 
+  async function notify(kind: "us" | "them" | "final") {
+    const { data } = await supabase().auth.getSession();
+    const crest = crestFor(teams, c.rival);
+    const r = await fetch("/api/push/goal", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token ?? ""}` },
+      body: JSON.stringify({ convocation_id: c.id, kind, minute: Math.min(130, Math.floor(clockNow(st!) / 60000) + 1), crest: crest && crest.startsWith("/api/fcf/crest?") ? crest : null }),
+    });
+    if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? `Error ${r.status}`);
+  }
+  async function goal(side: "us" | "them", delta: 1 | -1) {
+    const next = { ...score, [side]: Math.max(0, Math.min(40, score[side] + delta)) };
+    if (next[side] === score[side]) return;
+    setScore(next);
+    if (delta > 0) haptic();
+    const { error } = await supabase().from("convocations").update({ live_us: next.us, live_them: next.them }).eq("id", c.id).select("id").single();
+    if (error) { setScore(score); return setMsg({ ok: false, text: `No s'ha pogut desar el marcador: ${error.message}` }); }
+    if (delta < 0) return setMsg({ ok: true, text: "Marcador corregit ✓" });
+    try { await notify(side); setMsg({ ok: true, text: side === "us" ? "⚽ Gol! Avís enviat a l'equip ✓" : "Gol del rival apuntat ✓" }); }
+    catch (e) { setMsg({ ok: false, text: `Gol apuntat, però l'avís no s'ha pogut enviar: ${e instanceof Error ? e.message : String(e)}` }); }
+  }
+
   function setPhase(p: Phase) {
     if (p === "h1" || p === "h2") whistle();
     if (p === "ht" || p === "end") whistle(true);
@@ -105,6 +131,10 @@ export function MinutesLive({ c, roster }: { c: Convocation; roster: RosterRow[]
     }
     if (!running && s.runningSince) { s.clock = clockNow(s); s.runningSince = null; }
     commit(s, p === "end");
+    if (p === "end" && c.published) {
+      void supabase().from("convocations").update({ live_final: true, live_us: score.us, live_them: score.them }).eq("id", c.id).select("id").single()
+        .then(({ error }) => (error ? undefined : notify("final").catch(() => {})));
+    }
   }
 
   function toggle(id: string) {
@@ -160,6 +190,13 @@ export function MinutesLive({ c, roster }: { c: Convocation; roster: RosterRow[]
         {st.phase === "h2" && <button className="btn" onClick={() => setPhase("end")}>🏁 Final del partit</button>}
         {st.phase !== "pre" && <button className="btn secondary" onClick={reset}>Tornar a començar</button>}
       </div>
+      {c.published && st.phase !== "pre" && (
+        <div className="ml-score" aria-label="Marcador">
+          <div><small>CE Europa</small><b>{score.us}</b><span><button type="button" onClick={() => void goal("us", -1)} aria-label="Treure un gol nostre">−</button><button type="button" className="add" onClick={() => void goal("us", 1)} disabled={st.phase === "end"}>⚽ Gol</button></span></div>
+          <i>–</i>
+          <div><small>{c.rival}</small><b>{score.them}</b><span><button type="button" onClick={() => void goal("them", -1)} aria-label="Treure un gol del rival">−</button><button type="button" className="add them" onClick={() => void goal("them", 1)} disabled={st.phase === "end"}>Gol</button></span></div>
+        </div>
+      )}
       {st.phase === "pre" && <p className="muted small" style={{ textAlign: "center", margin: "6px 0 0" }}>Revisa qui comença al camp (l&apos;onze inicial ja hi és) i toca «Comença el partit».</p>}
       {msg && <p className={`small ${msg.ok ? "muted" : "msg error"}`} style={{ textAlign: "center" }}><Ticked text={msg.text} /></p>}
 

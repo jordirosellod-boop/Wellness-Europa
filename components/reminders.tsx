@@ -47,6 +47,30 @@ const TEXT = {
 } as const;
 
 /** Botó per activar els avisos al mòbil (jugadores: recordatoris; staff: resum setmanal). */
+/** Activa els avisos d'aquest mòbil (demana permís i el desa). Torna «on», «denied» o «off». */
+export async function enablePush(): Promise<"on" | "denied" | "off"> {
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") return perm === "denied" ? "denied" : "off";
+  const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  await navigator.serviceWorker.ready;
+  const res = await fetch("/api/push/key", { cache: "no-store" });
+  const { publicKey, error } = await res.json();
+  if (!publicKey) throw new Error(error ?? "No s'ha pogut obtenir la clau.");
+  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64ToBytes(publicKey) }));
+  const json = sub.toJSON();
+  // Esperem la confirmació del servidor abans de dir que està activat.
+  const { data, error: dbErr } = await supabase()
+    .from("push_subscriptions")
+    .upsert({ endpoint: sub.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth }, { onConflict: "endpoint" })
+    .select("id")
+    .maybeSingle();
+  if (dbErr || !data) {
+    await sub.unsubscribe().catch(() => {});
+    throw new Error(dbErr?.message ?? "No s'ha confirmat.");
+  }
+  return "on";
+}
+
 export function Reminders({ staff = false }: { staff?: boolean } = {}) {
   const t = TEXT[staff ? "staff" : "player"];
   const [status, setStatus] = useState<Status>("loading");
@@ -61,28 +85,8 @@ export function Reminders({ staff = false }: { staff?: boolean } = {}) {
     setBusy(true);
     setMsg(null);
     try {
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") {
-        setStatus(perm === "denied" ? "denied" : "off");
-        return;
-      }
-      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      await navigator.serviceWorker.ready;
-      const res = await fetch("/api/push/key", { cache: "no-store" });
-      const { publicKey, error } = await res.json();
-      if (!publicKey) throw new Error(error ?? "No s'ha pogut obtenir la clau.");
-      const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64ToBytes(publicKey) }));
-      const json = sub.toJSON();
-      // Esperem la confirmació del servidor abans de dir que està activat.
-      const { data, error: dbErr } = await supabase()
-        .from("push_subscriptions")
-        .upsert({ endpoint: sub.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth }, { onConflict: "endpoint" })
-        .select("id")
-        .maybeSingle();
-      if (dbErr || !data) {
-        await sub.unsubscribe().catch(() => {});
-        throw new Error(dbErr?.message ?? "No s'ha confirmat.");
-      }
+      const r = await enablePush();
+      if (r !== "on") { setStatus(r); return; }
       setStatus("on");
       setMsg({ ok: true, text: t.done });
     } catch (e) {

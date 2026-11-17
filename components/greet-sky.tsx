@@ -44,6 +44,12 @@ export function GreetSky() {
     window.addEventListener("scroll", on, { passive: true });
     return () => { window.removeEventListener("scroll", on); cancelAnimationFrame(raf); };
   }, []);
+  // Les ombres de les targetes de l'inici van cap al costat contrari del sol (o de la lluna, més suaus)
+  useEffect(() => {
+    const r = document.documentElement.style;
+    r.setProperty("--sun-dx", ((sky.x - 59) / 29).toFixed(2));
+    r.setProperty("--shadow-a", sky.phase === "nit" ? ".06" : sky.phase === "dia" ? ".11" : ".09");
+  }, [sky]);
   const style = { "--sun-x": `${sky.x}%`, "--sun-y": `${sky.y}%` } as CSSProperties;
   return (
     <span className="greet-sky" data-sky={sky.phase} style={style} aria-hidden="true">

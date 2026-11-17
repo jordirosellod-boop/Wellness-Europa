@@ -11,6 +11,8 @@ self.addEventListener("push", (event) => {
       icon: "/icon-192.png",
       // A Android, la icona petita de dalt de la pantalla: la silueta de l'escut (només en blanc)
       badge: "/badge-96.png",
+      // Imatge gran (Android): p. ex. el marcador amb els dos escuts
+      ...(typeof data.image === "string" && data.image.startsWith(self.location.origin + "/api/score-image") ? { image: data.image } : {}),
       // Els avisos del mateix tipus se substitueixen (no s'amunteguen), però tornen a sonar
       tag: data.tag || (data.title || "avis").replace(/[^\p{L}\p{N} ]/gu, "").trim().toLowerCase().slice(0, 40) || "avis",
       renotify: true,

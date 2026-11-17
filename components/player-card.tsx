@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchActionCutout } from "@/lib/player-photos";
 import { drawCardStory } from "@/lib/player-stories";
 import { StoryCard } from "@/components/convo-story";
+import { CardBack } from "@/components/card-back";
 
 type CardData = {
   dorsal: string | null;
@@ -76,6 +77,9 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
 
   // Inclinació amb el mòbil (giroscopi): el cromo es mou i el reflex daurat segueix el moviment.
   const touching = useRef(false);
+  // Tocar el cromo el gira (darrere: la temporada mes a mes). Si s'arrossega el dit (inclinar), no gira.
+  const [flipped, setFlipped] = useState(false);
+  const downAt = useRef<{ x: number; y: number } | null>(null);
   // (el cromo només es pinta al navegador, quan ja se sap qui és la jugadora)
   const [gyro, setGyro] = useState<"off" | "ask" | "on">(() => {
     if (typeof window === "undefined" || !("DeviceOrientationEvent" in window)) return "off";
@@ -170,6 +174,12 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
       </section>
     )}
     <div className="pcard-wrap">
+      <div className={`pcard-flip${flipped ? " flipped" : ""}`}
+        onPointerDownCapture={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; }}
+        onClick={(e) => { const p = downAt.current; if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) return; setFlipped((f) => !f); }}
+        role="button" tabIndex={0} aria-pressed={flipped} aria-label={flipped ? "Girar el cromo (davant)" : "Girar el cromo (la temporada)"}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setFlipped((f) => !f); } }}>
+      <div className="pcard-inner">
       <div ref={ref} className={`pcard ${tier} ${kitFont.variable}${d ? "" : " loading"}${cutout ? " has-photo" : ""}`} onPointerDown={askGyro} onPointerMove={tilt} onPointerLeave={reset} onPointerUp={reset} onPointerCancel={reset}>
         <div className="pcard-holo" aria-hidden="true" />
         <div className="pcard-glare" aria-hidden="true" />
@@ -192,6 +202,11 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
         <dl className="pcard-stats">
           {stats.map(([k, v]) => (<div key={k}><dd>{v}</dd><dt>{k}</dt></div>))}
         </dl>
+      </div>
+      <div className={`pcard pcard-back ${tier}`} aria-hidden={!flipped}>
+        {flipped && <CardBack meId={meId} from={seasonStart(today)} today={today} season={season(today)} streak={d?.streak ?? 0} />}
+      </div>
+      </div>
       </div>
       {d && (
         <StoryCard label="📸 Compartir el meu cromo" busyLabel="Preparant el cromo…" alt="El teu cromo per compartir" fname={`cromo-${season(today).replace("/", "-")}.png`}

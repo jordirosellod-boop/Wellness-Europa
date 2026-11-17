@@ -3537,3 +3537,73 @@ html[data-kit] .topbar, html[data-kit] .btn { transition: background-color .6s e
 /* Contorn de llum daurada a les fotos de les jugadores (com en una foto d'estudi) */
 .cv-photo img { filter: drop-shadow(-12px 6px 10px rgba(0,0,30,.6)) drop-shadow(0 0 1px rgba(255,238,180,.95)) drop-shadow(0 0 5px rgba(246,215,122,.35)); }
 img.pcard-photo, .p-hero-photo img { filter: drop-shadow(0 0 1px rgba(255,238,180,.9)) drop-shadow(0 0 7px rgba(246,215,122,.3)) drop-shadow(0 14px 22px rgba(0,0,30,.45)); }
+
+/* Marcador en directe (staff) */
+.ml-score { display: flex; align-items: stretch; justify-content: center; gap: 10px; margin: 12px 0 4px; }
+.ml-score > div { flex: 1; display: grid; justify-items: center; gap: 4px; padding: 10px 6px; border-radius: 16px; background: linear-gradient(180deg, #0b1d5e, #061847); color: #fff; }
+.ml-score small { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .8; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ml-score b { font-family: var(--display); font-weight: 400; font-size: 2.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.ml-score > i { align-self: center; font-style: normal; font-family: var(--display); font-size: 2rem; color: var(--or); }
+.ml-score span { display: flex; gap: 6px; }
+.ml-score button { border: 0; border-radius: 999px; padding: 6px 10px; font-weight: 800; cursor: pointer; background: rgba(255,255,255,.12); color: #fff; }
+.ml-score button.add { background: linear-gradient(135deg, #f3dc9a, var(--or)); color: var(--navy); padding: 6px 14px; }
+.ml-score button.add.them { background: rgba(255,255,255,.22); color: #fff; }
+.md-live-score { font-family: var(--display); font-weight: 400; font-size: 1.3em; letter-spacing: .04em; }
+
+/* Frase del míster */
+.greet-motto { position: relative; margin: 8px 0 0; font-family: var(--display); font-size: 1.05rem; letter-spacing: .02em; color: #fff3cf; text-shadow: 0 2px 8px rgba(0,0,0,.25); animation: rise .5s var(--ease) .3s both; }
+.greet-motto > span { color: #f6d77a; font-size: 1.3em; line-height: 0; }
+.greet-motto small { font-family: var(--body, inherit); font-size: .72rem; opacity: .8; letter-spacing: .04em; }
+.motto-now { margin: 6px 0 0; font-family: var(--display); font-size: 1.15rem; color: var(--navy); }
+
+/* Benvinguda de primera vegada */
+.welcome { position: fixed; inset: 0; z-index: 9550; display: grid; grid-template-rows: 1fr auto auto auto; padding: calc(40px + env(safe-area-inset-top, 0px)) 24px calc(28px + env(safe-area-inset-bottom, 0px));
+  color: #fff; text-align: center; background: var(--grain), radial-gradient(80% 50% at 50% 20%, #1f47c2 0%, #0a1f63 55%, #040c2c 100%); animation: wo-in .45s ease both; }
+.wl-slide { align-self: center; display: grid; justify-items: center; gap: 10px; animation: wl-in .55s var(--ease) both; }
+@keyframes wl-in { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+.wl-crest { filter: drop-shadow(0 18px 30px rgba(0,0,0,.45)); animation: lu-pop .8s var(--ease-back) .1s both; }
+.wl-ico { width: 120px; height: 120px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1.5px rgba(246,215,122,.45); }
+.wl-ico .club-ico { width: 64px; height: 64px; }
+.wl-k { font-size: .8rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #f6d77a; margin-top: 8px; }
+.wl-t { font-family: var(--display); font-weight: 400; font-size: clamp(2.4rem, 11vw, 3.4rem); line-height: .95; letter-spacing: .03em; }
+.wl-d { max-width: 330px; margin: 4px auto 0; color: #d8e1ff; line-height: 1.45; }
+.wl-dots { display: flex; justify-content: center; gap: 8px; margin: 18px 0 14px; }
+.wl-dots i { width: 8px; height: 8px; border-radius: 99px; background: rgba(255,255,255,.3); transition: width .35s var(--ease), background .35s; }
+.wl-dots i.on { width: 26px; background: #f6d77a; }
+.wl-msg { margin: 0 auto 10px; max-width: 340px; font-size: .9rem; color: #fff3cf; }
+.wl-actions { display: grid; gap: 8px; max-width: 360px; width: 100%; margin: 0 auto; }
+.wl-go { border: 0; border-radius: 999px; padding: 15px; font-family: var(--display); font-size: 1.15rem; letter-spacing: .05em; cursor: pointer; color: var(--navy);
+  background: linear-gradient(135deg, #f3dc9a, var(--or) 55%, #c79a2e); box-shadow: 0 10px 26px rgba(219,179,77,.35); }
+.wl-skip { border: 0; background: none; color: rgba(255,255,255,.75); padding: 8px; cursor: pointer; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .welcome, .wl-slide, .wl-crest { animation: none; } }
+
+/* Cromo reversible: davant la jugadora, darrere la temporada */
+.pcard-flip { perspective: 1100px; cursor: pointer; -webkit-tap-highlight-color: transparent; outline: none; }
+.pcard-flip:focus-visible .pcard-inner { outline: 3px solid var(--or); outline-offset: 4px; border-radius: 22px; }
+.pcard-inner { position: relative; transform-style: preserve-3d; transition: transform .85s cubic-bezier(.3,1.25,.5,1); }
+.pcard-flip.flipped .pcard-inner { transform: rotateY(180deg); }
+.pcard-inner > .pcard { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.pcard-inner > .pcard-back { position: absolute; inset: 0; transform: rotateY(180deg); animation: none; padding: 16px 16px 14px; }
+.pcard-back-in { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; height: 100%; }
+.cb-top { display: flex; align-items: center; gap: 8px; }
+.cb-top b { font-family: var(--display); font-weight: 400; font-size: 1.2rem; letter-spacing: .06em; }
+.cb-load { margin: auto; opacity: .7; }
+.cb-row { display: grid; gap: 4px; }
+.cb-h { display: flex; justify-content: space-between; align-items: baseline; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .85; }
+.cb-h b { font-family: var(--display); font-weight: 400; font-size: 1.2rem; letter-spacing: 0; opacity: 1; }
+.cb-bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; align-items: end; height: 54px; }
+.cb-bars span { display: grid; grid-template-rows: 1fr auto; height: 100%; justify-items: center; gap: 2px; }
+.cb-bars i { align-self: end; width: 100%; max-width: 16px; height: var(--h); min-height: 2px; border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, #fff3cf, #dbb34d); box-shadow: 0 0 8px rgba(246,215,122,.35); transform-origin: bottom; animation: cb-grow .7s var(--ease-back) var(--d) both; }
+.pcard.gold .cb-bars i, .pcard.silver .cb-bars i { background: linear-gradient(180deg, #2a55d0, #0b2a78); box-shadow: none; }
+@keyframes cb-grow { from { transform: scaleY(0); } }
+.cb-bars small { font-size: .55rem; opacity: .75; }
+.cb-streak { margin-top: auto; text-align: center; font-weight: 700; font-size: .85rem; }
+.cb-hint { text-align: center; font-size: .65rem; opacity: .6; letter-spacing: .08em; text-transform: uppercase; }
+@media (prefers-reduced-motion: reduce) { .pcard-inner { transition: none; } .cb-bars i { animation: none; } }
+
+/* Ombres que segueixen el sol de la salutació (inici de jugadores i staff) */
+:where(.player-app, .staff-home) .card {
+  box-shadow: calc(var(--sun-dx, 0) * -7px) 6px 18px rgba(10, 30, 90, var(--shadow-a, .1));
+  transition: box-shadow 1.2s ease;
+}

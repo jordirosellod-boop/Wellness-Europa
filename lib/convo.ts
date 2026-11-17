@@ -17,6 +17,10 @@ export type Convocation = {
   published: boolean;
   published_at: string | null;
   notified_at: string | null;
+  /** Marcador en directe (el porta el staff durant el partit). */
+  live_us?: number | null;
+  live_them?: number | null;
+  live_final?: boolean;
 };
 
 /** Una fila de la llista. Les afegides (d'un altre equip) porten `origin` i sempre estan convocades. */
@@ -28,7 +32,7 @@ export const FRIENDLY = "Amistós";
 export const isFriendly = (c: { competition: string | null }) => /^amist/i.test(c.competition?.trim() ?? "");
 
 export const CONVO_COLS =
-  "id, match_date, kickoff, meet_time, rival, is_home, competition, venue, address, kit, notes, published, published_at, notified_at";
+  "id, match_date, kickoff, meet_time, rival, is_home, competition, venue, address, kit, notes, published, published_at, notified_at, live_us, live_them, live_final";
 
 /** Convocatòries des d'una data (les que pot veure qui ho demana), ordenades per data. */
 export async function fetchConvocations(from: string): Promise<Convocation[]> {

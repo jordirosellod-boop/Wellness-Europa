@@ -2,6 +2,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { createHash, timingSafeEqual } from "node:crypto";
 
+/** Un avís al mòbil. `image`: imatge gran (Android); `tag`: els del mateix tipus se substitueixen. */
+export type PushMsg = { title: string; body: string; url: string; image?: string; tag?: string };
+
 // Només per a codi de servidor (rutes /api): fa servir la clau secreta.
 export function adminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,7 +17,7 @@ export function adminClient(): SupabaseClient {
  * Envia un avís als mòbils d'unes persones concretes (jugadores o staff).
  * Esborra les subscripcions que ja no existeixen. Torna quants mòbils l'han rebut.
  */
-export async function pushTo(db: SupabaseClient, ids: string[], msg: { title: string; body: string; url: string }): Promise<number> {
+export async function pushTo(db: SupabaseClient, ids: string[], msg: PushMsg): Promise<number> {
   if (!ids.length) return 0;
   const { data: subs, error } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("player_id", ids).order("id");
   if (error) throw new Error(error.message);
@@ -43,13 +46,13 @@ async function idsOf(db: SupabaseClient, role: "player" | "coach"): Promise<stri
 }
 
 /** Avís a totes les jugadores que tenen les notificacions activades. */
-export async function pushToPlayers(db: SupabaseClient, msg: { title: string; body: string; url: string }): Promise<{ sent: number; players: number }> {
+export async function pushToPlayers(db: SupabaseClient, msg: PushMsg): Promise<{ sent: number; players: number }> {
   const ids = await idsOf(db, "player");
   return { sent: await pushTo(db, ids, msg), players: ids.length };
 }
 
 /** Avís al staff (només als que l'han activat al seu mòbil). `except`: qui ho ha fet (no cal avisar-lo). */
-export async function pushToStaff(db: SupabaseClient, msg: { title: string; body: string; url: string }, except?: string): Promise<number> {
+export async function pushToStaff(db: SupabaseClient, msg: PushMsg, except?: string): Promise<number> {
   return pushTo(db, (await idsOf(db, "coach")).filter((id) => id !== except), msg);
 }
 
