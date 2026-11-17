@@ -31,9 +31,18 @@ export async function POST(req: Request) {
 
   // Pestanya «Resultats» d'una jornada: data, hora i resultat de tots els partits del grup
   if (parsed.kind === "results") {
-    const found = parsed.results.flatMap((r) => {
-      const m = all.find((x) => sideOf(x, r.home) === "home" && sideOf(x, r.away) === "away");
-      return m ? [{ r, m }] : [];
+    // Si la FCF ha girat local i visitant (es juga a l'altre camp), es tria el partit de la mateixa jornada (el més proper en data)
+    const day = (k: string | null) => (k ? Date.parse(`${k.slice(0, 10)}T12:00:00Z`) : NaN);
+    const found = parsed.results.flatMap((r0) => {
+      const cands = all.flatMap((x) =>
+        sideOf(x, r0.home) === "home" && sideOf(x, r0.away) === "away" ? [{ x, swap: false }]
+          : sideOf(x, r0.home) === "away" && sideOf(x, r0.away) === "home" ? [{ x, swap: true }] : []);
+      if (!cands.length) return [];
+      const target = day(r0.date);
+      cands.sort((a, b) => (Number.isFinite(target) ? Math.abs(day(a.x.kickoff) - target) - Math.abs(day(b.x.kickoff) - target) : Number(a.swap) - Number(b.swap)));
+      const { x: m, swap } = cands[0];
+      const r = swap ? { ...r0, home: r0.away, away: r0.home, home_goals: r0.away_goals, away_goals: r0.home_goals } : r0;
+      return [{ r, m }];
     });
     if (!found.length) return Response.json({ error: "No trobo cap d'aquests partits al nostre grup." }, { status: 404 });
     const jornades = [...new Set(found.map((f) => f.m.jornada))].sort((a, b) => a - b);
