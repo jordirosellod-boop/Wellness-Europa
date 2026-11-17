@@ -96,3 +96,44 @@ export function parseActaText(raw: string): PastedActa | null {
   }
   return { kind: "acta", date, time, venue, home, away, home_goals: hg, away_goals: ag, finished, goals, players };
 }
+
+export type PastedResult = { home: string; away: string; date: string | null; time: string | null; home_goals: number | null; away_goals: number | null; closed: boolean; status: string | null; venue: string | null };
+
+/**
+ * Llegeix la pestanya «Resultats» d'una jornada copiada de la FCF. Cada partit surt com:
+ * LOCAL / LOCAL / [ESTAT / dd/mm/aaaa / hh:mm / 4 / - / 2] / VISITANT / VISITANT / INFORMACIÓ DEL CAMP / camp
+ */
+export function parseResultsText(raw: string): PastedResult[] {
+  const L = raw.replace(/\r/g, "").split("\n").map((l) => l.replace(/ /g, " ").trim()).filter(Boolean);
+  const team = (i: number) => (i + 1 < L.length && L[i] === L[i + 1] && isName(L[i]) && !/^INFORMACI/i.test(L[i]) ? L[i] : null);
+  const out: PastedResult[] = [];
+  let i = 0;
+  while (i < L.length) {
+    const home = team(i);
+    if (!home) { i++; continue; }
+    let j = i + 2, status: string | null = null, date: string | null = null, time: string | null = null, hg: number | null = null, ag: number | null = null;
+    if (j < L.length && !team(j) && /^[A-ZÀ-Ú .]{4,}$/.test(L[j]) && !/^INFORMACI/i.test(L[j])) status = L[j++];
+    const dm = (L[j] ?? "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dm) { date = `${dm[3]}-${dm[2].padStart(2, "0")}-${dm[1].padStart(2, "0")}`; j++; }
+    const tm = (L[j] ?? "").match(/^(\d{1,2})[:.](\d{2})$/);
+    if (tm) { time = `${tm[1].padStart(2, "0")}:${tm[2]}`; j++; }
+    if (/^\d{1,2}$/.test(L[j] ?? "") && L[j + 1] === "-" && /^\d{1,2}$/.test(L[j + 2] ?? "")) { hg = Number(L[j]); ag = Number(L[j + 2]); j += 3; }
+    const away = team(j);
+    if (!away) { i++; continue; }
+    j += 2;
+    let venue: string | null = null;
+    if (/^INFORMACI/i.test(L[j] ?? "")) { venue = L[j + 1] && !team(j + 1) ? L[j + 1] : null; j += venue ? 2 : 1; }
+    const closed = !!status && /TANCADA|FINALITZAT/i.test(status) && hg != null && ag != null;
+    out.push({ home, away, date, time, home_goals: hg, away_goals: ag, closed, status, venue });
+    i = j;
+  }
+  return out;
+}
+
+/** Què s'ha enganxat: una acta o la pestanya de resultats d'una jornada. */
+export function parseFcfText(raw: string): { kind: "acta"; acta: PastedActa } | { kind: "results"; results: PastedResult[] } | null {
+  const isResults = /INFORMACI[ÓO] DEL CAMP/i.test(raw) && !/^\s*DATA\s*:/im.test(raw);
+  if (isResults) { const r = parseResultsText(raw); return r.length ? { kind: "results", results: r } : null; }
+  const a = parseActaText(raw);
+  return a ? { kind: "acta", acta: a } : null;
+}

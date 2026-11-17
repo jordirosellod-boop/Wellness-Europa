@@ -114,8 +114,11 @@ export async function readManual(db: SupabaseClient, grup: string): Promise<Reco
   return c?.data ?? {};
 }
 export async function writeManual(db: SupabaseClient, grup: string, acta: string, m: ManualMatch) {
+  return writeManualMany(db, grup, { [acta]: m });
+}
+export async function writeManualMany(db: SupabaseClient, grup: string, items: Record<string, ManualMatch>) {
   const cur = await readManual(db, grup);
-  cur[acta] = { ...cur[acta], ...m };
+  for (const [acta, m] of Object.entries(items)) cur[acta] = { ...cur[acta], ...m };
   const { error } = await db.from("fcf_cache").upsert({ key: `manual:${grup}`, data: cur, fetched_at: new Date().toISOString() });
   if (error) throw new Error(error.message);
 }
