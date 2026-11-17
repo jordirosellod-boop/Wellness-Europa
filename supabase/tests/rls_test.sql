@@ -288,7 +288,7 @@ select pg_temp.expect_error($$select * from public.push_subscriptions$$, 'Anòni
 -- =============== ESTADÍSTIQUES FCF ===============
 reset role;
 insert into public.fcf_matches (acta_id, jornada, home, away, home_goals, away_goals, is_home, closed) values ('4132183', 1, 'OAR VIC A', 'EUROPA, C.E. C', 0, 10, false, true);
-insert into public.fcf_players (fcf_id, full_name, goals) values ('54291437', 'PEREZ ORDOÑEZ, VERA', 4), ('44132866', 'AVILA GOMEZ, LAURA', 3);
+insert into public.fcf_players (fcf_id, full_name, goals) values ('54291437', 'JUGADORA, PROVA U', 4), ('44132866', 'JUGADORA, PROVA DOS', 3);
 insert into public.fcf_appearances (acta_id, fcf_id, titular, goals) values ('4132183', '54291437', true, 3);
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
 select pg_temp.check((select count(*) from public.fcf_players) = 2 and (select count(*) from public.fcf_matches) = 1, 'Una jugadora veu les estadístiques de l''equip');

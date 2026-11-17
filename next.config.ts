@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+          // L'app no fa servir càmera (les fotos es trien de la galeria), micròfon ni ubicació
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
         ],
       },
       {

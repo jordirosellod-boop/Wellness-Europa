@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 // Només per a codi de servidor (rutes /api): fa servir la clau secreta.
 export function adminClient(): SupabaseClient {
@@ -86,4 +87,11 @@ export async function vapidKeys(db: SupabaseClient): Promise<{ publicKey: string
   const saved = await read();
   if (!saved) throw new Error("No s'han pogut desar les claus de notificacions.");
   return saved;
+}
+
+/** Compara dues claus sense deixar pistes pel temps que triga (per a la clau interna de les tasques programades). */
+export function sameSecret(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const h = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(h(a), h(b));
 }

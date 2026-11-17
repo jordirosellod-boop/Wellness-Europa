@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { hhmm, KITS, kitOf } from "@/lib/convo";
 import { addDays, isoDow, startOfWeek } from "@/lib/dates";
 import { madridEpoch } from "@/lib/matchday";
-import { claimPush, adminClient, pushTo, pushToStaff } from "@/lib/server-admin";
+import { claimPush, adminClient, pushTo, pushToStaff, sameSecret } from "@/lib/server-admin";
 import { fetchAll } from "@/lib/supabase";
 import { leagueRaw } from "@/lib/league-raw";
 import { nextRival } from "@/lib/rival-report";
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const db = adminClient();
   const { data: secret } = await db.from("app_secrets").select("value").eq("name", "cron_secret").maybeSingle();
   const given = req.headers.get("x-cron-secret");
-  if (!secret?.value || !given || given !== secret.value) {
+  if (!sameSecret(given, secret?.value)) {
     return Response.json({ error: "No autoritzat." }, { status: 401 });
   }
 

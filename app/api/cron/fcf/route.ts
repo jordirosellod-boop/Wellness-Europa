@@ -1,5 +1,5 @@
 import { syncFcf } from "@/lib/fcf-sync";
-import { adminClient } from "@/lib/server-admin";
+import { adminClient, sameSecret } from "@/lib/server-admin";
 
 export const maxDuration = 60;
 
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   let allowed = false;
   if (given) {
     const { data } = await db.from("app_secrets").select("value").eq("name", "cron_secret").maybeSingle();
-    allowed = !!data?.value && data.value === given;
+    allowed = sameSecret(given, data?.value);
   } else {
     const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     if (token) {

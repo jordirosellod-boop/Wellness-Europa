@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { adminClient, vapidKeys } from "@/lib/server-admin";
+import { adminClient, vapidKeys, sameSecret } from "@/lib/server-admin";
 import { todayMadrid } from "@/lib/wellness";
 
 // L'executa la base de dades (pg_cron) a les 7:30 de Barcelona els dies d'entrenament.
@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const db = adminClient();
   const { data: secret } = await db.from("app_secrets").select("value").eq("name", "cron_secret").maybeSingle();
   const given = req.headers.get("x-cron-secret");
-  if (!secret?.value || !given || given !== secret.value) {
+  if (!sameSecret(given, secret?.value)) {
     return Response.json({ error: "No autoritzat." }, { status: 401 });
   }
 
