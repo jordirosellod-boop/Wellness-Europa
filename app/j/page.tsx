@@ -63,6 +63,8 @@ import { GreetSky } from "@/components/greet-sky";
 import { curtain, LevelUp } from "@/components/feel";
 import { ClubIcon } from "@/components/club-icons";
 import { Welcome } from "@/components/welcome";
+import { MvpReveal, MvpVoteCard } from "@/components/mvp";
+import { WeekSummaryCard } from "@/components/week-summary";
 
 type State =
   | { kind: "loading" }
@@ -593,6 +595,9 @@ function Dashboard({
       <SplashMatchSaver today={today} />
 
       <ResultCard today={today} meId={me.id} name={me.display_name} />
+      <MvpVoteCard meId={me.id} today={today} />
+      <MvpReveal />
+      <WeekSummaryCard meId={me.id} today={today} />
 
       {data?.convo && data.convo.c.match_date === today && (
         <MatchdayHero c={data.convo.c} called={data.convo.called} onOpen={() => go("convo")} />

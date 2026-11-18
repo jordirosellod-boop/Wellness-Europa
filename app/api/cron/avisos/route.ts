@@ -53,6 +53,7 @@ export async function POST(req: Request) {
   if (hour >= 14 && hour < 17) await step("tendencia", () => trendAlerts(db, today));
   if (hour === 22) await step("rpe", () => rpeReminder(db, today));
   if (dow === 7 && hour >= 20 && hour < 23) await step("resum", () => weeklySummary(db, today));
+  if (dow === 7 && hour >= 20 && hour < 23) await step("resum-jugadores", () => playerWeeks(db, today));
   if (dow === 1 && hour >= 9 && hour < 12) await step("informe-rival", () => rivalReportReady(db, today));
 
   return Response.json({ done, errors }, { status: errors.length ? 500 : 200 });
@@ -241,6 +242,40 @@ async function weeklySummary(db: SupabaseClient, today: string): Promise<number 
     body: parts.join(" · "),
     url: "/entrenador",
   });
+}
+
+/** Diumenge al vespre: a cada jugadora, la seva setmana (entrenos i minuts; sense dades de salut a la pantalla de bloqueig). */
+async function playerWeeks(db: SupabaseClient, today: string): Promise<number | null> {
+  const from = startOfWeek(today);
+  const sessions = await fetchAll<{ id: string }>((f, t) =>
+    db.from("sessions").select("id").gte("session_date", from).lte("session_date", today).eq("cancelled", false).eq("kind", "Entrenament").order("id").range(f, t));
+  const convos = await fetchAll<{ id: string }>((f, t) =>
+    db.from("convocations").select("id").gte("match_date", from).lte("match_date", today).order("id").range(f, t));
+  if (!sessions.length && !convos.length) return null;
+  if (!(await claimPush(db, `resum-j:${from}`))) return null;
+  const [players, att, mins] = await Promise.all([
+    fetchAll<{ id: string }>((f, t) => db.from("profiles").select("id").eq("role", "player").order("id").range(f, t)),
+    sessions.length ? fetchAll<{ player_id: string; present: boolean }>((f, t) =>
+      db.from("attendance").select("player_id, present").in("session_id", sessions.map((s) => s.id)).order("session_id").order("player_id").range(f, t)) : Promise.resolve([]),
+    convos.length ? fetchAll<{ player_id: string; minutes: number }>((f, t) =>
+      db.from("match_minutes").select("player_id, minutes").in("convocation_id", convos.map((c) => c.id)).order("convocation_id").order("player_id").range(f, t)) : Promise.resolve([]),
+  ]);
+  let sent = 0;
+  for (const p of players) {
+    const mine = att.filter((a) => a.player_id === p.id);
+    const min = mins.filter((m) => m.player_id === p.id).reduce((n, m) => n + m.minutes, 0);
+    const parts = [
+      mine.length ? `${mine.filter((a) => a.present).length} de ${mine.length} entrenos` : null,
+      min ? `${min} minuts jugats` : null,
+    ].filter(Boolean);
+    sent += await pushTo(db, [p.id], {
+      title: "📊 La teva setmana",
+      body: `${parts.length ? parts.join(" · ") + ". " : ""}Toca per veure el resum.`,
+      url: "/j",
+      tag: `resum-${from}`,
+    });
+  }
+  return sent;
 }
 
 /** Dilluns: es llegeixen les actes noves de la FCF i s'avisa el staff que l'informe del proper rival està a punt. */

@@ -332,6 +332,17 @@ create table if not exists public.convocation_views (
   primary key (convocation_id, player_id)
 );
 
+-- MVP DEL PARTIT: les convocades voten la millor (un vot cadascuna, no a si mateixa). Els vots són secrets:
+-- la jugadora només veu el seu; el resultat (només la guanyadora) surt l'endemà a les 12 h.
+create table if not exists public.mvp_votes (
+  convocation_id uuid not null references public.convocations(id) on delete cascade,
+  voter_id       uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  candidate_id   uuid not null references public.profiles(id) on delete cascade,
+  created_at     timestamptz not null default now(),
+  primary key (convocation_id, voter_id),
+  constraint mvp_not_self check (candidate_id <> voter_id)
+);
+
 -- JUGADORES AFEGIDES a una convocatòria (pujades d'un altre equip: Cadet A, Juvenil D...).
 -- No tenen compte a l'app. Dades mínimes: nom, dorsal i equip d'on vénen.
 create table if not exists public.convocation_guests (
@@ -1382,6 +1393,36 @@ begin
   update public.meeting_slots set player_id = b.player_id, done = false, updated_at = now() where id = a.id;
 end $$;
 
+-- MVP: la votació és oberta des de l'hora del partit fins l'endemà a les 12 h (hora de Barcelona).
+create or replace function public.mvp_open(p_convo uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce((
+    select c.published
+       and (now() at time zone 'Europe/Madrid') >= c.match_date + coalesce(c.kickoff, time '00:00')
+       and (now() at time zone 'Europe/Madrid') < (c.match_date + 1) + time '12:00'
+    from public.convocations c where c.id = p_convo), false);
+$$;
+create or replace function public.called_in(p_convo uuid, p_player uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.convocation_players cp where cp.convocation_id = p_convo and cp.player_id = p_player and cp.called);
+$$;
+-- Les guanyadores (només quan la votació s'ha tancat; sense el nombre de vots). Empat: totes les que en tenen més.
+create or replace function public.mvp_winners()
+returns table (convocation_id uuid, match_date date, rival text, player_id uuid)
+language sql stable security definer set search_path = '' as $$
+  with t as (
+    select v.convocation_id, v.candidate_id, count(*) as n
+    from public.mvp_votes v join public.convocations c on c.id = v.convocation_id
+    where (now() at time zone 'Europe/Madrid') >= (c.match_date + 1) + time '12:00'
+    group by v.convocation_id, v.candidate_id
+  ), m as (select convocation_id, max(n) as mx from t group by convocation_id)
+  select t.convocation_id, c.match_date, c.rival, t.candidate_id
+  from t join m on m.convocation_id = t.convocation_id and t.n = m.mx
+  join public.convocations c on c.id = t.convocation_id
+  where (select public.is_coach()) or (select public.is_player())
+  order by c.match_date desc, t.candidate_id;
+$$;
+
 -- PETOS: qui els porta cada dia (de p_from a p_to). Ho poden veure el staff i les jugadores.
 create or replace function public.bib_schedule(p_from date, p_to date)
 returns table (day date, player_id uuid, display_name text, dorsal smallint, manual boolean)
@@ -1806,6 +1847,7 @@ alter table public.team_crests        enable row level security;
 alter table public.meeting_rounds     enable row level security;
 alter table public.meeting_slots      enable row level security;
 alter table public.convocation_views  enable row level security;
+alter table public.mvp_votes          enable row level security;
 alter table public.fcf_league_actas   enable row level security;
 alter table public.scouting_targets   enable row level security;
 alter table public.corrections        enable row level security;
@@ -1816,7 +1858,7 @@ revoke all on public.profiles, public.player_links, public.sessions, public.well
   public.push_subscriptions, public.auto_fine_settings, public.auto_fine_log, public.app_secrets,
   public.fcf_config, public.fcf_matches, public.fcf_players, public.fcf_appearances,
   public.team_settings, public.league_points, public.attendance,
-  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests, public.convocation_views,
+  public.player_numbers, public.convocations, public.convocation_players, public.convocation_lineups, public.convocation_guests, public.convocation_views, public.mvp_votes,
   public.injuries, public.rehab_entries, public.player_positions, public.player_nicknames, public.staff_greetings, public.absence_notices, public.task_library, public.player_photos, public.calendar_tokens, public.google_drive_links, public.oauth_states, public.rival_ref_actas, public.match_minutes, public.training_plans,
   public.analysis_matches, public.analysis_events, public.analysis_buttons, public.rival_scouting, public.corrections, public.tactic_boards,
   public.weekly_plans, public.published_trainings, public.bib_settings, public.bib_overrides, public.bib_numbers, public.team_crests, public.meeting_rounds, public.meeting_slots, public.fcf_cache, public.push_log, public.duty_groups, public.duty_settings,
@@ -1863,6 +1905,8 @@ grant select, insert, update, delete on public.duty_groups to authenticated;
 grant select, update on public.duty_settings to authenticated;
 grant select, insert, update, delete on public.published_trainings, public.bib_overrides, public.bib_numbers, public.team_crests, public.meeting_rounds, public.meeting_slots to authenticated;
 grant select, insert on public.convocation_views to authenticated;
+grant select, insert on public.mvp_votes to authenticated;
+grant all on public.mvp_votes to service_role;
 grant all on public.convocation_views to service_role;
 grant select, update on public.bib_settings to authenticated;
 grant all on public.fcf_league_actas, public.scouting_targets to service_role;
@@ -1876,6 +1920,8 @@ revoke all on function public.duty_week(date) from public, anon;
 grant execute on function public.duty_week(date) to authenticated, service_role;
 revoke all on function public.has_meeting_in(uuid), public.meeting_round_published(uuid) from public, anon;
 grant execute on function public.has_meeting_in(uuid), public.meeting_round_published(uuid) to authenticated, service_role;
+revoke all on function public.mvp_open(uuid), public.called_in(uuid, uuid), public.mvp_winners() from public, anon;
+grant execute on function public.mvp_open(uuid), public.called_in(uuid, uuid), public.mvp_winners() to authenticated, service_role;
 revoke all on function public.swap_meeting_slots(uuid, uuid) from public, anon;
 grant execute on function public.swap_meeting_slots(uuid, uuid) to authenticated, service_role;
 revoke all on function public.bib_schedule(date, date) from public, anon;
@@ -2136,6 +2182,15 @@ create policy bib_settings_coach on public.bib_settings for all to authenticated
 drop policy if exists bib_overrides_coach on public.bib_overrides;
 create policy bib_overrides_coach on public.bib_overrides for all to authenticated
   using ((select public.is_coach())) with check ((select public.is_coach()));
+drop policy if exists mvp_votes_coach on public.mvp_votes;
+create policy mvp_votes_coach on public.mvp_votes for select to authenticated using ((select public.is_coach()));
+drop policy if exists mvp_votes_own on public.mvp_votes;
+create policy mvp_votes_own on public.mvp_votes for select to authenticated using (voter_id = (select auth.uid()));
+-- Vota una convocada, per una altra convocada, mentre la votació és oberta
+drop policy if exists mvp_votes_insert on public.mvp_votes;
+create policy mvp_votes_insert on public.mvp_votes for insert to authenticated
+  with check (voter_id = (select auth.uid()) and (select public.is_player()) and public.mvp_open(convocation_id)
+              and public.called_in(convocation_id, voter_id) and public.called_in(convocation_id, candidate_id));
 drop policy if exists convocation_views_coach on public.convocation_views;
 create policy convocation_views_coach on public.convocation_views for select to authenticated using ((select public.is_coach()));
 drop policy if exists convocation_views_own on public.convocation_views;

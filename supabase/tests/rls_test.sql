@@ -676,6 +676,37 @@ delete from public.convocations where id = '00000000-0000-0000-0000-0000000b1b01
 create temp table mtp as select (select id from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id limit 1) as p1,
   (select id from public.profiles where role = 'player' and id <> '00000000-0000-0000-0000-0000000000b2' order by id offset 1 limit 1) as p2;
 grant select on mtp to authenticated, anon;
+-- MVP del partit
+insert into public.convocations (id, match_date, kickoff, rival, published) values
+  ('00000000-0000-0000-0000-0000000d0d01', (now() at time zone 'Europe/Madrid')::date, '00:00', 'Obert CF', true),
+  ('00000000-0000-0000-0000-0000000d0d02', (now() at time zone 'Europe/Madrid')::date - 3, '10:00', 'Tancat CF', true);
+insert into public.convocation_players (convocation_id, player_id, called) values
+  ('00000000-0000-0000-0000-0000000d0d01', '00000000-0000-0000-0000-0000000000b2', true),
+  ('00000000-0000-0000-0000-0000000d0d01', (select p1 from mtp), true),
+  ('00000000-0000-0000-0000-0000000d0d01', (select p2 from mtp), false),
+  ('00000000-0000-0000-0000-0000000d0d02', '00000000-0000-0000-0000-0000000000b2', true),
+  ('00000000-0000-0000-0000-0000000d0d02', (select p1 from mtp), true);
+insert into public.mvp_votes (convocation_id, voter_id, candidate_id) values ('00000000-0000-0000-0000-0000000d0d02', (select p1 from mtp), '00000000-0000-0000-0000-0000000000b2');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b2', false); set role authenticated;
+insert into public.mvp_votes (convocation_id, candidate_id) values ('00000000-0000-0000-0000-0000000d0d01', (select p1 from mtp));
+select pg_temp.check((select count(*) from public.mvp_votes) = 1, 'La jugadora vota la MVP i només veu el seu vot');
+select pg_temp.expect_error($$insert into public.mvp_votes (convocation_id, candidate_id) values ('00000000-0000-0000-0000-0000000d0d01', (select p1 from mtp))$$, 'Només es pot votar una vegada');
+select pg_temp.expect_error($$insert into public.mvp_votes (convocation_id, candidate_id) values ('00000000-0000-0000-0000-0000000d0d02', (select p1 from mtp))$$, 'Amb la votació tancada no es pot votar');
+select pg_temp.expect_error($$insert into public.mvp_votes (convocation_id, voter_id, candidate_id) values ('00000000-0000-0000-0000-0000000d0d01', (select p1 from mtp), '00000000-0000-0000-0000-0000000000b2')$$, 'No es pot votar en nom d''una altra');
+select pg_temp.expect_error($$update public.mvp_votes set candidate_id = (select p2 from mtp)$$, 'El vot no es pot canviar');
+select pg_temp.check((select count(*) from public.mvp_winners() where convocation_id = '00000000-0000-0000-0000-0000000d0d01') = 0, 'Amb la votació oberta no se sap qui guanya');
+select pg_temp.check((select player_id from public.mvp_winners() where convocation_id = '00000000-0000-0000-0000-0000000d0d02') = '00000000-0000-0000-0000-0000000000b2', 'Tancada la votació, surt la guanyadora');
+reset role; select set_config('request.jwt.claim.sub', (select p2::text from mtp), false); set role authenticated;
+select pg_temp.expect_error($$insert into public.mvp_votes (convocation_id, candidate_id) values ('00000000-0000-0000-0000-0000000d0d01', '00000000-0000-0000-0000-0000000000b2')$$, 'Una no convocada no pot votar');
+reset role; select set_config('request.jwt.claim.sub', (select p1::text from mtp), false); set role authenticated;
+select pg_temp.expect_error($$insert into public.mvp_votes (convocation_id, candidate_id) values ('00000000-0000-0000-0000-0000000d0d01', (select p1 from mtp))$$, 'No es pot votar a si mateixa');
+select pg_temp.expect_error($$insert into public.mvp_votes (convocation_id, candidate_id) values ('00000000-0000-0000-0000-0000000d0d01', (select p2 from mtp))$$, 'Només es pot votar una convocada');
+reset role; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a', false); set role authenticated;
+select pg_temp.check((select count(*) from public.mvp_votes) = 2, 'El staff veu tots els vots');
+reset role; select set_config('request.jwt.claim.sub','', false); set role anon;
+select pg_temp.expect_error($$select * from public.mvp_winners()$$, 'Anònim no veu les MVP');
+reset role;
+delete from public.convocations where id in ('00000000-0000-0000-0000-0000000d0d01', '00000000-0000-0000-0000-0000000d0d02');
 -- Qui ha vist la convocatòria
 insert into public.convocations (id, match_date, rival, published) values
   ('00000000-0000-0000-0000-0000000c0c01', current_date + 3, 'Vista CF', true),

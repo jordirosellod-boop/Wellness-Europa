@@ -1,5 +1,6 @@
 "use client";
 
+import { MvpReveal } from "@/components/mvp";
 import { SplashMatchSaver } from "@/components/splash-match";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
@@ -130,6 +131,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
   return (
     <div className="staff-home">
       <SplashMatchSaver today={today} />
+      <MvpReveal />
       <header className={`greet ${part}`}>
         <GreetSky />
         {editing ? (
