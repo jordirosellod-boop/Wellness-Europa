@@ -17,6 +17,7 @@ import { fetchAll, supabase } from "@/lib/supabase";
 import { fetchWeeklyPlan } from "@/lib/weekly";
 import { fmtDate, fmtDateSmart, fmtSessionTime, nowMadridHHMM, SESSION_COLS, type Session } from "@/lib/wellness";
 import { GreetSky } from "@/components/greet-sky";
+import { ReadinessCard } from "@/components/readiness-card";
 
 type Info = {
   next: Session | null;
@@ -153,6 +154,7 @@ export function StaffHome({ meId, name, today, owner }: { meId: string; name: st
       </header>
 
       <CoachToday today={today} />
+      <ReadinessCard today={today} />
       {info?.trainingToday && (
         <Link href="/entrenador/entreno" className="wk-banner train">
           <span className="wk-banner-k">📋 Entreno d&apos;avui</span>

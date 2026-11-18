@@ -3602,3 +3602,18 @@ img.pcard-photo, .p-hero-photo img { filter: drop-shadow(0 0 1px rgba(255,238,18
   box-shadow: calc(var(--sun-dx, 0) * -7px) 6px 18px rgba(10, 30, 90, var(--shadow-a, .1));
   transition: box-shadow 1.2s ease;
 }
+
+/* Semàfor de disponibilitat (staff) */
+.rd-counts { display: inline-flex; gap: 6px; }
+.rd-dot { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 99px; font-weight: 800; font-size: .85rem; color: #fff; }
+.rd-dot.red { background: #d93838; } .rd-dot.yellow { background: #e8a91a; color: #3a2600; } .rd-dot.green { background: #2f9e55; }
+.rd-dot.none, .rd-dot.away { background: #c3cad8; }
+.rd-list .rd-dot { min-width: 12px; width: 12px; height: 12px; padding: 0; flex: none; box-shadow: 0 0 0 3px rgba(0,0,0,.04); }
+.rd-list li .rd-dot.red { box-shadow: 0 0 0 3px rgba(217,56,56,.18), 0 0 10px rgba(217,56,56,.5); }
+.rd-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.rd-list li { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--vora); }
+.rd-list li:first-child { border-top: 0; }
+.rd-name { font-weight: 700; }
+.rd-why { grid-column: 2; font-size: .82rem; color: var(--suau); }
+.rd-list li.red .rd-why { color: #b42323; font-weight: 600; }
+.rd-trend { margin: 0 0 8px; padding: 8px 10px; border-radius: 12px; background: #fff6e0; color: #7a5200; font-size: .88rem; }

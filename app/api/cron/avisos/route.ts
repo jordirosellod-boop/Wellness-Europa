@@ -8,6 +8,7 @@ import { leagueRaw } from "@/lib/league-raw";
 import { nextRival } from "@/lib/rival-report";
 import { prettyTeam } from "@/lib/analysis";
 import { nowMadridHHMM, todayMadrid } from "@/lib/wellness";
+import { downTrend, fmtTrend, type WellRow } from "@/lib/readiness";
 
 export const maxDuration = 60;
 
@@ -19,6 +20,7 @@ export const maxDuration = 60;
 //  · cada dia a les 22 h: a qui encara no ha fet l'RPE d'avui (menys les absents o que han avisat)
 //  · diumenge a les 20 h: resum de la setmana al staff
 //  · reunions individuals: la vigília a les 19 h i una hora abans
+//  · cada dia a les 14 h: al staff, si el wellness d'alguna jugadora porta 3 dies baixant
 //  · dilluns a les 9 h: l'informe del proper rival ja està fet (abans es llegeixen les actes noves de la FCF)
 export async function POST(req: Request) {
   const db = adminClient();
@@ -48,6 +50,7 @@ export async function POST(req: Request) {
   await step("quedada", () => meetReminder(db, today));
   if (hour >= 19 && hour < 22) await step("reunio-vigilia", () => meetingsTomorrow(db, addDays(today, 1)));
   await step("reunio-1h", () => meetingsSoon(db, today));
+  if (hour >= 14 && hour < 17) await step("tendencia", () => trendAlerts(db, today));
   if (hour === 22) await step("rpe", () => rpeReminder(db, today));
   if (dow === 7 && hour >= 20 && hour < 23) await step("resum", () => weeklySummary(db, today));
   if (dow === 1 && hour >= 9 && hour < 12) await step("informe-rival", () => rivalReportReady(db, today));
@@ -68,6 +71,31 @@ async function bibsTomorrow(db: SupabaseClient, day: string): Promise<number | n
     body: `${first(row.display_name)}, demà els portes tu. Que no se t'oblidin!`,
     url: "/j",
   });
+}
+
+/** Al staff: jugadores amb el wellness 3 dies seguits a la baixa (un avís per jugadora i dia, si avui n'ha fet). */
+async function trendAlerts(db: SupabaseClient, today: string): Promise<number | null> {
+  const { data, error } = await db.from("wellness").select("player_id, score, sleep, fatigue, mood, has_pain, sessions!inner(session_date)")
+    .gte("sessions.session_date", addDays(today, -12)).lte("sessions.session_date", today).order("id").range(0, 4999);
+  if (error) throw new Error(error.message);
+  const rows: WellRow[] = ((data ?? []) as unknown as { player_id: string; score: number; sleep: number; fatigue: number; mood: number; has_pain: boolean; sessions: { session_date: string } | { session_date: string }[] }[])
+    .map((w) => ({ player_id: w.player_id, date: (Array.isArray(w.sessions) ? w.sessions[0]?.session_date : w.sessions?.session_date) ?? "", score: Number(w.score), sleep: w.sleep, fatigue: w.fatigue, mood: w.mood, has_pain: w.has_pain }))
+    .filter((w) => w.date);
+  const ids = [...new Set(rows.filter((r) => r.date === today).map((r) => r.player_id))];
+  if (!ids.length) return null;
+  const { data: names } = await db.from("profiles").select("id, display_name").in("id", ids);
+  const nameOf = new Map((names ?? []).map((p) => [p.id as string, p.display_name as string]));
+  let sent = 0;
+  for (const id of ids) {
+    const t = downTrend(rows.filter((r) => r.player_id === id), today);
+    if (!t || !(await claimPush(db, `tendencia:${id}:${today}`))) continue;
+    sent += await pushToStaff(db, {
+      title: `📉 ${first(nameOf.get(id) ?? "Una jugadora")}: 3 dies baixant`,
+      body: `Wellness ${fmtTrend(t)}. Potser val la pena parlar-hi.`,
+      url: "/entrenador",
+    });
+  }
+  return sent || null;
 }
 
 type MSlot = { id: string; day: string; start_time: string; player_id: string };
