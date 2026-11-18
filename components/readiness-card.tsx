@@ -41,10 +41,11 @@ async function load(today: string): Promise<{ rows: Row[]; training: boolean }> 
   return { rows: out, training: sessions.length > 0 };
 }
 
-/** Staff: el semàfor de disponibilitat de cada jugadora avui (lesions, wellness, dolor, càrrega i tendència). */
+/** Staff: el semàfor de disponibilitat de cada jugadora avui (lesions, wellness, dolor, càrrega i tendència). Compacte: toca un nom per veure el motiu. */
 export function ReadinessCard({ today }: { today: string }) {
   const [data, setData] = useState<{ rows: Row[]; training: boolean } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const [showGreen, setShowGreen] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -52,34 +53,33 @@ export function ReadinessCard({ today }: { today: string }) {
     return () => { alive = false; };
   }, [today]);
   if (err) return null;
-  if (!data) return <section className="card readiness"><h2 className="ico-h">🚦 Semàfor d&apos;avui</h2><p className="muted small">Calculant…</p></section>;
-  const count = (l: Level) => data.rows.filter((r) => r.r.level === l).length;
-  const shown = data.rows.filter((r) => r.r.level !== "green" || showGreen);
-  const trends = data.rows.filter((r) => r.r.trend);
+  const rows = data?.rows ?? [];
+  const count = (l: Level) => rows.filter((r) => r.r.level === l).length;
+  const chips = rows.filter((r) => r.r.level !== "green" || showGreen);
+  const sel = rows.find((r) => r.id === open) ?? null;
   return (
-    <section className="card readiness">
-      <div className="row between" style={{ alignItems: "center" }}>
-        <h2 className="ico-h" style={{ margin: 0 }}>🚦 Semàfor d&apos;avui</h2>
-        <span className="rd-counts">
-          {(["red", "yellow", "green"] as Level[]).map((l) => <span key={l} className={`rd-dot ${l}`}>{count(l)}</span>)}
-        </span>
+    <section className="card readiness" title="Lesions, wellness, dolor, càrrega (ACWR) i tendència. Només ho veu el staff.">
+      <div className="rd-head">
+        <b>🚦 Semàfor{data && !data.training ? " · avui no hi ha entreno" : " d'avui"}</b>
+        {data ? (
+          <span className="rd-counts">
+            {(["red", "yellow", "green"] as Level[]).map((l) => (
+              <button key={l} type="button" className={`rd-count ${l}`} aria-label={`${count(l)} ${LABEL[l]}`}
+                onClick={() => l === "green" && setShowGreen((v) => !v)}>{count(l)}</button>
+            ))}
+          </span>
+        ) : <span className="muted small">Calculant…</span>}
       </div>
-      <p className="muted small" style={{ margin: "4px 0 8px" }}>
-        {data.training ? "Abans de l'entreno: " : "Avui no hi ha entreno. "}lesions, wellness, dolor, càrrega (ACWR) i tendència. Només ho veu el staff.
-      </p>
-      {trends.length > 0 && <p className="rd-trend">📉 Tendència a la baixa: <b>{trends.map((t) => t.name.split(" ")[0]).join(", ")}</b></p>}
-      <ul className="rd-list">
-        {shown.map((x) => (
-          <li key={x.id} className={x.r.level}>
-            <i className={`rd-dot ${x.r.level}`} aria-hidden="true" />
-            <span className="rd-name">{x.name}</span>
-            <span className="rd-why">{x.r.reasons.join(" · ") || LABEL[x.r.level]}</span>
-          </li>
-        ))}
-      </ul>
-      {count("green") > 0 && (
-        <button type="button" className="linkbtn" onClick={() => setShowGreen((v) => !v)}>{showGreen ? "Amagar les que estan bé" : `+ ${count("green")} en verd`}</button>
-      )}
+      {data && (chips.length ? (
+        <div className="rd-chips">
+          {chips.map((x) => (
+            <button key={x.id} type="button" className={`rd-chip ${x.r.level}${open === x.id ? " on" : ""}`} onClick={() => setOpen(open === x.id ? null : x.id)}>
+              <i aria-hidden="true" />{x.name.split(" ")[0]}{x.r.trend ? " 📉" : ""}
+            </button>
+          ))}
+        </div>
+      ) : <p className="rd-ok">Totes en verd ✓</p>)}
+      {sel && <p className={`rd-why-line ${sel.r.level}`}><b>{sel.name}:</b> {sel.r.reasons.join(" · ") || LABEL[sel.r.level]}</p>}
     </section>
   );
 }
