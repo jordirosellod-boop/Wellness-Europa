@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-17",
+ "updated": "2026-11-23",
  "manual": {
   "4132082": {
    "kickoff": "2026-10-18T15:00:00",
@@ -204,6 +204,48 @@
    "home_goals": 1,
    "away_goals": 1,
    "closed": true
+  },
+  "4132125": {
+   "kickoff": "2026-11-21T12:00:00",
+   "home_goals": 1,
+   "away_goals": 7,
+   "closed": true
+  },
+  "4132122": {
+   "kickoff": "2026-11-21T17:00:00",
+   "home_goals": 12,
+   "away_goals": 0,
+   "closed": true
+  },
+  "4132129": {
+   "kickoff": "2026-11-21T17:00:00",
+   "home_goals": 2,
+   "away_goals": 1,
+   "closed": true
+  },
+  "4132126": {
+   "kickoff": "2026-11-21T18:15:00",
+   "home_goals": 5,
+   "away_goals": 1,
+   "closed": true
+  },
+  "4132127": {
+   "kickoff": "2026-11-22T12:00:00",
+   "home_goals": 0,
+   "away_goals": 10,
+   "closed": true
+  },
+  "4132124": {
+   "kickoff": "2026-11-22T15:00:00",
+   "home_goals": 2,
+   "away_goals": 1,
+   "closed": true
+  },
+  "4132128": {
+   "kickoff": "2026-11-22T17:00:00",
+   "home_goals": 2,
+   "away_goals": 0,
+   "closed": true
   }
  },
  "venues": {
@@ -240,6 +282,13 @@
   "4132119": "Camp de Futbol Mpal. de Premià de Dalt",
   "4132120": "Camp de Futbol Mpal. Nou Sardenya",
   "4132121": "Camp de Futbol Parroquia de Santa Maria de Llerona",
-  "4132114": "Camp de Futbol Mpal. Ca la Guidó-pedro Alia Dorado"
+  "4132114": "Camp de Futbol Mpal. Ca la Guidó-pedro Alia Dorado",
+  "4132125": "Camp de Futbol Mpal. de l'Estartit",
+  "4132122": "Camp de Futbol Mpal. Torres de Palau",
+  "4132129": "Camp de Futbol Mpal. Ca la Guidó-Pedro Alia Dorado",
+  "4132126": "Camp de Futbol Mpal. Teixonera",
+  "4132127": "Camp de Futbol Mpal. de Breda",
+  "4132124": "Camp de Futbol Mpal. de Santa Eulàlia de Riuprimer",
+  "4132128": "Camp de Futbol Mpal. de Torelló"
  }
 }
