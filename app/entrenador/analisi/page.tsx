@@ -277,14 +277,18 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const recorder = useRef<Awaited<ReturnType<typeof startTabRecording>> | null>(null);
   // Webs amb sessió (Hudl, Wyscout…): s'obren a part i, si no es poden veure aquí, es grava aquella finestra
   const [frameKey, setFrameKey] = useState(0);
-  const [winRec, setWinRec] = useState<{ since: number } | null>(null);
+  const [winRec, setWinRec] = useState<{ since: number; stream: MediaStream } | null>(null);
+  // Visualitzador: el vídeo gran amb la botonera al costat (cada botó fa un tall)
+  const [viewer, setViewer] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
   const winRecorder = useRef<Awaited<ReturnType<typeof startTabRecording>> | null>(null);
   const [recorded, setRecorded] = useState<SavedVideo[]>([]);
   useEffect(() => {
     if (!winRec) return;
-    const t = setInterval(() => force((x) => x + 1), 1000);
+    const t = setInterval(() => { const r = winRecorder.current; if (r) onTickRef.current(r.elapsed()); force((x) => x + 1); }, 250);
     return () => clearInterval(t);
   }, [winRec]);
+  const onTickRef = useRef<(t: number) => void>(() => {});
   useEffect(() => {
     listVideos(id).then((l) => setRecorded(l.filter((v) => v.name.startsWith("Partit gravat"))), () => {});
   }, [id, winRec]);
@@ -365,6 +369,9 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match]);
+  useEffect(() => { onTickRef.current = onTick; }, [onTick]);
+  /** On és ara el vídeo (o quant fa que es grava, si s'està capturant una altra finestra). */
+  const videoNow = () => (winRecorder.current ? winRecorder.current.elapsed() : player.current?.time() ?? 0);
 
   function playIndex(i: number) {
     const q = queue.current;
@@ -490,6 +497,29 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (okText) setMsg({ ok: true, text: okText });
   }
 
+  // Si es surt de pantalla completa amb Esc, també es tanca el visualitzador
+  useEffect(() => {
+    const f = () => { if (!document.fullscreenElement) setViewer(false); };
+    document.addEventListener("fullscreenchange", f);
+    return () => document.removeEventListener("fullscreenchange", f);
+  }, []);
+  // Tecles del visualitzador: 1-9 botons, espai play/pausa, fletxes ±3 s (amb Maj ±10 s)
+  const tagRef = useRef(tag);
+  useEffect(() => { tagRef.current = tag; });
+  useEffect(() => {
+    if (!viewer) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (/^[1-9]$/.test(e.key)) { const b = buttons[Number(e.key) - 1]; if (b) { e.preventDefault(); void tagRef.current(b); } return; }
+      if (e.key === " ") { e.preventDefault(); if (player.current?.paused()) player.current.play(); else player.current?.pause(); return; }
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); const d = (e.shiftKey ? 10 : 3) * (e.key === "ArrowLeft" ? -1 : 1); player.current?.seek((player.current?.time() ?? 0) + d); return; }
+      if (e.key === "Escape") setViewer(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [viewer, buttons]);
+
   if (error) return (<><p className="msg error">{error}</p><button className="btn small secondary" onClick={onBack}>← Partits</button></>);
   if (!match) return <Loading />;
 
@@ -501,6 +531,9 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
 
   async function tag(b: AButton) {
     if (!match) return;
+    if (mode === "video" && !winRec && (!src || src.kind === "embed")) {
+      return setMsg({ ok: false, text: src ? "Aquesta web no diu a l'app en quin moment va el vídeo. Toca «🖥 Capturar» i marca mentre el mires: així cada botó fa el tall bé." : "Primer obre un vídeo (o captura'l d'una altra web) i després ja pots marcar." });
+    }
     const t = Math.round(clock * 100) / 100;
     const { data, error: e } = await supabase()
       .from("analysis_events")
@@ -510,7 +543,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (e || !data) return setMsg({ ok: false, text: `No s'ha pogut marcar: ${e?.message ?? ""}` });
     const ev = { ...(data as AEvent), t: Number((data as AEvent).t) };
     setEvents((x) => [...x, ev].sort((a, b2) => a.t - b2.t));
-    setMsg({ ok: true, text: `${b.label} · ${minuteOf(match, t)} ✓` });
+    setRecent((r) => [ev.id, ...r].slice(0, 20));
+    setMsg({ ok: true, text: `✂ ${b.label} · ${minuteOf(match, t)} · tall de ${b.pre_s + b.post_s} s ✓` });
     if (/^gols?\b/i.test(b.label) && team === "us") crowd();
     if ((b.ask_player && match.kind !== "rival") || b.ask_result || b.ask_zone) setDetail(ev.id);
   }
@@ -592,7 +626,9 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     try {
       winRecorder.current = await startTabRecording(match.id, safeName(`Partit gravat - ${match.title} - ${match.match_date}`), { other: true });
       winRecorder.current.onEnded(() => void stopWinRec());
-      setWinRec({ since: Date.now() });
+      setWinRec({ since: Date.now(), stream: winRecorder.current.stream });
+      setMode("video");
+      setMsg({ ok: true, text: "Capturant ✓ Posa el vídeo en marxa a l'altra finestra i marca amb els botons mentre el mires. En acabar, toca «Aturar i analitzar»: tindràs el partit aquí amb tots els talls." });
     } catch (e) {
       winRecorder.current = null;
       if (e instanceof Error && e.name === "NotAllowedError") return;
@@ -646,7 +682,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
       const c = Math.round(liveNow(live) * 100) / 100;
       return h === 1 ? saveMatch({ h1_start: c }, "Inici de la 1a part marcat.") : saveMatch({ h2_start: c }, "Inici de la 2a part marcat.");
     }
-    const v = Math.round((player.current?.time() ?? 0) * 100) / 100;
+    const v = Math.round(videoNow() * 100) / 100;
     if (h === 1) return saveMatch({ video_offset: Math.round((v - Number(match.h1_start)) * 100) / 100 }, "Inici de la 1a part sincronitzat amb el vídeo.");
     if (match.h2_start != null && events.some((e) => e.t >= Number(match.h2_start!)))
       return saveMatch({ video_offset_h2: Math.round((v - Number(match.h2_start)) * 100) / 100 }, "Inici de la 2a part sincronitzat amb el vídeo.");
@@ -686,21 +722,35 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     setDrawEdit(e);
   };
 
+  function openViewer(on: boolean) {
+    setViewer(on);
+    try {
+      if (on && !document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => {});
+      if (!on && document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    } catch { /* el navegador no ho deixa: es fa igualment dins la pàgina */ }
+  }
   const detailEv = events.find((e) => e.id === detail) ?? null;
   const target = targetEv ? events.find((e) => e.id === targetEv) ?? null : null;
 
   return (
-    <div className="analysis">
-      <div className="row between">
+    <div className={`analysis${viewer ? " an-viewer" : ""}`}>
+      {viewer && (
+        <div className="an-viewer-top">
+          <span className="esc">{match.title}</span>
+          <span className="muted small">Cada botó fa un tall · tecles 1-9, espai i fletxes</span>
+          <button type="button" className="btn small" onClick={() => openViewer(false)}>✕ Sortir</button>
+        </div>
+      )}
+      <div className="row between an-head">
         <button className="btn small secondary" onClick={onBack}>← Partits</button>
         <span className="row" style={{ gap: 6 }}>
           <ScoreBox match={match} onSave={(gf, ga) => saveMatch({ goals_for: gf, goals_against: ga }, "Resultat desat.")} />
         </span>
       </div>
-      <h1 className="esc team-inline" style={{ margin: "8px 0 4px", fontSize: "1.6rem", gap: 10 }}><Crest name={match.rival} size={40} />{match.title}</h1>
-      <p className="muted small" style={{ marginTop: 0 }}>{fmtDate(match.match_date)}</p>
+      <h1 className="esc team-inline an-head" style={{ margin: "8px 0 4px", fontSize: "1.6rem", gap: 10 }}><Crest name={match.rival} size={40} />{match.title}</h1>
+      <p className="muted small an-head" style={{ marginTop: 0 }}>{fmtDate(match.match_date)}</p>
 
-      <div className="seg-toggle" role="group" aria-label="Mode" style={{ marginBottom: 8 }}>
+      <div className="seg-toggle an-head" role="group" aria-label="Mode" style={{ marginBottom: 8 }}>
         <button type="button" aria-pressed={mode === "video"} onClick={() => setMode("video")}>🎬 Vídeo</button>
         <button type="button" aria-pressed={mode === "live"} onClick={() => setMode("live")}>⏱ Directe</button>
       </div>
@@ -709,12 +759,15 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
         <div className="an-left">
           {mode === "video" ? (
             <section className="card an-video-card">
-              {!src ? (
+              {!src && !winRec ? (
                 <div className="stack">
                   <label className="btn block" style={{ display: "flex" }}>
                     📂 Obrir el vídeo del dispositiu
                     <input type="file" accept="video/*" onChange={openFile} hidden />
                   </label>
+                  {canRecordTab() && (
+                    <button type="button" className="btn block secondary" onClick={() => void startWinRec()}>🖥 Capturar qualsevol vídeo (d&apos;una altra pestanya o web)</button>
+                  )}
                   {recorded.length > 0 && (
                     <div className="stack" style={{ gap: 6 }}>
                       {recorded.slice(0, 3).map((v) => (
@@ -737,7 +790,12 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
               ) : (
                 <>
                   <div className={`an-stage${rec ? " rec" : ""}`}>
-                    <VideoPlayer key={`${src.url}-${frameKey}`} ref={player} kind={src.kind} src={src.url} onTick={onTick} onFail={linkFailed} />
+                    {src && (
+                      <div hidden={!!winRec}>
+                        <VideoPlayer key={`${src.url}-${frameKey}`} ref={player} kind={src.kind} src={src.url} onTick={winRec ? undefined : onTick} onFail={linkFailed} />
+                      </div>
+                    )}
+                    {winRec && <LiveCapture stream={winRec.stream} />}
                     {rec && <RecOverlay rec={rec} title={match.title} onStart={(t, auto) => void recStart(t, auto)} onTeam={(t) => setRec((r) => r && { ...r, team: t })} onClose={recClose} labels={teamLabels(match)} />}
                     {frozen && !drawEdit && <DrawingOverlay shapes={frozen} />}
                     {drawEdit && (
@@ -752,7 +810,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                       />
                     )}
                   </div>
-                  {src.kind === "embed" && (
+                  {src?.kind === "embed" && !winRec && (
                     <div className="msg info an-msg an-login">
                       <p style={{ margin: 0 }}>Aquesta web no deixa que l&apos;app controli el vídeo. Si s&apos;ha d&apos;iniciar sessió per veure el partit:</p>
                       <div className="row" style={{ gap: 6, marginTop: 6 }}>
@@ -773,7 +831,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                       <button type="button" className="btn small" onClick={() => void stopWinRec()}>⏹ Aturar i analitzar</button>
                     </div>
                   )}
-                  <div className="an-controls">
+                  <div className="an-controls" hidden={!!winRec}>
                     <button onClick={() => player.current?.seek((player.current?.time() ?? 0) - 10)} aria-label="Enrere 10 segons">−10</button>
                     <button onClick={() => player.current?.seek((player.current?.time() ?? 0) - 3)} aria-label="Enrere 3 segons">−3</button>
                     <button className="main" onClick={() => (player.current?.paused() ? player.current?.play() : player.current?.pause())} aria-label="Play o pausa">⏯</button>
@@ -782,7 +840,9 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                     <select aria-label="Velocitat" value={rateV} onChange={(e) => { const r = Number(e.target.value); setRateV(r); player.current?.rate(r); }}>
                       {[0.25, 0.5, 1, 1.5, 2].map((r) => <option key={r} value={r}>{r}x</option>)}
                     </select>
+                    <button type="button" className="an-small-link an-viewer-btn" onClick={() => openViewer(!viewer)}>{viewer ? "✕ Sortir del visualitzador" : "⛶ Visualitzador"}</button>
                     <button type="button" className="an-small-link" onClick={recAny}>🎬 Mode gravació</button>
+                    {canRecordTab() && <button type="button" className="an-small-link" onClick={() => void startWinRec()}>🖥 Capturar</button>}
                     <button type="button" className="an-small-link" onClick={() => setSrc(null)}>Canviar</button>
                   </div>
                   {playing && (
@@ -831,7 +891,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
 
         <div className="an-right">
-          <div className="tabs" style={{ marginBottom: 8 }}>
+          <div className="tabs an-head" style={{ marginBottom: 8 }}>
             <button aria-pressed={tab === "tag"} onClick={() => setTab("tag")}>Etiquetar</button>
             <button aria-pressed={tab === "list"} onClick={() => setTab("list")}>Accions ({events.length})</button>
             <button aria-pressed={tab === "clips"} onClick={() => setTab("clips")}>Talls</button>
@@ -839,30 +899,53 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
             <button aria-pressed={tab === "report"} onClick={() => setTab("report")}>Informe</button>
           </div>
 
-          {tab === "tag" && (
-            <section className="card">
+          {(tab === "tag" || viewer) && (
+            <section className="card an-tagcard">
               <div className="row between" style={{ marginBottom: 8 }}>
                 <div className="seg-toggle" role="group" aria-label="Equip">
                   <button type="button" aria-pressed={team === "us"} onClick={() => setTeam("us")}>{match.kind === "rival" ? match.rival || "Rival" : "CE Europa"}</button>
                   <button type="button" aria-pressed={team === "rival"} onClick={() => setTeam("rival")}>{match.kind === "rival" ? "Contrari" : match.rival || "Rival"}</button>
                 </div>
-                <button className="btn small secondary" onClick={() => setEditButtons((v) => !v)}>{editButtons ? "Fet" : "Editar botons"}</button>
+                <span className="row" style={{ gap: 6 }}>
+                  {!viewer && mode === "video" && (src || winRec) && <button className="btn small" onClick={() => openViewer(true)}>⛶ Visualitzador</button>}
+                  {!viewer && <button className="btn small secondary" onClick={() => setEditButtons((v) => !v)}>{editButtons ? "Fet" : "Editar botons"}</button>}
+                </span>
               </div>
               {editButtons ? (
                 <ButtonEditor buttons={buttons} onChange={setButtons} onMsg={setMsg} />
               ) : (
                 <div className={`tag-grid${team === "rival" ? " rival" : ""}`}>
-                  {buttons.map((b) => (
+                  {buttons.map((b, i) => (
                     <button key={b.id} type="button" className="tag-btn esc" style={{ "--c": b.color } as CSSProperties} onClick={() => tag(b)}>
+                      {viewer && i < 9 && <kbd className="tag-key">{i + 1}</kbd>}
                       {b.label}
                     </button>
                   ))}
                 </div>
               )}
+              {viewer && (
+                <div className="an-cuts">
+                  <div className="row between">
+                    <b className="esc">✂ Talls ({events.length})</b>
+                    <button type="button" className="btn small" disabled={!events.length || !!winRec} onClick={() => { openViewer(false); setTab("clips"); }}>Fer el vídeo de talls →</button>
+                  </div>
+                  <ul>
+                    {(recent.length ? recent.map((rid) => events.find((x) => x.id === rid)).filter((x): x is AEvent => !!x) : events.slice().reverse()).slice(0, 6).map((ev) => (
+                      <li key={ev.id} style={{ "--c": ev.color } as CSSProperties}>
+                        <button type="button" disabled={!src || !!winRec} onClick={() => seek(ev)} aria-label={`Veure ${ev.action}`}>▶</button>
+                        <span><b>{ev.action}</b> · {minuteOf(match, ev.t)}{ev.team === "rival" ? " · rival" : ""}</span>
+                        <button type="button" onClick={() => setDetail(ev.id)} aria-label="Detalls">✎</button>
+                        <button type="button" onClick={() => delEvent(ev.id)} aria-label="Esborrar">✕</button>
+                      </li>
+                    ))}
+                  </ul>
+                  {winRec && <p className="muted small" style={{ margin: "6px 0 0" }}>Mentre captures, els talls es van apuntant. En «Aturar i analitzar» ja els podràs veure i exportar.</p>}
+                </div>
+              )}
             </section>
           )}
 
-          {tab === "list" && (
+          {tab === "list" && !viewer && (
             <EventList
               match={match}
               events={events}
@@ -880,20 +963,20 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
             />
           )}
 
-          {tab === "clips" && (
+          {tab === "clips" && !viewer && (
             <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo || src?.remote ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")}
               onRecord={recAny}
               embed={src?.kind === "embed"} onRecordWindow={() => void startWinRec()} />
           )}
 
-          {tab === "stats" && (
+          {tab === "stats" && !viewer && (
             <>
               <Insights match={match} events={events} name={(pid) => name(pid)} />
               <AnalysisStats match={match} events={events} players={players} />
             </>
           )}
 
-          {tab === "report" && (
+          {tab === "report" && !viewer && (
             <>
               <section className="card no-print">
                 <label className="field" htmlFor="anotes">Notes de l&apos;entrenador (surten a l&apos;informe)</label>
@@ -1170,6 +1253,24 @@ function RecOverlay({ rec, title, onStart, onTeam, onClose, labels }: {
       )}
       {!(rec.auto && rec.phase === "run") && <button type="button" className="rec-x" onClick={onClose} aria-label="Sortir del mode gravació">✕</button>}
       {rec.phase === "run" && <i className="rec-progress" style={{ width: `${((rec.i + 1) / Math.max(1, rec.n)) * 100}%` }} />}
+    </div>
+  );
+}
+
+/** El que s'està capturant d'una altra finestra, en directe dins l'app. */
+function LiveCapture({ stream }: { stream: MediaStream }) {
+  const v = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const el = v.current;
+    if (!el) return;
+    el.srcObject = stream;
+    void el.play().catch(() => {});
+    return () => { el.srcObject = null; };
+  }, [stream]);
+  return (
+    <div className="an-live-cap">
+      <video ref={v} muted playsInline autoPlay />
+      <span className="an-live-badge"><i /> CAPTURANT</span>
     </div>
   );
 }

@@ -36,7 +36,12 @@ export async function startTabRecording(match_id: string, baseName: string, opts
   };
   const stopped = new Promise<void>((ok) => { rec.onstop = () => ok(); });
   rec.start(4000);
+  const startedAt = performance.now();
   return {
+    /** El que s'està gravant (per veure-ho en directe dins l'app). */
+    stream,
+    /** Segons gravats fins ara: coincideix amb el temps del vídeo que es desarà. */
+    elapsed: () => (performance.now() - startedAt) / 1000,
     /** Atura i desa a «Vídeos fets». Torna l'id del vídeo. */
     async stop(): Promise<string> {
       // Primer es desa tot; la captura s'atura al final (alguns navegadors tanquen coses en aturar-la)
