@@ -7,6 +7,7 @@ import { AddToCorrection, CorrectionsPanel } from "@/components/corrections";
 import { RivalPanel } from "@/components/rival-scout";
 import { AnalysisSeason } from "@/components/analysis-season";
 import { ClipExport } from "@/components/clip-export";
+import { ImportedClips } from "@/components/imported-clips";
 import { TacticsHome } from "@/components/tactics-home";
 import { AnalysisStats, ZonePitch, type APlayer } from "@/components/analysis-stats";
 import { DrawingEditor, DrawingOverlay, type Shape } from "@/components/telestrator";
@@ -995,6 +996,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
             />
           )}
 
+          {tab === "clips" && !viewer && <ImportedClips match={match} buttons={buttons} />}
           {tab === "clips" && !viewer && (
             <ClipExport match={match} events={events} buttons={buttons} file={videoFile ?? (src?.veo || src?.remote ? src.url : null)} playerName={(pid) => (pid ? name(pid) : "")}
               onRecord={recAny}

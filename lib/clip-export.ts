@@ -24,6 +24,8 @@ export type Clip = {
   drawing?: Shape[] | null;
   drawAt?: number; // segon del vídeo on es congela per mostrar el dibuix
   team?: "us" | "rival"; // per posar l'escut de l'equip a l'etiqueta
+  /** Un tall fet fora de l'app: es llegeix d'aquest fitxer (start/end són dins d'aquest fitxer). */
+  src?: File;
 };
 export type Section = { title: string; sub: string; color: string; clips: Clip[] };
 
@@ -66,6 +68,7 @@ export async function exportClips(file: File | string, sections: Section[], o: E
     throw new ExportError("Aquest navegador no pot fer vídeos. Fes servir Safari (iPad/iPhone actualitzat) o Chrome.");
   }
   const input = new mb.Input({ source: typeof file === "string" ? new mb.UrlSource(file) : new mb.BlobSource(file), formats: mb.ALL_FORMATS });
+  const inputs: InstanceType<typeof mb.Input>[] = [];
   try {
     const vTrack = await input.getPrimaryVideoTrack();
     if (!vTrack || !(await vTrack.canDecode())) throw new ExportError("No es pot llegir el vídeo d'aquest fitxer en aquest dispositiu.");
@@ -101,6 +104,24 @@ export async function exportClips(file: File | string, sections: Section[], o: E
 
     const frames = new mb.CanvasSink(vTrack, { width: W, height: H, fit: "contain", poolSize: 2 });
     const audio = aTrack && aSrc ? new mb.AudioSampleSink(aTrack) : null;
+    // Talls d'altres fitxers (fets fora de l'app): cada fitxer s'obre un sol cop.
+    // L'àudio només s'hi posa si té el mateix format que el principal (si no, va en silenci).
+    type Src = { frames: InstanceType<typeof mb.CanvasSink>; audio: InstanceType<typeof mb.AudioSampleSink> | null };
+    const extra = new Map<File, Src>();
+    const sourceOf = async (c: Clip): Promise<Src> => {
+      if (!c.src) return { frames, audio };
+      const got = extra.get(c.src);
+      if (got) return got;
+      const inp = new mb.Input({ source: new mb.BlobSource(c.src), formats: mb.ALL_FORMATS });
+      inputs.push(inp);
+      const vt = await inp.getPrimaryVideoTrack();
+      if (!vt || !(await vt.canDecode())) throw new ExportError(`No es pot llegir el tall «${c.src.name}» en aquest dispositiu.`);
+      const at = await inp.getPrimaryAudioTrack();
+      const sameAudio = !!(at && aTrack && aSrc && at.sampleRate === aTrack.sampleRate && at.numberOfChannels === aTrack.numberOfChannels && (await at.canDecode().catch(() => false)));
+      const src: Src = { frames: new mb.CanvasSink(vt, { width: W, height: H, fit: "contain", poolSize: 2 }), audio: sameAudio ? new mb.AudioSampleSink(at!) : null };
+      extra.set(c.src, src);
+      return src;
+    };
     const total = totalSeconds(sections, o);
     let cursor = 0; // segons ja escrits al vídeo nou
     const progress = () => o.onProgress?.(Math.min(1, cursor / total));
@@ -164,7 +185,8 @@ export async function exportClips(file: File | string, sections: Section[], o: E
         let frozen = false;
         let shift = 0; // segons afegits per la pausa
         let last = clip.start;
-        for await (const f of frames.canvases(clip.start, clip.end)) {
+        const S = await sourceOf(clip);
+        for await (const f of S.frames.canvases(clip.start, clip.end)) {
           check();
           if (f.timestamp + f.duration <= clip.start) continue;
           const t = Math.max(f.timestamp, clip.start);
@@ -191,7 +213,15 @@ export async function exportClips(file: File | string, sections: Section[], o: E
         }
         const clipLen = Math.max(0, last - clip.start);
         // Àudio del tall, retallat exactament al tros i amb el mateix desplaçament per la pausa.
-        if (audio && aSrc) {
+        if (aSrc && !S.audio) {
+          // tall sense àudio compatible: silenci de la mateixa durada
+          const save = cursor;
+          cursor = base;
+          await silence(clipLen + shift);
+          cursor = save;
+        }
+        if (S.audio && aSrc) {
+          const audio = S.audio;
           const clipEnd = clip.start + clipLen;
           const pausedAt = freezeAt != null && frozen ? freezeAt : null;
           let pausedAdded = false;
@@ -240,6 +270,7 @@ export async function exportClips(file: File | string, sections: Section[], o: E
     return new Blob([buf], { type: "video/mp4" });
   } finally {
     input.dispose();
+    for (const i of inputs) i.dispose();
   }
 }
 

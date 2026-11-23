@@ -3737,3 +3737,44 @@ img.pcard-photo, .p-hero-photo img { filter: drop-shadow(0 0 1px rgba(255,238,18
   .an-viewer .an-controls { gap: 4px; }
   .an-viewer .an-controls button, .an-viewer .an-controls select { min-height: 36px; padding: 4px 8px; }
 }
+
+/* ===== Talls fets fora de l'app ===== */
+.imp-add { gap: 6px; flex-wrap: nowrap; }
+.imp-add select { flex: 1; min-width: 0; }
+.imp-groups { display: grid; gap: 10px; margin-top: 12px; }
+.imp-group { border: 1px solid var(--vora); border-left: 6px solid var(--c); border-radius: 12px; padding: 8px 10px; background: #fff; }
+.imp-group-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.imp-group-h .esc { color: var(--navy); font-size: 1.15rem; }
+.imp-group ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.imp-group li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; }
+.imp-name { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: center; text-align: left; background: var(--fons-suau, #eef2fb); border: 0; border-radius: 10px; padding: 6px 10px; cursor: pointer; font: inherit; min-width: 0; }
+.imp-name > span { grid-row: span 2; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--c); color: #fff; font-size: .75rem; }
+.imp-name b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--navy); }
+.imp-name small { color: var(--suau); font-size: .75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imp-group li select { max-width: 130px; font-size: .8rem; padding: 6px; border-radius: 8px; }
+.imp-act { display: flex; gap: 3px; }
+.imp-act button { min-width: 32px; min-height: 34px; border: 1px solid var(--vora); background: #fff; border-radius: 8px; cursor: pointer; }
+.imp-act button:disabled { opacity: .35; cursor: default; }
+@media (max-width: 520px) { .imp-group li { grid-template-columns: minmax(0, 1fr) auto; } .imp-group li select { grid-column: 1; max-width: none; } .imp-act { grid-row: 1 / span 2; grid-column: 2; flex-direction: column; } }
+.imp-export { margin-top: 12px; display: grid; gap: 6px; }
+.imp-job { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.imp-job .bar { grid-column: 1 / -1; height: 8px; border-radius: 99px; background: var(--vora); overflow: hidden; }
+.imp-job .bar i { display: block; height: 100%; background: var(--navy); transition: width .3s; }
+.imp-modal { position: fixed; inset: 0; z-index: 80; background: rgba(3,10,36,.7); display: grid; place-items: center; padding: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
+.imp-sheet { width: min(760px, 100%); max-height: 100%; overflow: auto; background: #fff; border-radius: 18px; padding: 14px; box-shadow: 0 30px 60px rgba(0,0,0,.4); }
+.imp-sheet .esc { color: var(--navy); font-size: 1.2rem; }
+.imp-video { display: block; width: 100%; max-height: 46dvh; background: #000; border-radius: 10px; margin-top: 8px; }
+.imp-trim { position: relative; height: 34px; margin-top: 10px; }
+.imp-rail { position: absolute; left: 0; right: 0; top: 13px; height: 8px; border-radius: 99px; background: var(--vora); }
+.imp-rail .sel { position: absolute; top: 0; bottom: 0; left: var(--a); right: calc(100% - var(--b)); background: var(--or); border-radius: 99px; }
+.imp-rail .now { position: absolute; top: -5px; bottom: -5px; left: var(--t); width: 2px; background: var(--navy); }
+.imp-trim input[type=range] { position: absolute; inset: 0; width: 100%; margin: 0; background: transparent; pointer-events: none; -webkit-appearance: none; appearance: none; }
+.imp-trim input[type=range]::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 22px; height: 30px; border-radius: 6px; background: var(--navy); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.3); cursor: ew-resize; }
+.imp-trim input[type=range]::-moz-range-thumb { pointer-events: auto; width: 20px; height: 28px; border-radius: 6px; background: var(--navy); border: 2px solid #fff; cursor: ew-resize; }
+.imp-trim input[type=range]::-webkit-slider-runnable-track { background: transparent; }
+.imp-times { display: flex; justify-content: space-between; font-size: .85rem; margin-top: 4px; }
+.imp-btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; justify-content: center; }
+.imp-btns .main { background: var(--navy); color: var(--or); }
+.imp-pick .tag-btn { min-height: 44px; font-size: .9rem; opacity: .55; }
+.imp-pick .tag-btn.on { opacity: 1; box-shadow: 0 0 0 3px var(--or); }
+.imp-pick .tag-btn { color: #fff; }
