@@ -8,6 +8,7 @@ import { RivalPanel } from "@/components/rival-scout";
 import { AnalysisSeason } from "@/components/analysis-season";
 import { ClipExport } from "@/components/clip-export";
 import { ImportedClips } from "@/components/imported-clips";
+import { ShowLayer, ShowRemote } from "@/components/show-mode";
 import { TacticsHome } from "@/components/tactics-home";
 import { AnalysisStats, ZonePitch, type APlayer } from "@/components/analysis-stats";
 import { DrawingEditor, DrawingOverlay, type Shape } from "@/components/telestrator";
@@ -291,6 +292,12 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   // Visualitzador: el vídeo gran amb la botonera al costat (cada botó fa un tall)
   const [viewer, setViewer] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  // Mode vestidor: els talls a la tele, un a un, amb el títol gran (es passen amb fletxes, un comandament o el mòbil)
+  type Show = { list: AEvent[]; i: number; phase: "card" | "play" | "end" };
+  const [show, setShow] = useState<Show | null>(null);
+  const showRef = useRef<Show | null>(null);
+  useEffect(() => { showRef.current = show; }, [show]);
+  const [remote, setRemote] = useState(false);
   const winRecorder = useRef<Awaited<ReturnType<typeof startTabRecording>> | null>(null);
   const [recorded, setRecorded] = useState<SavedVideo[]>([]);
   useEffect(() => {
@@ -376,6 +383,11 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     if (rp && match) {
       const it = rp.items[rp.i];
       if (it?.kind === "clip" && !rp.timer && t >= toVideo(match, it.ev.t) + Number(it.ev.post_s)) recStep(rp.i + 1);
+    }
+    const sh = showRef.current;
+    if (sh && sh.phase === "play" && match) {
+      const e = sh.list[sh.i];
+      if (t >= toVideo(match, e.t) + Number(e.post_s)) { player.current?.pause(); setShow({ ...sh, phase: "end" }); }
     }
     const q = queue.current;
     if (q && match) {
@@ -534,6 +546,48 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [viewer, buttons]);
+
+  // Mode vestidor: el títol es veu 2,5 s i després comença el tall sol
+  useEffect(() => {
+    if (!show || show.phase !== "card") return;
+    const t = setTimeout(() => showPlay(), 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show?.i, show?.phase, show]);
+  // Fletxes, espai i comandaments de presentacions (Av Pàg / Re Pàg)
+  useEffect(() => {
+    if (!show) return;
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key;
+      if (["ArrowRight", "PageDown", "ArrowDown"].includes(k)) { e.preventDefault(); showNext(); }
+      else if (["ArrowLeft", "PageUp", "ArrowUp"].includes(k)) { e.preventDefault(); showPrev(); }
+      else if (k === " " || k === "Enter") { e.preventDefault(); showToggle(); }
+      else if (k === "r" || k === "R") showPlay();
+      else if (k === "Escape") showExit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!show]);
+  // El mòbil com a comandament: l'ordinador de la tele escolta les ordres i diu què ensenya
+  const showChan = useRef<ReturnType<ReturnType<typeof supabase>["channel"]> | null>(null);
+  useEffect(() => {
+    if (!show || !id) return;
+    let ch: ReturnType<ReturnType<typeof supabase>["channel"]>;
+    try { ch = supabase().channel(`vestidor-${id}`, { config: { broadcast: { self: false } } }); } catch { return; }
+    ch.on("broadcast", { event: "cmd" }, ({ payload }) => {
+      const c = (payload as { c?: string })?.c;
+      if (c === "next") showNext(); else if (c === "prev") showPrev(); else if (c === "toggle") showToggle(); else if (c === "replay") showPlay(); else if (c === "exit") showExit();
+    }).subscribe();
+    showChan.current = ch;
+    return () => { void supabase().removeChannel(ch); showChan.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!show, id]);
+  useEffect(() => {
+    if (!show || !showChan.current) return;
+    const e = show.list[show.i];
+    void showChan.current.send({ type: "broadcast", event: "state", payload: { i: show.i, n: show.list.length, phase: show.phase, label: e.action, color: e.color, min: match ? minuteOf(match, e.t) : "" } });
+  }, [show, match]);
 
   if (error) return (<><p className="msg error">{error}</p><button className="btn small secondary" onClick={onBack}>← Partits</button></>);
   if (!match) return <Loading />;
@@ -755,6 +809,58 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     setDrawEdit(e);
   };
 
+  function startShow(list: AEvent[]) {
+    if (!src || mode !== "video" || winRec) return setMsg({ ok: false, text: "Per al mode vestidor, primer obre el vídeo del partit." });
+    if (!list.length) return setMsg({ ok: false, text: "No hi ha cap acció per ensenyar." });
+    queue.current = null; setPlaying(null); setViewer(false);
+    player.current?.pause();
+    setShow({ list, i: 0, phase: "card" });
+    document.documentElement.classList.add("rec-on");
+    try { if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => {}); } catch { /* sense pantalla completa */ }
+  }
+  function showPlay() {
+    const sh = showRef.current;
+    if (!sh || !match) return;
+    const e = sh.list[sh.i];
+    watch.current = { ev: e, shown: false };
+    setFrozen(null);
+    player.current?.seek(Math.max(0, toVideo(match, e.t) - Number(e.pre_s)));
+    player.current?.play();
+    setShow({ ...sh, phase: "play" });
+  }
+  function showGo(i: number) {
+    const sh = showRef.current;
+    if (!sh) return;
+    player.current?.pause();
+    watch.current = null; setFrozen(null);
+    setShow({ ...sh, i: Math.max(0, Math.min(sh.list.length - 1, i)), phase: "card" });
+  }
+  function showNext() {
+    const sh = showRef.current;
+    if (!sh) return;
+    if (sh.phase === "card") return showPlay();
+    if (sh.i < sh.list.length - 1) showGo(sh.i + 1);
+  }
+  function showPrev() {
+    const sh = showRef.current;
+    if (!sh) return;
+    if (sh.phase !== "card") return showGo(sh.i); // primer, a l'inici del mateix tall
+    showGo(sh.i - 1);
+  }
+  function showToggle() {
+    const sh = showRef.current;
+    if (!sh) return;
+    if (sh.phase !== "play") return showNext();
+    if (player.current?.paused()) player.current.play(); else player.current?.pause();
+  }
+  function showExit() {
+    player.current?.pause();
+    watch.current = null; setFrozen(null);
+    setShow(null);
+    document.documentElement.classList.remove("rec-on");
+    try { if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {}); } catch { /* res */ }
+  }
+
   function openViewer(on: boolean) {
     setViewer(on);
     try {
@@ -822,13 +928,14 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                 </div>
               ) : (
                 <>
-                  <div className={`an-stage${rec ? " rec" : ""}`}>
+                  <div className={`an-stage${rec || show ? " rec" : ""}`}>
                     {src && (
                       <div hidden={!!winRec}>
                         <VideoPlayer key={`${src.url}-${frameKey}`} ref={player} kind={src.kind} src={src.url} onTick={winRec ? undefined : onTick} onFail={linkFailed} />
                       </div>
                     )}
                     {winRec && <LiveCapture stream={winRec.stream} />}
+                    {show && match && <ShowLayer key={`${show.i}-${show.phase}`} show={show} match={match} who={(e) => (e.team === "rival" ? match.rival || "Rival" : name(e.player_id))} onNext={showNext} onPrev={showPrev} onReplay={showPlay} onToggle={showToggle} onExit={showExit} />}
                     {rec && <RecOverlay rec={rec} title={match.title} onStart={(t, auto) => void recStart(t, auto)} onTeam={(t) => setRec((r) => r && { ...r, team: t })} onClose={recClose} labels={teamLabels(match)} />}
                     {frozen && !drawEdit && <DrawingOverlay shapes={frozen} />}
                     {drawEdit && (
@@ -874,6 +981,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
                       {[0.25, 0.5, 1, 1.5, 2].map((r) => <option key={r} value={r}>{r}x</option>)}
                     </select>
                     <button type="button" className="an-small-link an-viewer-btn" onClick={() => openViewer(!viewer)}>{viewer ? "✕ Sortir del visualitzador" : "⛶ Visualitzador"}</button>
+                    <button type="button" className="an-small-link" onClick={() => startShow(events)}>📺 Vestidor</button>
                     <button type="button" className="an-small-link" onClick={recAny}>🎬 Mode gravació</button>
                     {canRecordTab() && <button type="button" className="an-small-link" onClick={() => void startWinRec()}>🖥 Capturar</button>}
                     <button type="button" className="an-small-link" onClick={() => setSrc(null)}>Canviar</button>
@@ -988,6 +1096,8 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
               onSeek={seek}
               onEdit={setDetail}
               onDelete={delEvent}
+              onShow={startShow}
+              onRemote={() => setRemote(true)}
               onPlayAll={(list) => {
                 if (!list.length) return;
                 queue.current = { list, i: 0 };
@@ -1024,6 +1134,7 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
       </div>
 
+      {remote && <ShowRemote matchId={match.id} title={match.title} onClose={() => setRemote(false)} />}
       {detailEv && (
         <EventDetail
           ev={detailEv}
@@ -1075,9 +1186,10 @@ function Timeline({ match, events, now, onSeek }: { match: AMatch; events: AEven
   );
 }
 
-function EventList({ match, events, players, name, canPlay, onSeek, onEdit, onDelete, onPlayAll }: {
+function EventList({ match, events, players, name, canPlay, onSeek, onEdit, onDelete, onPlayAll, onShow, onRemote }: {
   match: AMatch; events: AEvent[]; players: APlayer[]; name: (pid: string | null) => string; canPlay: boolean;
   onSeek: (e: AEvent) => void; onEdit: (id: string) => void; onDelete: (id: string) => void; onPlayAll: (l: AEvent[]) => void;
+  onShow: (l: AEvent[]) => void; onRemote: () => void;
 }) {
   const [fa, setFa] = useState("");
   const [ft, setFt] = useState("");
@@ -1100,6 +1212,10 @@ function EventList({ match, events, players, name, canPlay, onSeek, onEdit, onDe
       <button className="btn block" disabled={!canPlay || list.length === 0} onClick={() => onPlayAll(list)} style={{ margin: "8px 0" }}>
         ▶ Reproduir {list.length === events.length ? "totes" : "les filtrades"} ({list.length})
       </button>
+      <div className="row" style={{ gap: 6, marginBottom: 8 }}>
+        <button className="btn small secondary" style={{ flex: 1 }} disabled={!canPlay || list.length === 0} onClick={() => onShow(list)}>📺 Ensenyar-les al vestidor</button>
+        <button className="btn small secondary" onClick={onRemote} title="Fer servir aquest mòbil per passar els talls de la tele">📱 Comandament</button>
+      </div>
       {!canPlay && <p className="muted small" style={{ marginTop: 0 }}>Obre el vídeo per veure els clips.</p>}
       {list.length === 0 ? (
         <p className="muted">Cap acció.</p>
@@ -1308,3 +1424,4 @@ function LiveCapture({ stream }: { stream: MediaStream }) {
     </div>
   );
 }
+
