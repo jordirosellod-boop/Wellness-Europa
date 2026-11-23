@@ -243,6 +243,15 @@ async function resolveVeo(link: string): Promise<{ video_url: string; title: str
   return j;
 }
 
+/** Qualsevol web pública amb un vídeo: el servidor busca l'adreça del vídeo (sense iniciar sessió enlloc). */
+async function resolveAny(link: string): Promise<{ video_url: string; type: "mp4" | "hls"; title: string | null }> {
+  const { data } = await supabase().auth.getSession();
+  const res = await fetch(`/api/video/resolve?url=${encodeURIComponent(link)}`, { headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` }, cache: "no-store" });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error ?? `Error ${res.status}`);
+  return j;
+}
+
 function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
   const [match, setMatch] = useState<AMatch | null>(null);
   const [events, setEvents] = useState<AEvent[]>([]);
@@ -326,7 +335,12 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
         setTab("list");
       }
       if (mm.video_source === "youtube" && mm.video_ref) setSrc({ kind: "youtube", url: mm.video_ref });
-      if (mm.video_source === "link" && mm.video_ref) { const l = classifyLink(mm.video_ref); if (l) setSrc(srcOf(l)); }
+      if (mm.video_source === "link" && mm.video_ref) {
+        const l = classifyLink(mm.video_ref);
+        if (l && (l.kind === "embed" || l.kind === "drive")) {
+          resolveAny(l.kind === "drive" ? mm.video_ref : l.url).then((v) => setSrc({ kind: "file", url: v.video_url, remote: true }), () => setSrc(srcOf(l)));
+        } else if (l) setSrc(srcOf(l));
+      }
       // Veo: l'adreça del vídeo pot caducar, així que es torna a demanar cada cop a partir de l'enllaç.
       if (mm.video_source === "veo" && mm.video_ref) {
         resolveVeo(mm.video_ref).then(
@@ -604,6 +618,24 @@ function Workspace({ id, onBack }: { id: string; onBack: () => void }) {
     }
     if (l.kind === "youtube") return openYoutube();
     setMsg(null);
+    // Pàgines (no fitxers) i Google Drive: primer es busca el vídeo de dins, per poder-lo controlar i tallar
+    if (l.kind === "embed" || l.kind === "drive") {
+      setVeoBusy(true);
+      try {
+        const v = await resolveAny(l.kind === "drive" ? ytUrl.trim() : l.url);
+        setSrc({ kind: "file", url: v.video_url, remote: true });
+        setVideoFile(null);
+        setMode("video");
+        setMsg({ ok: true, text: "Vídeo trobat ✓ Ja pots marcar, dibuixar i fer els talls." });
+        const ref = ytUrl.replace(/\s+/g, "").slice(0, 1000);
+        if (match?.video_ref !== ref || match?.video_source !== "link") saveMatch({ video_source: "link", video_ref: ref });
+        return;
+      } catch (e) {
+        setMsg({ ok: false, text: `${e instanceof Error ? e.message : String(e)} L'obro tal com és: si el vídeo es veu però no pots marcar, toca «🖥 Capturar».` });
+      } finally {
+        setVeoBusy(false);
+      }
+    }
     setSrc(srcOf(l));
     setVideoFile(null);
     setMode("video");

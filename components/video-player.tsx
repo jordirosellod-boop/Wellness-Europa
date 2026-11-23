@@ -64,6 +64,23 @@ function loadVimeo() {
 
 export type PlayerKind = "file" | "youtube" | "vimeo" | "embed";
 
+// Vídeos en directe/HLS (.m3u8): Safari els reprodueix sol; als altres navegadors es fa servir hls.js
+type HlsCtor = { isSupported: () => boolean; new (): { loadSource: (s: string) => void; attachMedia: (v: HTMLVideoElement) => void; destroy: () => void; on: (ev: string, cb: (e: unknown, d: { fatal?: boolean }) => void) => void }; Events: { ERROR: string } };
+let hlsReady: Promise<HlsCtor> | null = null;
+function loadHls(): Promise<HlsCtor> {
+  hlsReady ??= new Promise((resolve, reject) => {
+    const w = window as unknown as { Hls?: HlsCtor };
+    if (w.Hls) return resolve(w.Hls);
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
+    s.onload = () => (w.Hls ? resolve(w.Hls) : reject(new Error("hls")));
+    s.onerror = () => { hlsReady = null; reject(new Error("hls")); };
+    document.head.appendChild(s);
+  });
+  return hlsReady;
+}
+const isHlsUrl = (s: string) => /\.m3u8(\?|#|$)/i.test(s);
+
 /**
  * Reproductor: "src" és un arxiu del dispositiu (blob:) o un enllaç a un fitxer de vídeo, un identificador de YouTube,
  * l'adreça del reproductor de Vimeo o qualsevol altra pàgina (embed: l'app no la pot controlar). El vídeo mai es puja enlloc.
@@ -133,6 +150,26 @@ export const VideoPlayer = forwardRef<VideoHandle, { kind: PlayerKind; src: stri
       };
     }, [kind, src]);
 
+    // HLS (.m3u8) fora de Safari
+    const hlsMode = kind === "file" && isHlsUrl(src);
+    useEffect(() => {
+      const el = video.current;
+      if (!hlsMode || !el) return;
+      if (el.canPlayType("application/vnd.apple.mpegurl")) { el.src = src; return; }
+      let alive = true;
+      let h: { destroy: () => void } | null = null;
+      loadHls().then((Hls) => {
+        if (!alive || !Hls.isSupported()) { if (alive) onFail?.(); return; }
+        const x = new Hls();
+        x.on(Hls.Events.ERROR, (_e, d) => { if (d?.fatal) onFail?.(); });
+        x.loadSource(src);
+        x.attachMedia(el);
+        h = x;
+      }, () => onFail?.());
+      return () => { alive = false; h?.destroy(); };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hlsMode, src]);
+
     // Avisa del temps actual unes 4 vegades per segon (per al rellotge i la llista).
     useEffect(() => {
       if (!onTick) return;
@@ -154,7 +191,7 @@ export const VideoPlayer = forwardRef<VideoHandle, { kind: PlayerKind; src: stri
       </div>
     );
     return kind === "file" ? (
-      <video ref={video} className="an-video" src={src} controls playsInline preload="metadata" onError={onFail} />
+      <video ref={video} className="an-video" src={hlsMode ? undefined : src} controls playsInline preload="metadata" onError={hlsMode ? undefined : onFail} />
     ) : (
       <div className="an-video yt">
         <div ref={ytBox} className="yt-box" />
