@@ -71,3 +71,33 @@ export async function fetchMyNextMeeting(meId: string, today: string): Promise<(
   const round = Array.isArray(r.meeting_rounds) ? r.meeting_rounds[0] : r.meeting_rounds;
   return { id: r.id, round_id: r.round_id, day: r.day, start_time: r.start_time, player_id: r.player_id, done: r.done, title: round?.title ?? "Reunió", duration_min: round?.duration_min ?? 15 };
 }
+
+/**
+ * Ajornar: els dies triats no hi ha reunions. Totes les reunions pendents des del primer d'aquests dies
+ * es tornen a repartir, en el mateix ordre, a les franges habituals següents (saltant els dies triats i, si cal, els que no hi ha entreno).
+ * Les reunions ja fetes i les d'abans d'aquell dia no es toquen. Funció pura: diu què cal esborrar i què cal crear.
+ */
+export function postponePlan(slots: MeetingSlot[], noMeetingDays: string[], minutes: number, windows: Window[] = DEFAULT_WINDOWS, alsoSkip: Set<string> = new Set()) {
+  const days = [...new Set(noMeetingDays)].sort();
+  if (!days.length) return null;
+  const from = days[0];
+  const moving = slots.filter((s) => !s.done && s.day >= from).sort((a, b) => a.day.localeCompare(b.day) || a.start_time.localeCompare(b.start_time));
+  const order = moving.filter((s) => s.player_id).map((s) => s.player_id!);
+  if (!order.length) return { from, remove: moving.map((s) => s.id), insert: [] as { day: string; start_time: string; player_id: string | null }[], moved: 0, last: null as string | null };
+  // Hores ocupades per reunions que no es mouen (p. ex. ja fetes): no s'hi pot posar ningú
+  const kept = new Set(slots.filter((s) => !moving.includes(s)).map((s) => `${s.day}|${hm(s.start_time)}`));
+  const skip = new Set([...days, ...alsoSkip]);
+  const plan = planSlots(order.concat(Array(kept.size).fill("__")), from, windows, minutes, skip)
+    .filter((p) => !kept.has(`${p.day}|${p.start_time}`));
+  // Es reparteixen les jugadores a les franges lliures en ordre (les marques "__" només feien lloc)
+  const out: { day: string; start_time: string; player_id: string | null }[] = [];
+  let i = 0;
+  for (const p of plan) {
+    if (i < order.length) out.push({ day: p.day, start_time: p.start_time, player_id: order[i++] });
+    else if (out.length && p.day === out[out.length - 1].day) out.push({ day: p.day, start_time: p.start_time, player_id: null });
+  }
+  if (i < order.length) return null; // no hi ha prou franges
+  const before = new Map(moving.filter((s) => s.player_id).map((s) => [s.player_id!, `${s.day}|${hm(s.start_time)}`]));
+  const moved = out.filter((p) => p.player_id && before.get(p.player_id) !== `${p.day}|${p.start_time}`).length;
+  return { from, remove: moving.map((s) => s.id), insert: out, moved, last: out.filter((p) => p.player_id).at(-1)?.day ?? null };
+}

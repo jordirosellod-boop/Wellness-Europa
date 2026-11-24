@@ -10,7 +10,7 @@ import { fetchBibPlayers, type BibPlayer } from "@/lib/bibs";
 import { addDays, fmtShort, isoDow } from "@/lib/dates";
 import { drawMeetingsImage, groupDays, seasonOf } from "@/lib/meetings-image";
 import {
-  DEFAULT_WINDOWS, DOW_NAMES, endOf, fetchRounds, fetchSlots, hm, planSlots, windowOf,
+  DEFAULT_WINDOWS, DOW_NAMES, endOf, fetchRounds, fetchSlots, hm, planSlots, postponePlan, windowOf,
   type MeetingRound, type MeetingSlot, type Window,
 } from "@/lib/meetings";
 import { fetchAll, supabase } from "@/lib/supabase";
@@ -177,6 +177,9 @@ function RoundView({ round, onBack, onChanged }: { round: MeetingRound; onBack: 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [title, setTitle] = useState(round.title);
   const [adding, setAdding] = useState<{ day: string; time: string } | null>(null);
+  // Ajornar: dies sense reunions (tot el que és pendent es reparteix a les franges habituals següents)
+  const [postpone, setPostpone] = useState<{ days: string[]; onlyTraining: boolean; extra: string } | null>(null);
+  const [noTraining, setNoTraining] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     const s = await fetchSlots(round.id);
@@ -276,6 +279,48 @@ function RoundView({ round, onBack, onChanged }: { round: MeetingRound; onBack: 
     if (error) return setMsg({ ok: false, text: error.message });
     onChanged();
   }
+  // Dies sense entreno (per no posar-hi reunions en ajornar)
+  useEffect(() => {
+    if (!postpone?.onlyTraining || !postpone.days.length) return;
+    const from = [...postpone.days].sort()[0];
+    let alive = true;
+    fetchAll<{ session_date: string }>((f, t) => supabase().from("sessions").select("session_date").eq("cancelled", false).gte("session_date", from).lte("session_date", addDays(from, 120)).order("session_date").order("id").range(f, t))
+      .then((l) => { if (!alive) return; const has = new Set(l.map((x) => x.session_date)); setNoTraining(new Set(Array.from({ length: 121 }, (_, i) => addDays(from, i)).filter((d) => !has.has(d)))); }, () => {});
+    return () => { alive = false; };
+  }, [postpone?.onlyTraining, postpone?.days]);
+  const preview = useMemo(() => {
+    if (!postpone || !slots) return null;
+    return postponePlan(slots, postpone.days, round.duration_min, DEFAULT_WINDOWS, postpone.onlyTraining ? noTraining : new Set());
+  }, [postpone, slots, round.duration_min, noTraining]);
+  async function applyPostpone() {
+    if (!postpone || !preview || !slots) return;
+    setBusy(true); setMsg(null);
+    const sb = supabase();
+    const old = slots.filter((s) => preview.remove.includes(s.id));
+    const { error: e1 } = await sb.from("meeting_slots").delete().in("id", preview.remove);
+    if (e1) { setBusy(false); return setMsg({ ok: false, text: `No s'han pogut moure: ${e1.message}` }); }
+    const { data: ins, error: e2 } = preview.insert.length
+      ? await sb.from("meeting_slots").insert(preview.insert.map((p) => ({ ...p, round_id: round.id }))).select("id, player_id")
+      : { data: [], error: null };
+    if (e2) {
+      // Si no s'ha pogut, es torna a deixar tot com estava
+      await sb.from("meeting_slots").insert(old.map((o) => ({ id: o.id, round_id: o.round_id, day: o.day, start_time: o.start_time, player_id: o.player_id, done: o.done })));
+      setBusy(false); await load();
+      return setMsg({ ok: false, text: `No s'han pogut moure (tot queda com estava): ${e2.message}` });
+    }
+    await load();
+    let text = `Fet ✓ ${preview.moved} reunions mogudes${preview.last ? `; l'última, el ${fmtShort(preview.last)}` : ""}.`;
+    if (round.published && preview.moved) {
+      try {
+        const ids = (ins ?? []).filter((x) => x.player_id).map((x) => x.id as string);
+        const j = await authed("/api/push/meetings", ids.length <= 10 ? { round_id: round.id, slot_ids: ids } : { round_id: round.id });
+        text += ` Avís enviat a ${j.sent ?? 0} mòbils.`;
+      } catch { text += " (no s'ha pogut enviar l'avís)"; }
+    }
+    setBusy(false); setPostpone(null);
+    setMsg({ ok: true, text });
+  }
+
   async function remove() {
     if (!window.confirm(`Esborrar «${round.title}» i totes les seves reunions?`)) return;
     setBusy(true);
@@ -307,6 +352,36 @@ function RoundView({ round, onBack, onChanged }: { round: MeetingRound; onBack: 
         </div>
         {msg && <p className={`msg${msg.ok ? " ok" : " error"}`}>{msg.text}</p>}
       </section>
+
+      {slots && slots.some((s) => !s.done && s.day >= today) && (postpone ? (
+        <section className="card stack mt-postpone">
+          <b>🗓 Dies que no hi haurà reunions</b>
+          <p className="muted small" style={{ margin: 0 }}>Tria els dies. Totes les reunions pendents d&apos;aquell dia en endavant es mouen, en el mateix ordre, a les franges habituals següents.</p>
+          <div className="mt-pp-days">
+            {[...new Set(slots.filter((s) => !s.done && s.day >= today).map((s) => s.day))].concat(postpone.days).filter((d, i, a) => a.indexOf(d) === i).sort().map((d) => (
+              <button key={d} type="button" className={`chip-btn${postpone.days.includes(d) ? " on" : ""}`} aria-pressed={postpone.days.includes(d)}
+                onClick={() => setPostpone((p) => p && { ...p, days: p.days.includes(d) ? p.days.filter((x) => x !== d) : [...p.days, d] })}>
+                {DOW_NAMES[isoDow(d)].slice(0, 2)} {Number(d.slice(8))}/{Number(d.slice(5, 7))}{d === today ? " · avui" : ""}
+              </button>
+            ))}
+          </div>
+          <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+            <input type="date" value={postpone.extra} min={today} onChange={(e) => setPostpone((p) => p && { ...p, extra: e.target.value })} aria-label="Un altre dia sense reunions" />
+            <button type="button" className="btn small secondary" disabled={!postpone.extra} onClick={() => setPostpone((p) => p && { ...p, days: [...new Set([...p.days, p.extra])], extra: "" })}>+ Afegir dia</button>
+          </div>
+          <label className="check"><input type="checkbox" checked={postpone.onlyTraining} onChange={(e) => setPostpone((p) => p && { ...p, onlyTraining: e.target.checked })} /> Només dies que hi ha entreno a l&apos;app</label>
+          {preview === null && postpone.days.length > 0 && <p className="msg error" style={{ margin: 0 }}>No hi ha prou franges en els propers mesos.</p>}
+          {preview && preview.moved > 0 && (
+            <p className="msg ok" style={{ margin: 0 }}>Es mouran {preview.moved} reunions. Començaran el {fmtShort(preview.insert[0].day)} i l&apos;última serà el {fmtShort(preview.last!)}.{round.published ? " Les jugadores rebran un avís amb el dia nou." : ""}</p>
+          )}
+          <div className="row" style={{ gap: 6 }}>
+            <button type="button" className="btn" disabled={busy || !preview || !preview.moved} onClick={() => void applyPostpone()}>{busy ? "Movent…" : "Moure-les"}</button>
+            <button type="button" className="btn secondary" disabled={busy} onClick={() => setPostpone(null)}>Cancel·lar</button>
+          </div>
+        </section>
+      ) : (
+        <button type="button" className="btn small secondary" style={{ justifySelf: "start" }} onClick={() => setPostpone({ days: [], onlyTraining: true, extra: "" })}>🗓 Ajornar: hi ha dies que no podem fer reunions</button>
+      ))}
 
       {missing.length > 0 && slots && (
         <section className="card">
