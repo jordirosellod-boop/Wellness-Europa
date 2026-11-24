@@ -3781,3 +3781,4 @@ img.pcard-photo, .p-hero-photo img { filter: drop-shadow(0 0 1px rgba(255,238,18
 .mt-pp-days { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-btn { font: inherit; font-size: .85rem; font-weight: 700; border: 1px solid var(--vora); background: #fff; color: var(--navy); border-radius: 99px; padding: 6px 12px; cursor: pointer; }
 .chip-btn.on { background: #b3261e; border-color: #b3261e; color: #fff; text-decoration: line-through; }
+.chip-btn.add.on { background: var(--navy); border-color: var(--navy); color: #fff; text-decoration: none; }

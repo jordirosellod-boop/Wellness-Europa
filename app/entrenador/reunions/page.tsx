@@ -178,7 +178,7 @@ function RoundView({ round, onBack, onChanged }: { round: MeetingRound; onBack: 
   const [title, setTitle] = useState(round.title);
   const [adding, setAdding] = useState<{ day: string; time: string } | null>(null);
   // Ajornar: dies sense reunions (tot el que és pendent es reparteix a les franges habituals següents)
-  const [postpone, setPostpone] = useState<{ days: string[]; onlyTraining: boolean; extra: string } | null>(null);
+  const [postpone, setPostpone] = useState<{ days: string[]; onlyTraining: boolean; extra: string; missed: string[] } | null>(null);
   const [noTraining, setNoTraining] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
@@ -290,7 +290,7 @@ function RoundView({ round, onBack, onChanged }: { round: MeetingRound; onBack: 
   }, [postpone?.onlyTraining, postpone?.days]);
   const preview = useMemo(() => {
     if (!postpone || !slots) return null;
-    return postponePlan(slots, postpone.days, round.duration_min, DEFAULT_WINDOWS, postpone.onlyTraining ? noTraining : new Set());
+    return postponePlan(slots, postpone.days, round.duration_min, DEFAULT_WINDOWS, postpone.onlyTraining ? noTraining : new Set(), new Set(postpone.missed));
   }, [postpone, slots, round.duration_min, noTraining]);
   async function applyPostpone() {
     if (!postpone || !preview || !slots) return;
@@ -369,6 +369,19 @@ function RoundView({ round, onBack, onChanged }: { round: MeetingRound; onBack: 
             <input type="date" value={postpone.extra} min={today} onChange={(e) => setPostpone((p) => p && { ...p, extra: e.target.value })} aria-label="Un altre dia sense reunions" />
             <button type="button" className="btn small secondary" disabled={!postpone.extra} onClick={() => setPostpone((p) => p && { ...p, days: [...new Set([...p.days, p.extra])], extra: "" })}>+ Afegir dia</button>
           </div>
+          {slots.some((s) => !s.done && s.player_id && s.day < today) && (
+            <div className="stack" style={{ gap: 6 }}>
+              <b className="small">Reunions d&apos;abans que no es van fer (toca-les per tornar-les a posar)</b>
+              <div className="mt-pp-days">
+                {slots.filter((s) => !s.done && s.player_id && s.day < today).map((s) => (
+                  <button key={s.id} type="button" className={`chip-btn add${postpone.missed.includes(s.id) ? " on" : ""}`} aria-pressed={postpone.missed.includes(s.id)}
+                    onClick={() => setPostpone((p) => p && { ...p, missed: p.missed.includes(s.id) ? p.missed.filter((x) => x !== s.id) : [...p.missed, s.id] })}>
+                    {byId.get(s.player_id!)?.name ?? "…"} · {Number(s.day.slice(8))}/{Number(s.day.slice(5, 7))}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <label className="check"><input type="checkbox" checked={postpone.onlyTraining} onChange={(e) => setPostpone((p) => p && { ...p, onlyTraining: e.target.checked })} /> Només dies que hi ha entreno a l&apos;app</label>
           {preview === null && postpone.days.length > 0 && <p className="msg error" style={{ margin: 0 }}>No hi ha prou franges en els propers mesos.</p>}
           {preview && preview.moved > 0 && (
@@ -380,7 +393,7 @@ function RoundView({ round, onBack, onChanged }: { round: MeetingRound; onBack: 
           </div>
         </section>
       ) : (
-        <button type="button" className="btn small secondary" style={{ justifySelf: "start" }} onClick={() => setPostpone({ days: [], onlyTraining: true, extra: "" })}>🗓 Ajornar: hi ha dies que no podem fer reunions</button>
+        <button type="button" className="btn small secondary" style={{ justifySelf: "start" }} onClick={() => setPostpone({ days: [], onlyTraining: true, extra: "", missed: [] })}>🗓 Ajornar: hi ha dies que no podem fer reunions</button>
       ))}
 
       {missing.length > 0 && slots && (

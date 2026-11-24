@@ -77,11 +77,12 @@ export async function fetchMyNextMeeting(meId: string, today: string): Promise<(
  * es tornen a repartir, en el mateix ordre, a les franges habituals següents (saltant els dies triats i, si cal, els que no hi ha entreno).
  * Les reunions ja fetes i les d'abans d'aquell dia no es toquen. Funció pura: diu què cal esborrar i què cal crear.
  */
-export function postponePlan(slots: MeetingSlot[], noMeetingDays: string[], minutes: number, windows: Window[] = DEFAULT_WINDOWS, alsoSkip: Set<string> = new Set()) {
+export function postponePlan(slots: MeetingSlot[], noMeetingDays: string[], minutes: number, windows: Window[] = DEFAULT_WINDOWS, alsoSkip: Set<string> = new Set(), missed: Set<string> = new Set()) {
   const days = [...new Set(noMeetingDays)].sort();
   if (!days.length) return null;
   const from = days[0];
-  const moving = slots.filter((s) => !s.done && s.day >= from).sort((a, b) => a.day.localeCompare(b.day) || a.start_time.localeCompare(b.start_time));
+  // Les pendents des d'aquell dia i, si es demana, reunions d'abans que no es van fer (van primer)
+  const moving = slots.filter((s) => !s.done && (s.day >= from || (missed.has(s.id) && s.player_id))).sort((a, b) => a.day.localeCompare(b.day) || a.start_time.localeCompare(b.start_time));
   const order = moving.filter((s) => s.player_id).map((s) => s.player_id!);
   if (!order.length) return { from, remove: moving.map((s) => s.id), insert: [] as { day: string; start_time: string; player_id: string | null }[], moved: 0, last: null as string | null };
   // Hores ocupades per reunions que no es mouen (p. ex. ja fetes): no s'hi pot posar ningú
