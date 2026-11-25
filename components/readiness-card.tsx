@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { loadTeamAcwr } from "@/lib/acwr-data";
 import { MIN_DAYS } from "@/lib/acwr";
@@ -81,7 +82,7 @@ export function ReadinessCard({ today }: { today: string }) {
           ))}
         </div>
       ) : <p className="rd-ok">Totes en verd ✓</p>)}
-      {sel && <p className={`rd-why-line ${sel.r.level}`}><b>{sel.name}:</b> {sel.r.reasons.join(" · ") || LABEL[sel.r.level]}</p>}
+      {sel && <p className={`rd-why-line ${sel.r.level}`}><b>{sel.name}:</b> {sel.r.reasons.join(" · ") || LABEL[sel.r.level]} <Link className="rd-360" href={`/entrenador/jugadora?id=${sel.id}`}>Fitxa 360° ›</Link></p>}
     </section>
   );
 }

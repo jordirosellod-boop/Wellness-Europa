@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { InjuriesAdmin } from "@/components/injuries-admin";
 import { PhotosAdmin } from "@/components/photos-admin";
@@ -170,7 +171,7 @@ function PlayerRow({ player, linkKey, onChange }: { player: Profile; linkKey?: s
 
   return (
     <li>
-      <b>{player.display_name}</b>
+      <div className="row between" style={{ alignItems: "center" }}><b>{player.display_name}</b><Link className="btn small" href={`/entrenador/jugadora?id=${player.id}`}>📊 Fitxa 360°</Link></div>
       <div className="row" style={{ marginTop: 8 }}>
         <button className="btn small" onClick={share} disabled={!linkKey || busy}>Enviar enllaç</button>
         <button className="btn small secondary" onClick={copy} disabled={!linkKey || busy}>Copiar</button>
