@@ -3,7 +3,7 @@ import webpush from "web-push";
 import { createHash, timingSafeEqual } from "node:crypto";
 
 /** Un avís al mòbil. `image`: imatge gran (Android); `tag`: els del mateix tipus se substitueixen. */
-export type PushMsg = { title: string; body: string; url: string; image?: string; tag?: string };
+export type PushMsg = { title: string; body: string; url: string; image?: string; tag?: string; actions?: { action: string; title: string; url: string }[] };
 
 // Només per a codi de servidor (rutes /api): fa servir la clau secreta.
 export function adminClient(): SupabaseClient {

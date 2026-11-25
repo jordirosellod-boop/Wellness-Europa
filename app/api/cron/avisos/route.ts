@@ -202,7 +202,7 @@ async function rpeReminder(db: SupabaseClient, today: string): Promise<number | 
   const done = new Set(rpe.map(key));
   const skip = new Set([...att, ...notices].map(key));
   const missing = players.filter((p) => ids.some((sid) => !done.has(`${sid}:${p.id}`) && !skip.has(`${sid}:${p.id}`))).map((p) => p.id);
-  return pushTo(db, missing, { title: "⏰ Et falta l'RPE d'avui", body: "Tens fins a les 00:00 per omplir-lo. Només et costarà un minut!", url: "/j?s=avui" });
+  return pushTo(db, missing, { title: "⏰ Et falta l'RPE d'avui", body: "Tens fins a les 00:00 per omplir-lo. Només et costarà un minut!", url: "/j?s=avui", actions: [{ action: "fill", title: "📝 Omplir ara", url: "/j?s=avui" }] });
 }
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : null);

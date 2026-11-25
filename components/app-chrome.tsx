@@ -81,3 +81,25 @@ export function OfflineBanner() {
     </div>
   );
 }
+
+/**
+ * Guarda l'app al mòbil (service worker) perquè s'obri a l'instant. Si després d'una versió nova falta algun tros
+ * de l'app vella, es recarrega un sol cop per agafar la nova.
+ */
+export function AppServiceWorker() {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+    const reloadOnce = (msg: string) => {
+      if (!/ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg)) return;
+      try { if (sessionStorage.getItem("chunk-reload")) return; sessionStorage.setItem("chunk-reload", "1"); } catch { return; }
+      window.location.reload();
+    };
+    const onErr = (e: ErrorEvent) => reloadOnce(`${e.message} ${e.error?.name ?? ""}`);
+    const onRej = (e: PromiseRejectionEvent) => reloadOnce(`${e.reason?.message ?? e.reason} ${e.reason?.name ?? ""}`);
+    window.addEventListener("error", onErr);
+    window.addEventListener("unhandledrejection", onRej);
+    return () => { window.removeEventListener("error", onErr); window.removeEventListener("unhandledrejection", onRej); };
+  }, []);
+  return null;
+}

@@ -1,4 +1,4 @@
-import { OfflineBanner, PullToRefresh } from "@/components/app-chrome";
+import { AppServiceWorker, OfflineBanner, PullToRefresh } from "@/components/app-chrome";
 import { CompactTitle, HapticTouches, HideNavOnScroll, ShakeCrests, SwipeNav, UndoToast } from "@/components/feel";
 import { LivePill } from "@/components/live-pill";
 import type { Metadata, Viewport } from "next";
@@ -78,6 +78,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         {children}
         <PullToRefresh />
+        <AppServiceWorker />
         <OfflineBanner />
         <HapticTouches />
         <HideNavOnScroll />

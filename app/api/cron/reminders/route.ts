@@ -39,7 +39,8 @@ export async function POST(req: Request) {
   const payload = JSON.stringify({
     title: "Juvenil C 2026/2027",
     body: "Bon dia! Avui hi ha entrenament: omple el wellness abans de les 14:00.",
-    url: "/j",
+    url: "/j?s=avui",
+    actions: [{ action: "fill", title: "📝 Omplir ara", url: "/j?s=avui" }],
   });
 
   let sent = 0;

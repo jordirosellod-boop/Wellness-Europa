@@ -25,6 +25,7 @@ export async function POST(req: Request) {
       title: "Convocatòria penjada",
       body: `Partit contra ${c.rival} · ${day}${c.kickoff ? ` a les ${String(c.kickoff).slice(0, 5)}` : ""}. Entra a veure-la!`,
       url: "/j?s=convo",
+      actions: [{ action: "see", title: "👀 Veure-la", url: "/j?s=convo" }, { action: "cal", title: "📅 Calendari", url: "/j?s=calendari" }],
     });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });

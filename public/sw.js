@@ -1,4 +1,47 @@
-// Service worker: només mostra els recordatoris i obre l'app quan es toquen.
+// Service worker: (1) guarda l'app al mòbil perquè s'obri a l'instant encara que hi hagi poca cobertura,
+// (2) mostra els avisos (amb botons) i obre l'app quan es toquen.
+// Només es guarda l'app (pàgines i fitxers), MAI les dades (wellness, salut…): les dades sempre venen d'internet.
+
+const STATIC = "static-v1", PAGES = "pages-v1";
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => ![STATIC, PAGES].includes(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+});
+
+const isStatic = (u) => u.pathname.startsWith("/_next/static/") || /\.(?:png|webp|jpg|svg|ico|ttf|woff2?)$/i.test(u.pathname);
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET" || req.headers.has("range")) return;
+  const u = new URL(req.url);
+  if (u.origin !== self.location.origin || u.pathname.startsWith("/api/")) return;
+  // Fitxers amb el nom canviant (no canvien mai): del mòbil primer
+  if (isStatic(u)) {
+    event.respondWith(caches.open(STATIC).then(async (c) => {
+      const hit = await c.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) c.put(req, res.clone()).catch(() => {});
+      return res;
+    }));
+    return;
+  }
+  // Pàgines: si internet respon de pressa, la versió nova; si va lent o no n'hi ha, la guardada (a l'instant)
+  if (req.mode === "navigate") {
+    event.respondWith((async () => {
+      const c = await caches.open(PAGES);
+      const key = u.origin + u.pathname; // sense ?s= ni #: la mateixa pàgina
+      const net = fetch(req).then((res) => { if (res.ok && res.type === "basic") c.put(key, res.clone()).catch(() => {}); return res; });
+      const cached = await c.match(key);
+      if (!cached) return net;
+      const slow = new Promise((ok) => setTimeout(() => ok(null), 1500));
+      const first = await Promise.race([net.catch(() => null), slow]);
+      return first || cached;
+    })());
+  }
+});
+
+
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
@@ -18,14 +61,18 @@ self.addEventListener("push", (event) => {
       renotify: true,
       vibrate: [60, 40, 60],
       timestamp: Date.now(),
-      data: { url: data.url || "/j" },
+      // Botons (Android): p. ex. «📝 Omplir ara»
+      ...(Array.isArray(data.actions) && data.actions.length ? { actions: data.actions.slice(0, 2).map((a) => ({ action: String(a.action), title: String(a.title) })) } : {}),
+      data: { url: data.url || "/j", actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : [] },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/j";
+  const d = event.notification.data || {};
+  const act = event.action && Array.isArray(d.actions) ? d.actions.find((a) => a.action === event.action) : null;
+  const url = (act && typeof act.url === "string" && act.url.startsWith("/") ? act.url : d.url) || "/j";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       const target = new URL(url, self.location.origin);
