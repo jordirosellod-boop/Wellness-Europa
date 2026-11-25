@@ -9,6 +9,23 @@ import { castVote, fetchMyVote, fetchWinners, type MvpWinner } from "@/lib/mvp";
 import { supabase } from "@/lib/supabase";
 import type { Convocation, RosterRow } from "@/lib/convo";
 
+// Les MVP de l'últim partit (fins a 8 dies després): porten corona a tot arreu. Es demana un sol cop per pàgina.
+let mvpIds: Promise<Set<string>> | null = null;
+export function useMvpIds(): Set<string> {
+  const [ids, setIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let alive = true;
+    mvpIds ??= fetchWinners().then((all) => {
+      const recent = all.filter((w) => Date.now() - Date.parse(`${w.match_date}T12:00:00Z`) < 8 * 86_400_000);
+      const last = recent.map((w) => w.match_date).sort().at(-1);
+      return new Set(recent.filter((w) => w.match_date === last).map((w) => w.player_id));
+    }).catch(() => new Set<string>());
+    mvpIds.then((s) => alive && setIds(s), () => {});
+    return () => { alive = false; };
+  }, []);
+  return ids;
+}
+
 /** Jugadora convocada: votar la MVP del partit (un vot, secret). */
 export function MvpVoteCard({ meId, today }: { meId: string; today: string }) {
   const [v, setV] = useState<{ c: Convocation; mates: RosterRow[]; voted: boolean } | null>(null);

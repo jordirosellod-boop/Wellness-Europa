@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchAttendance, fetchSessionsBetween } from "@/lib/attendance";
 import { addDays, isoDow, startOfWeek } from "@/lib/dates";
 import { fetchAll, supabase } from "@/lib/supabase";
+import { Num } from "@/components/count-up";
 
 type Week = { from: string; to: string; trained: number; trainings: number; wellAvg: number | null; wellDone: number; sessions: number; minutes: number; matches: number };
 
@@ -58,7 +59,7 @@ export function WeekSummaryCard({ meId, today }: { meId: string; today: string }
       <div className="wk-sum-h"><b>📊 La teva setmana</b><small>{dm(w.from)} – {dm(w.to)}</small></div>
       <div className="wk-sum-tiles">
         {tiles.map(([v, l, k], i) => (
-          <div key={k} style={{ ["--d" as string]: `${i * 0.06}s` }}><b>{v}</b><small>{l}</small></div>
+          <div key={k} style={{ ["--d" as string]: `${i * 0.06}s` }}><b><Num text={v} /></b><small>{l}</small></div>
         ))}
       </div>
       <p className="wk-sum-line">{line}</p>

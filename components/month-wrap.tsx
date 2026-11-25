@@ -8,7 +8,7 @@ import { fetchActionCutout } from "@/lib/player-photos";
 const SLIDE_MS = 5500;
 
 /** Número que puja des de 0 (en mig segon) quan apareix la diapositiva. */
-function CountUp({ to, decimals = 0 }: { to: number; decimals?: number }) {
+export function CountUp({ to, decimals = 0 }: { to: number; decimals?: number }) {
   const [v, setV] = useState(0);
   useEffect(() => {
     // Amb «menys moviment», arriba al número de cop.
@@ -26,7 +26,7 @@ function CountUp({ to, decimals = 0 }: { to: number; decimals?: number }) {
   return <>{v.toFixed(decimals).replace(".", ",")}</>;
 }
 
-type Slide = { key: string; cls: string; body: ReactNode; party?: boolean };
+export type Slide = { key: string; cls: string; body: ReactNode; party?: boolean };
 
 function slidesOf(w: MonthWrap, name: string, cutout: string | null): Slide[] {
   const out: Slide[] = [];
@@ -146,11 +146,6 @@ function slidesOf(w: MonthWrap, name: string, cutout: string | null): Slide[] {
 export function MonthStories({ meId, name, day, today, onClose }: { meId: string; name: string; day: string; today: string; onClose: () => void }) {
   const [w, setW] = useState<MonthWrap | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [i, setI] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [party, setParty] = useState(false);
-  const closeRef = useRef<HTMLButtonElement>(null);
-
   const [cutout, setCutout] = useState<string | null>(null);
   useEffect(() => {
     fetchMonthWrap(meId, day, today).then(setW, (e) => setErr(e instanceof Error ? e.message : String(e)));
@@ -160,21 +155,27 @@ export function MonthStories({ meId, name, day, today, onClose }: { meId: string
     fetchActionCutout(meId).then((x) => alive && setCutout(x), () => {});
     return () => { alive = false; };
   }, [meId]);
+  return <Stories slides={w ? slidesOf(w, name, cutout) : null} label={w ? `El teu ${w.name}` : "El teu mes"} loading="Preparant el teu mes…" err={err} onClose={onClose} />;
+}
 
-  const slides = w ? slidesOf(w, name, cutout) : [];
+/** Diapositives a pantalla completa: avancen soles, toc a la dreta/esquerra, confeti a les de celebració. */
+export function Stories({ slides: given, label, loading, err, onClose, footer }: { slides: Slide[] | null; label: string; loading: string; err: string | null; onClose: () => void; footer?: ReactNode }) {
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [party, setParty] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const slides = given ?? [];
   const n = slides.length;
   const next = useCallback(() => setI((x) => (x + 1 < n ? x + 1 : x)), [n]);
   const prev = () => setI((x) => Math.max(0, x - 1));
   const last = n > 0 && i === n - 1;
 
-  // Avança sol; a l'última s'atura.
   useEffect(() => {
     if (!n || paused || last) return;
     const t = setTimeout(next, SLIDE_MS);
     return () => clearTimeout(t);
   }, [i, n, paused, last, next]);
 
-  // Confeti en entrar a una diapositiva de celebració (un cop per diapositiva).
   const isParty = !!slides[i]?.party;
   useEffect(() => {
     if (!isParty) return;
@@ -197,7 +198,7 @@ export function MonthStories({ meId, name, day, today, onClose }: { meId: string
 
   const s = slides[i];
   return (
-    <div className={`mw ${s?.cls ?? "s-intro"}`} role="dialog" aria-modal="true" aria-label={w ? `El teu ${w.name}` : "El teu mes"}>
+    <div className={`mw ${s?.cls ?? "s-intro"}`} role="dialog" aria-modal="true" aria-label={label}>
       {party && <Confetti onDone={() => setParty(false)} />}
       <div className="mw-bars" aria-hidden="true">
         {slides.map((x, k) => (
@@ -205,7 +206,7 @@ export function MonthStories({ meId, name, day, today, onClose }: { meId: string
         ))}
       </div>
       <button ref={closeRef} type="button" className="mw-close" onClick={onClose} aria-label="Tancar">✕</button>
-      {!w && !err && <div className="mw-slide"><span className="mw-k">Preparant el teu mes…</span></div>}
+      {!given && !err && <div className="mw-slide"><span className="mw-k">{loading}</span></div>}
       {err && <div className="mw-slide"><p className="mw-p">No s&apos;ha pogut carregar: {err}</p></div>}
       {s && (
         <div
@@ -220,10 +221,11 @@ export function MonthStories({ meId, name, day, today, onClose }: { meId: string
           onPointerLeave={() => setPaused(false)}
         >
           {s.body}
+          {last && footer}
           {last && <button type="button" className="btn mw-again" onClick={(e) => { e.stopPropagation(); setI(0); }} onPointerUp={(e) => e.stopPropagation()}>↺ Tornar-ho a veure</button>}
         </div>
       )}
-      <span className="sr-only" aria-live="polite">{w ? `Diapositiva ${i + 1} de ${n}` : ""}</span>
+      <span className="sr-only" aria-live="polite">{given ? `Diapositiva ${i + 1} de ${n}` : ""}</span>
     </div>
   );
 }

@@ -57,15 +57,25 @@ export function AttackDefense({ teams, usId, selId, onPick }: { teams: TeamStat[
 
 /** Evolució de la posició jornada a jornada (nosaltres en blau, l'equip triat en ocre, la resta en gris). */
 export function PositionRace({ teams, usId, selId }: { teams: TeamStat[]; usId?: string; selId?: string | null }) {
+  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
   const js = [...new Set(teams.flatMap((t) => t.posHistory.map((p) => p.j)))].sort((a, b) => a - b);
   const n = teams.length;
   const W = 640, H = 340, L = 30, R = 120, T = 14, B = 30;
   const x = (j: number) => (js.length <= 1 ? (L + W - R) / 2 : L + ((js.indexOf(j)) / (js.length - 1)) * (W - L - R));
   const y = (pos: number) => T + ((pos - 1) / Math.max(1, n - 1)) * (H - T - B);
   const order = [...teams].sort((a, b) => Number(a.id === usId || a.id === selId) - Number(b.id === usId || b.id === selId));
+  const us = teams.find((t) => t.id === usId);
   return (
-    <figure className="bd-chart">
+    <figure className="bd-chart bd-race" onPointerLeave={() => setTip(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Evolució de la posició a la classificació">
+        <defs>
+          {/* Degradat daurat sota la nostra línia i resplendor del darrer punt */}
+          <linearGradient id="race-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#dbb34d" stopOpacity=".35" />
+            <stop offset="1" stopColor="#dbb34d" stopOpacity="0" />
+          </linearGradient>
+          <filter id="race-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" /></filter>
+        </defs>
         {Array.from({ length: n }, (_, i) => i + 1).filter((p) => p === 1 || p % 3 === 0 || p === n).map((p) => (
           <g key={p}>
             <line x1={L} x2={W - R} y1={y(p)} y2={y(p)} stroke={GRID} />
@@ -73,6 +83,10 @@ export function PositionRace({ teams, usId, selId }: { teams: TeamStat[]; usId?:
           </g>
         ))}
         {js.map((j) => <text key={j} x={x(j)} y={H - 8} textAnchor="middle" fontSize={11} fill={MUTED}>J{j}</text>)}
+        {us && us.posHistory.length > 1 && (
+          <polygon className="race-area" fill="url(#race-area)"
+            points={`${x(us.posHistory[0].j)},${H - B} ${us.posHistory.map((p) => `${x(p.j)},${y(p.pos)}`).join(" ")} ${x(us.posHistory[us.posHistory.length - 1].j)},${H - B}`} />
+        )}
         {order.map((t) => {
           const c = t.id === usId ? C_US : t.id === selId ? C_SEL : C_CTX;
           const strong = c !== C_CTX;
@@ -80,16 +94,30 @@ export function PositionRace({ teams, usId, selId }: { teams: TeamStat[]; usId?:
           const last = t.posHistory[t.posHistory.length - 1];
           return (
             <g key={t.id}>
-              <polyline points={pts} fill="none" stroke={c} strokeWidth={strong ? 3 : 1.5} strokeLinejoin="round" strokeLinecap="round" />
+              <polyline className={strong ? "race-line" : undefined} points={pts} fill="none" stroke={c} strokeWidth={strong ? 3 : 1.5} strokeLinejoin="round" strokeLinecap="round" pathLength={1} />
               {t.posHistory.map((p) => (
-                <circle key={p.j} cx={x(p.j)} cy={y(p.pos)} r={strong ? 5 : 3} fill={c} stroke="#fff" strokeWidth={2}>
+                <circle key={p.j} cx={x(p.j)} cy={y(p.pos)} r={strong ? 5 : 3} fill={c} stroke="#fff" strokeWidth={2}
+                  onPointerEnter={() => setTip({ x: x(p.j), y: y(p.pos), text: `${t.name.slice(0, 18)} · J${p.j}: ${p.pos}a` })}
+                  onClick={() => setTip({ x: x(p.j), y: y(p.pos), text: `${t.name.slice(0, 18)} · J${p.j}: ${p.pos}a` })}>
                   <title>{`${t.name} · J${p.j}: ${p.pos}a`}</title>
                 </circle>
               ))}
+              {last && t.id === usId && (
+                <g className="race-end">
+                  <circle cx={x(last.j)} cy={y(last.pos)} r={11} fill={C_US} opacity={0.45} filter="url(#race-glow)" />
+                  <circle cx={x(last.j)} cy={y(last.pos)} r={6} fill="#dbb34d" stroke="#fff" strokeWidth={2.5} />
+                </g>
+              )}
               {last && strong && <text x={W - R + 8} y={y(last.pos) + 4} fontSize={12} fontWeight={700} fill={INK}>{t.name.slice(0, 16)}</text>}
             </g>
           );
         })}
+        {tip && (
+          <g className="race-tip" transform={`translate(${Math.min(W - R - 70, Math.max(L + 70, tip.x))} ${Math.max(28, tip.y - 14)})`} pointerEvents="none">
+            <rect x={-72} y={-24} width={144} height={22} rx={11} fill={INK} />
+            <text x={0} y={-9} textAnchor="middle" fontSize={11} fontWeight={700} fill="#fff">{tip.text}</text>
+          </g>
+        )}
       </svg>
       <figcaption className="bd-legend"><i style={{ background: C_US }} /> Nosaltres {selId && selId !== usId && <><i style={{ background: C_SEL }} /> Equip triat</>} <i style={{ background: C_CTX }} /> Resta</figcaption>
     </figure>

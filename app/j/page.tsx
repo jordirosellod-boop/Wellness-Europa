@@ -65,6 +65,8 @@ import { ClubIcon } from "@/components/club-icons";
 import { Welcome } from "@/components/welcome";
 import { MvpReveal, MvpVoteCard } from "@/components/mvp";
 import { WeekSummaryCard } from "@/components/week-summary";
+import { WellnessTrend } from "@/components/wellness-trend";
+import { SeasonWrapButton } from "@/components/season-wrap";
 
 type State =
   | { kind: "loading" }
@@ -310,6 +312,7 @@ function PlayerHome({ me }: { me: Profile }) {
           <h1>El meu cromo</h1>
           <PlayerCard meId={me.id} name={me.display_name} today={today} />
           <MyMonthButton meId={me.id} name={me.display_name} today={today} />
+          <SeasonWrapButton meId={me.id} name={me.display_name} today={today} />
         </>
       )}
 
@@ -592,6 +595,7 @@ function Dashboard({
       {error && <p className="msg error">{error}</p>}
 
       <MonthWrapBanner meId={me.id} name={me.display_name} today={today} />
+      <SeasonWrapButton meId={me.id} name={me.display_name} today={today} home />
       <SplashMatchSaver today={today} />
 
       <ResultCard today={today} meId={me.id} name={me.display_name} />
@@ -636,6 +640,7 @@ function Dashboard({
       )}
 
       {data?.streak != null && <StreakCard meId={me.id} n={data.streak} />}
+      <WellnessTrend meId={me.id} today={today} />
 
       <MeetingCard meId={me.id} today={today} />
       <BibsCard meId={me.id} today={today} />

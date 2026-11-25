@@ -7,6 +7,7 @@ import { Shirt, useDorsals } from "@/components/shirt";
 import type { RosterRow } from "@/lib/convo";
 import { fetchActionCutout, fetchThumbs } from "@/lib/player-photos";
 import { transition } from "@/lib/vt";
+import { useMvpIds } from "@/components/mvp";
 
 /** Dorsal amb la tipografia de samarreta (les fletxes ja formen part de la lletra). */
 export function KitNumber({ n }: { n: number | null }) {
@@ -19,6 +20,7 @@ export type GridRow = Pick<RosterRow, "player_id" | "display_name" | "dorsal" | 
 export function PlayerGrid({ rows, meId }: { rows: GridRow[]; meId?: string }) {
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
   const dorsals = useDorsals();
+  const mvp = useMvpIds();
   useEffect(() => {
     let alive = true;
     fetchThumbs().then((m) => alive && setThumbs(m), () => {});
@@ -80,7 +82,7 @@ export function PlayerGrid({ rows, meId }: { rows: GridRow[]; meId?: string }) {
             </div>
             <div className="cv-foot">
               <span className="sr-only">{r.dorsal == null ? "Sense dorsal" : `Dorsal ${r.dorsal}`}</span>
-              <span className="kit-name">{r.display_name}</span>
+              <span className="kit-name">{mvp.has(r.player_id) && <span className="mvp-crown" title="MVP de l'últim partit">👑</span>}{r.display_name}</span>
             </div>
             {r.origin && <span className="kit-origin">{r.origin}</span>}
           </li>

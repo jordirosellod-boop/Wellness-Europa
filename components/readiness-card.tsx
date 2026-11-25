@@ -6,6 +6,7 @@ import { MIN_DAYS } from "@/lib/acwr";
 import { addDays } from "@/lib/dates";
 import { LEVEL_ORDER, readinessOf, type Level, type Readiness, type WellRow } from "@/lib/readiness";
 import { fetchAll, supabase } from "@/lib/supabase";
+import { useMvpIds } from "@/components/mvp";
 
 type Row = { id: string; name: string; r: Readiness };
 const LABEL: Record<Level, string> = { red: "Vigilar", yellow: "Atenció", none: "Pendent", away: "No ve", green: "Bé" };
@@ -46,6 +47,7 @@ export function ReadinessCard({ today }: { today: string }) {
   const [data, setData] = useState<{ rows: Row[]; training: boolean } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const mvp = useMvpIds();
   const [showGreen, setShowGreen] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -74,7 +76,7 @@ export function ReadinessCard({ today }: { today: string }) {
         <div className="rd-chips">
           {chips.map((x) => (
             <button key={x.id} type="button" className={`rd-chip ${x.r.level}${open === x.id ? " on" : ""}`} onClick={() => setOpen(open === x.id ? null : x.id)}>
-              <i aria-hidden="true" />{x.name.split(" ")[0]}{x.r.trend ? " 📉" : ""}
+              <i aria-hidden="true" />{mvp.has(x.id) ? "👑 " : ""}{x.name.split(" ")[0]}{x.r.trend ? " 📉" : ""}
             </button>
           ))}
         </div>

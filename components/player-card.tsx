@@ -12,6 +12,8 @@ import { fetchActionCutout } from "@/lib/player-photos";
 import { drawCardStory } from "@/lib/player-stories";
 import { StoryCard } from "@/components/convo-story";
 import { CardBack } from "@/components/card-back";
+import { Num } from "@/components/count-up";
+import { useMvpIds } from "@/components/mvp";
 import { Trophies } from "@/components/trophies";
 import { drawWallpaper } from "@/lib/wallpaper";
 
@@ -150,6 +152,7 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
     ["ENT", d.attendance == null ? "–" : `${d.attendance}%`], ["🔥", String(d.streak)], ["LLI", d.league == null ? "–" : `#${d.league}`],
   ] : [];
   const [first, ...rest] = name.trim().split(/\s+/);
+  const isMvp = useMvpIds().has(meId);
 
   return (
     <>
@@ -163,7 +166,7 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
           {d && (
             <dl className="p-hero-stats">
               {([["PJ", d.matches], ["TIT", d.starts], ["GOL", d.goals], ["ENT", d.attendance == null ? "–" : `${d.attendance}%`]] as [string, string | number][]).map(([k, v]) => (
-                <div key={k}><dd>{v}</dd><dt>{k}</dt></div>
+                <div key={k}><dd><Num text={v} /></dd><dt>{k}</dt></div>
               ))}
             </dl>
           )}
@@ -182,8 +185,9 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
         role="button" tabIndex={0} aria-pressed={flipped} aria-label={flipped ? "Girar el cromo (davant)" : "Girar el cromo (la temporada)"}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setFlipped((f) => !f); } }}>
       <div className="pcard-inner">
-      <div ref={ref} className={`pcard ${tier} ${kitFont.variable}${d ? "" : " loading"}${cutout ? " has-photo" : ""}`} onPointerDown={askGyro} onPointerMove={tilt} onPointerLeave={reset} onPointerUp={reset} onPointerCancel={reset}>
+      <div ref={ref} className={`pcard ${tier} ${kitFont.variable}${d ? "" : " loading"}${cutout ? " has-photo" : ""}${isMvp ? " is-mvp" : ""}`} onPointerDown={askGyro} onPointerMove={tilt} onPointerLeave={reset} onPointerUp={reset} onPointerCancel={reset}>
         <div className="pcard-holo" aria-hidden="true" />
+        {isMvp && <span className="mvp-badge" title="MVP de l'últim partit">👑 MVP</span>}
         <div className="pcard-glare" aria-hidden="true" />
         <div className="pcard-top">
           <span className="pcard-num">{d?.dorsal ?? "–"}</span>
@@ -202,7 +206,7 @@ export function PlayerCard({ meId, name, today }: { meId: string; name: string; 
         )}
         <div className="pcard-name"><b>{first}</b>{rest.length > 0 && <span>{rest.join(" ")}</span>}</div>
         <dl className="pcard-stats">
-          {stats.map(([k, v]) => (<div key={k}><dd>{v}</dd><dt>{k}</dt></div>))}
+          {stats.map(([k, v]) => (<div key={k}><dd><Num text={v} /></dd><dt>{k}</dt></div>))}
         </dl>
       </div>
       <div className={`pcard pcard-back ${tier}`} aria-hidden={!flipped}>

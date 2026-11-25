@@ -3782,3 +3782,40 @@ img.pcard-photo, .p-hero-photo img { filter: drop-shadow(0 0 1px rgba(255,238,18
 .chip-btn { font: inherit; font-size: .85rem; font-weight: 700; border: 1px solid var(--vora); background: #fff; color: var(--navy); border-radius: 99px; padding: 6px 12px; cursor: pointer; }
 .chip-btn.on { background: #b3261e; border-color: #b3261e; color: #fff; text-decoration: line-through; }
 .chip-btn.add.on { background: var(--navy); border-color: var(--navy); color: #fff; text-decoration: none; }
+
+/* Números que pugen: petit rebot en arribar */
+.count-up { display: inline-block; font-variant-numeric: tabular-nums; }
+.count-up.landed { animation: cu-land .35s cubic-bezier(.3,1.6,.5,1); }
+@keyframes cu-land { 40% { transform: scale(1.14); } }
+/* MVP: corona i marc daurat */
+.mvp-crown { margin-right: 4px; display: inline-block; animation: crown-bob 2.4s ease-in-out infinite; }
+@keyframes crown-bob { 50% { transform: translateY(-2px) rotate(-6deg); } }
+.convo-grid li:has(.mvp-crown) { box-shadow: 0 0 0 3px #dbb34d, 0 8px 22px rgba(219,179,77,.35); border-radius: 14px; }
+.pcard.is-mvp { box-shadow: 0 0 0 3px #f6d77a, 0 18px 40px rgba(219,179,77,.45); }
+.mvp-badge { position: absolute; z-index: 4; top: 10px; left: 50%; translate: -50% 0; font-family: var(--display); font-size: .8rem; letter-spacing: .1em; padding: 3px 10px; border-radius: 99px;
+  background: linear-gradient(135deg, #f6e3a8, #dbb34d 60%, #c79a2e); color: #0b1846; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+@media (prefers-reduced-motion: reduce) { .count-up.landed, .mvp-crown { animation: none; } }
+/* Gràfic de la classificació: la nostra línia es dibuixa i l'últim punt brilla */
+.bd-race .race-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: race-draw 1.4s cubic-bezier(.2,.7,.2,1) .1s forwards; }
+@keyframes race-draw { to { stroke-dashoffset: 0; } }
+.bd-race .race-area { opacity: 0; animation: fade-in .8s ease .9s forwards; }
+.bd-race .race-end circle:first-child { animation: race-pulse 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes race-pulse { 50% { transform: scale(1.5); opacity: .15; } }
+@keyframes fade-in { to { opacity: 1; } }
+.bd-race circle { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .bd-race .race-line { animation: none; stroke-dashoffset: 0; } .bd-race .race-area { animation: none; opacity: 1; } .bd-race .race-end circle { animation: none; } }
+/* El teu wellness (gràfic) */
+.wt-card { background: linear-gradient(160deg, #0b1846, #12307f); color: #fff; border: 0; }
+.wt-head { display: flex; justify-content: space-between; align-items: baseline; }
+.wt-head b { font-family: var(--display); font-weight: 400; font-size: 1.2rem; letter-spacing: .03em; }
+.wt-trend { font-size: .8rem; font-weight: 700; color: #c9d5ff; background: rgba(255,255,255,.1); padding: 2px 10px; border-radius: 99px; }
+.wt-trend.up { color: #9be7a6; } .wt-trend.down { color: #ffb4a8; }
+.wt-chart { display: block; width: 100%; height: auto; margin-top: 6px; color: #fff; overflow: visible; }
+.wt-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: race-draw 1.3s cubic-bezier(.2,.7,.2,1) .15s forwards; }
+.wt-area { opacity: 0; animation: fade-in .8s ease .8s forwards; }
+.wt-glow { animation: race-pulse 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.wt-foot { margin: 4px 0 0; font-size: .85rem; color: #d8e1ff; }
+@media (prefers-reduced-motion: reduce) { .wt-line { animation: none; stroke-dashoffset: 0; } .wt-area { animation: none; opacity: 1; } .wt-glow { animation: none; } }
+/* La teva temporada */
+.mw-banner.season { background: linear-gradient(135deg, #0b1846, #12307f 60%, #8a6412); }
+.mw-share { margin-top: 18px; background: linear-gradient(135deg, #f9ce34, #ee2a7b 55%, #6228d7); color: #fff; border: 0; }
