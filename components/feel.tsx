@@ -27,7 +27,7 @@ export function Ticked({ text }: { text: string }) {
 export function HapticTouches() {
   useEffect(() => {
     const on = (e: Event) => {
-      const el = (e.target as HTMLElement | null)?.closest?.("button.btn:not(.secondary):not(:disabled), [data-haptic], .scale button, .tag-btn, .roll-btn, .ml-p");
+      const el = (e.target as HTMLElement | null)?.closest?.("button.btn:not(.secondary):not(:disabled), [data-haptic], .scale button, .tag-btn, .roll-btn, .ml-p, .toggle button, .seg-toggle button, .tabs button, .weekdays button, .bottom-nav button, .chip-btn, .mvp-grid button");
       if (el) haptic();
     };
     document.addEventListener("click", on, true);
@@ -49,6 +49,30 @@ export function HapticTouches() {
     };
     document.addEventListener("pointerdown", down, true);
     return () => { document.removeEventListener("click", on, true); document.removeEventListener("pointerdown", down, true); };
+  }, []);
+  return null;
+}
+
+/** La barra de baix s'amaga quan baixes llegint i torna en pujar (com a les apps). */
+export function HideNavOnScroll() {
+  useEffect(() => {
+    let last = window.scrollY, acc = 0, raf = 0;
+    const set = (hide: boolean) => document.documentElement.classList.toggle("nav-hidden", hide);
+    const on = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const y = window.scrollY, d = y - last;
+        last = y;
+        if (y < 80) { acc = 0; return set(false); }
+        acc = Math.sign(d) === Math.sign(acc) ? acc + d : d;
+        if (acc > 40) set(true);
+        else if (acc < -24) set(false);
+        // A baix de tot, sempre visible
+        if (window.innerHeight + y >= document.documentElement.scrollHeight - 4) set(false);
+      });
+    };
+    window.addEventListener("scroll", on, { passive: true });
+    return () => { window.removeEventListener("scroll", on); cancelAnimationFrame(raf); set(false); };
   }, []);
   return null;
 }

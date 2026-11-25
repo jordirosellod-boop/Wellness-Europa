@@ -3819,3 +3819,10 @@ img.pcard-photo, .p-hero-photo img { filter: drop-shadow(0 0 1px rgba(255,238,18
 /* La teva temporada */
 .mw-banner.season { background: linear-gradient(135deg, #0b1846, #12307f 60%, #8a6412); }
 .mw-share { margin-top: 18px; background: linear-gradient(135deg, #f9ce34, #ee2a7b 55%, #6228d7); color: #fff; border: 0; }
+
+/* Microdetalls: la barra de baix s'amaga en baixar; els botons tornen amb un petit rebot */
+.bottom-nav { transition: transform .32s cubic-bezier(.2,.8,.2,1); }
+html.nav-hidden .bottom-nav { transform: translateY(calc(100% + 12px)); }
+.btn, .tabs button, .toggle button, .seg-toggle button, .scale button, .chip-btn, .tag-btn { transition: transform .28s cubic-bezier(.3,1.6,.5,1), background-color .2s ease, color .2s ease, box-shadow .2s ease; }
+.btn:not(:disabled):active, .seg-toggle button:active, .chip-btn:active { transform: scale(.95); transition-duration: .06s; }
+@media (prefers-reduced-motion: reduce) { .bottom-nav { transition: none; } }

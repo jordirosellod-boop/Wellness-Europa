@@ -1,5 +1,5 @@
 import { OfflineBanner, PullToRefresh } from "@/components/app-chrome";
-import { CompactTitle, HapticTouches, ShakeCrests, SwipeNav, UndoToast } from "@/components/feel";
+import { CompactTitle, HapticTouches, HideNavOnScroll, ShakeCrests, SwipeNav, UndoToast } from "@/components/feel";
 import { LivePill } from "@/components/live-pill";
 import type { Metadata, Viewport } from "next";
 import { Anton, Poppins } from "next/font/google";
@@ -80,6 +80,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <PullToRefresh />
         <OfflineBanner />
         <HapticTouches />
+        <HideNavOnScroll />
         <SwipeNav />
         <LivePill />
         <ShakeCrests />
